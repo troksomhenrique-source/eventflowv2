@@ -1,3 +1,10 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="EventFlow — ERP e CRM para locadora de eventos.">
 <title>EventFlow</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -127,6 +134,8 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+</head>
+<body>
 <style>
 /* ---------- kanban ---------- */
 .kb{display:grid;grid-template-columns:repeat(4,minmax(232px,1fr));gap:12px;overflow-x:auto;padding-bottom:4px}
@@ -225,6 +234,18 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .modes{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);padding:2px;gap:2px}
 .modes button{background:none;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-family:var(--disp);font-size:11.5px;font-weight:600;color:var(--ink2)}
 .modes button.on{background:var(--accent);color:var(--onAccent)}
+.authwrap{min-height:100dvh;display:grid;place-items:center;padding:24px 16px;background:var(--bg)}
+.authcard{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.authcard .brandline{display:flex;align-items:center;gap:10px;padding:20px 22px 0}
+.authcard .brandline .mk{width:30px;height:30px;border-radius:7px;background:var(--accent);display:grid;place-items:center}
+.authcard .brandline b{font-family:var(--disp);font-size:17px;font-weight:700;letter-spacing:-.02em}
+.authcard form{padding:18px 22px 22px;display:grid;gap:12px}
+.authcard h2{font-size:14px;font-weight:600;margin-top:4px}
+.authcard p.sub{margin:0;font-size:12.5px;color:var(--ink3);line-height:1.5}
+.authcard .erro{background:var(--critSoft);color:var(--crit);border:1px solid color-mix(in srgb,var(--crit) 30%,transparent);border-radius:var(--r2);padding:9px 11px;font-size:12.5px}
+.authcard .ok{background:var(--okSoft);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 30%,transparent);border-radius:var(--r2);padding:9px 11px;font-size:12.5px}
+.authcard footer{border-top:1px solid var(--line2);background:var(--surface2);padding:12px 22px;font-size:11.5px;color:var(--ink3);line-height:1.5}
+.carregando{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:200;font-family:var(--disp);font-size:13px;color:var(--ink2);gap:10px}
 .flex{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .between{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .sechead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
@@ -257,7 +278,7 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
 }
 </style>
 
-<div class="app">
+<div class="app" id="app" hidden>
   <aside class="side" id="side">
     <div class="brand">
       <span class="mk"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--onAccent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h6M2.5 8h8.5M2.5 11.5h6"/><path d="M11.2 4.6L14 8l-2.8 3.4"/></svg></span>
@@ -270,7 +291,7 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
         <button data-act="tema" data-m="light">Claro</button>
         <button data-act="tema" data-m="dark">Escuro</button>
       </div>
-      <button class="btn sm" style="width:100%;justify-content:center" data-act="reset">Restaurar dados de demonstração</button>
+      <button class="btn sm" style="width:100%;justify-content:center" data-act="sair">Sair da conta</button>
     </div>
   </aside>
   <div class="scrim" id="scrim"></div>
@@ -279,21 +300,23 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
       <button class="burger" data-act="menu" aria-label="Abrir menu"><svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
       <div class="crumb" id="crumb"></div>
       <div class="spacer"></div>
-      <div class="roles" id="roles"></div>
+      <button class="btn sm" data-act="recarregar" title="Buscar novidades do servidor" id="btnSync">Atualizar</button>
       <div class="who" id="who"></div>
     </header>
     <main class="view"><div class="wrap" id="view"></div></main>
   </div>
 </div>
+<div id="authHost"></div>
 <div id="modalHost"></div>
 <div class="toast" id="toast"></div>
 <script>
 "use strict";
-const HOJE = "2026-09-22";
+const HOJE = new Date().toISOString().slice(0,10);
+/* rótulos dos papéis; a pessoa vem do banco, em perfis */
 const PERFIS = {
-  gerencia: {nome:"Patrícia Andrade", cargo:"Diretora de Operações", label:"Gerência", ini:"PA"},
-  producao: {nome:"Diego Sartori", cargo:"Produtor Técnico", label:"Produção", ini:"DS"},
-  estoque:  {nome:"Wellington Alves", cargo:"Chefe de Almoxarifado", label:"Estoque", ini:"WA"}
+  gerencia: {label:"Gerência"},
+  producao: {label:"Produção"},
+  estoque:  {label:"Estoque"}
 };
 const NAV = [
   {g:"Operação", items:[
@@ -333,139 +356,24 @@ const ic = n => '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" str
 
 /* ---------------- catálogo ---------------- */
 const CAT = [
-  /* ESTRUTURA */
-  ["TRS-Q30","Treliça Box Truss Q30 · 3 m","Estrutura","pç",16.5,120,4,"aereo",42,6,0],
-  ["TRS-Q40","Treliça Box Truss Q40 · 3 m","Estrutura","pç",24.0,64,0,"aereo",68,4,0],
-  ["TRS-SLV","Sleeve Block Q30 · torre","Estrutura","pç",12.0,24,0,"solo",95,4,0],
-  ["BAS-P50","Base P50 c/ contrapeso 25 kg","Estrutura","pç",45.0,40,2,"solo",60,2,0],
-  ["TAL-1T","Talha manual 1 t · corrente 12 m","Estrutura","pç",11.0,36,1,"aereo",85,2,0],
-  ["TAL-2T","Talha elétrica 2 t · 18 m","Estrutura","pç",38.0,12,0,"aereo",290,1,750],
-  ["SLG-2T","Sling poliéster WLL 2 t · 2 m","Estrutura","pç",0.8,200,0,"aereo",12,40,0],
-  ["MAN-3T","Manilha âncora 3,25 t","Estrutura","pç",0.6,240,0,"aereo",8,60,0],
-  ["PRT-2X1","Praticável 2×1 m c/ pé regulável","Estrutura","pç",32.0,80,3,"solo",55,8,0],
-  ["PSO-NAV","Piso naval 18 mm 2×1 m","Estrutura","pç",28.0,90,0,"solo",38,10,0],
-  /* SOM */
-  ["LNA-VT","Line array VT4888 · caixa","Som","pç",60.0,24,0,"aereo",380,2,700],
-  ["SUB-218","Subwoofer duplo 18\"","Som","pç",78.0,16,1,"solo",260,1,1400],
-  ["CON-M32","Console digital M32","Som","pç",21.0,6,0,"solo",450,1,180],
-  ["MIC-SF","Microfone sem fio · bastão + headset","Som","cj",2.4,20,1,"solo",110,1,40],
-  ["MON-P12","Monitor de palco 12\"","Som","pç",24.0,12,0,"solo",130,2,400],
-  /* LUZ */
-  ["MOV-B230","Moving Beam 230 · 7R","Luz","pç",18.5,48,2,"aereo",120,2,280],
-  ["MOV-W575","Moving Wash LED 575","Luz","pç",22.0,36,0,"aereo",145,2,575],
-  ["PAR-18","PAR LED 18×12 W RGBWA","Luz","pç",3.2,160,6,"aereo",35,8,220],
-  ["MES-AVO","Mesa Avolites Tiger Touch II","Luz","pç",14.0,4,0,"solo",520,1,90],
-  ["RCK-DIM","Rack dimmer 12 canais","Luz","pç",26.0,10,0,"solo",190,1,100],
-  /* VÍDEO */
-  ["LED-P39","Painel LED P3.9 · 0,5×0,5 m","Vídeo","pç",8.5,240,8,"aereo",95,20,90],
-  ["PRC-600","Processador LED Novastar VX600","Vídeo","pç",6.0,6,0,"solo",320,1,80],
-  ["CAM-PTZ","Câmera PTZ Full HD c/ controle","Vídeo","pç",4.5,8,0,"aereo",280,2,60],
-  ["CAM-4K","Câmera 4K c/ lente zoom e CCU","Vídeo","pç",6.2,6,0,"solo",650,1,90],
-  ["TRI-PRO","Tripé profissional c/ cabeça fluida","Vídeo","pç",9.0,12,1,"solo",90,2,0],
-  ["SWT-4K","Switcher de vídeo 4K · 8 entradas","Vídeo","pç",8.0,3,0,"solo",720,1,150],
-  ["ENC-STR","Encoder de streaming multiplataforma","Vídeo","pç",4.0,4,0,"solo",480,1,120],
-  ["MON-REF","Monitor de referência 24\"","Vídeo","pç",5.5,10,0,"solo",160,2,65],
-  ["INT-WL","Intercom sem fio · base + 4 beltpacks","Vídeo","cj",7.0,4,0,"solo",340,1,60],
-  ["LNK-FIB","Kit de fibra óptica SDI · 100 m","Vídeo","cj",12.0,6,0,"solo",190,1,0],
-  ["PAS-SDI","Passador SDI ⇄ HDMI c/ scaler","Vídeo","pç",1.2,12,0,"solo",85,4,25],
-  /* CENOGRAFIA */
-  ["CEN-PNL","Painel cenográfico 1 × 2,5 m","Cenografia","pç",22.0,120,4,"solo",48,6,0],
-  ["CEN-TST","Testeira tensionada 4 × 1 m","Cenografia","pç",8.0,30,0,"aereo",120,4,0],
-  ["CEN-BKD","Backdrop tensionado 6 × 3 m","Cenografia","pç",14.0,18,0,"aereo",260,2,0],
-  ["CEN-TAP","Forração / carpete · 20 m²","Cenografia","rolo",28.0,40,0,"solo",90,1,0],
-  ["TND-10","Tenda piramidal 10 × 10 m","Cenografia","cj",380.0,6,0,"solo",2400,1,0],
-  ["CAD-TIF","Cadeira Tiffany c/ almofada","Cenografia","pç",3.5,600,24,"solo",14,20,0],
-  ["MES-BIS","Mesa bistrô c/ capa","Cenografia","pç",12.0,120,0,"solo",45,6,0],
-  ["LNG-SOF","Sofá lounge 2 lugares","Cenografia","pç",40.0,24,2,"solo",190,1,0],
-  /* INTERNET */
-  ["NET-LNK","Link dedicado 500 Mbps · ativação","Internet","cj",2.0,4,0,"solo",1800,1,0],
-  ["NET-RTR","Roteador corporativo c/ failover 4G","Internet","pç",3.2,6,0,"solo",320,2,30],
-  ["NET-APX","Access point Wi-Fi 6 · uso externo","Internet","pç",1.4,24,1,"aereo",140,6,25],
-  ["NET-SWT","Switch gerenciável 24 portas PoE","Internet","pç",4.5,8,0,"solo",180,1,180],
-  ["NET-CAB","Kit de cabeamento de rede · 100 m","Internet","cj",9.0,12,0,"solo",70,1,0],
-  /* EXTRAS */
-  ["GER-180","Gerador silenciado 180 kVA","Extras","pç",1900.0,4,1,"solo",3200,1,0],
-  ["CLM-30","Climatizador 30.000 BTU","Extras","pç",55.0,20,0,"solo",180,1,250],
-  ["EXT-RAD","Rádio comunicador HT · par","Extras","cj",0.8,30,2,"solo",45,10,12],
-  ["EXT-EXT","Extintor ABC 6 kg c/ suporte","Extras","pç",12.0,40,0,"solo",35,4,0]
 ].map(a=>({cod:a[0],nome:a[1],cat:a[2],un:a[3],peso:a[4],total:a[5],manut:a[6],rig:a[7],diaria:a[8],porCase:a[9],watts:a[10]}));
 
-/* ---------------- seed ---------------- */
+/* ---------------- estado vazio ---------------- */
+function maisDias(iso,n){const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 function seed(){
-  const clientes = [
-    {id:"C01",nome:"Vivo · Telefônica Brasil",tipo:"Corporativo",doc:"02.558.157/0001-62",contato:"Renata Prado",tel:"(11) 99812-4400",cidade:"São Paulo · SP",desde:"2021"},
-    {id:"C02",nome:"Banco Bradesco",tipo:"Corporativo",doc:"60.746.948/0001-12",contato:"Marcos Teixeira",tel:"(11) 99745-1180",cidade:"Osasco · SP",desde:"2019"},
-    {id:"C03",nome:"Ateliê Cerimônias",tipo:"Social",doc:"31.884.220/0001-08",contato:"Bruna Lisboa",tel:"(11) 98110-6622",cidade:"Itu · SP",desde:"2022"},
-    {id:"C04",nome:"Prefeitura de Campinas",tipo:"Público",doc:"51.885.242/0001-40",contato:"Sec. de Cultura",tel:"(19) 3236-8000",cidade:"Campinas · SP",desde:"2024"},
-    {id:"C05",nome:"Ambev",tipo:"Corporativo",doc:"07.526.557/0001-00",contato:"Felipe Nakano",tel:"(11) 99303-7712",cidade:"São Paulo · SP",desde:"2020"},
-    {id:"C06",nome:"Instituto Sonhar",tipo:"Terceiro setor",doc:"18.402.771/0001-55",contato:"Cláudia Menezes",tel:"(11) 97402-3388",cidade:"São Paulo · SP",desde:"2023"},
-    {id:"C07",nome:"Feira Hospitalar Brasil",tipo:"Corporativo",doc:"44.120.906/0001-31",contato:"Ivan Correia",tel:"(11) 99615-0043",cidade:"São Paulo · SP",desde:"2025"}
-  ];
-  const negocios = [
-    {id:"N-1042",titulo:"Ativação Corona Sunsets",cliente:"C05",etapa:"qualificacao",valor:182000,data:"2026-11-14",local:"Praia Grande · SP",resp:"Patrícia Andrade"},
-    {id:"N-1043",titulo:"Festival de Inverno 2026",cliente:"C04",etapa:"proposta",valor:418500,data:"2026-12-05",local:"Praça Arautos da Paz · Campinas",resp:"Patrícia Andrade"},
-    {id:"N-1044",titulo:"Convenção de Líderes",cliente:"C02",etapa:"negociacao",valor:310000,data:"2026-09-30",local:"Transamérica Expo Center",resp:"Patrícia Andrade"},
-    {id:"N-1045",titulo:"Summit de Inovação",cliente:"C01",etapa:"ganho",valor:265400,data:"2026-10-08",local:"Expo Center Norte · Pav. Branco",resp:"Patrícia Andrade",osId:"OSV-2026-0148"},
-    {id:"N-1046",titulo:"Casamento Marina & Rafael",cliente:"C03",etapa:"ganho",valor:96800,data:"2026-10-17",local:"Fazenda Vila Rica · Itu",resp:"Patrícia Andrade",osId:"OSV-2026-0149"},
-    {id:"N-1047",titulo:"Jantar de Gala Beneficente",cliente:"C06",etapa:"qualificacao",valor:74000,data:"2026-12-12",local:"Museu da Casa Brasileira",resp:"Patrícia Andrade"}
-  ];
-  const os = [
-    {id:"OSV-2026-0148",cliente:"C01",evento:"Vivo Summit de Inovação",local:"Expo Center Norte · Pavilhão Branco",cidade:"São Paulo · SP",publico:1800,area:480,
-     montagem:"2026-10-06",evIni:"2026-10-08",evFim:"2026-10-09",desmontagem:"2026-10-10",valor:265400,produtor:"Diego Sartori",status:"Em produção",criada:"2026-09-15",
-     itens:[["TRS-Q30",48,6,0],["TRS-Q40",24,4,0],["BAS-P50",12,2,0],["TAL-1T",16,2,0],["SLG-2T",48,40,0],["MAN-3T",56,60,0],["LED-P39",96,20,90],["PRC-600",2,1,80],["MOV-B230",16,2,280],["MOV-W575",12,2,575],["PAR-18",40,8,220],["MES-AVO",1,1,90],["LNA-VT",12,2,700],["SUB-218",8,1,1400],["CON-M32",2,1,180],["PRT-2X1",36,8,0],["PSO-NAV",40,10,0],["CLM-30",6,1,250],["GER-180",2,1,0]].map(x=>({cod:x[0],qtd:x[1]})),
-     solo:{area:480,adm:500,admPont:600,publicoKgm2:300,torres:false,apoios:4,feito:true},
-     aereo:{pontos:16,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:12,feito:false},
-     descritivo:"",etapaAtual:"aereo"},
-    {id:"OSV-2026-0149",cliente:"C03",evento:"Casamento Marina & Rafael",local:"Fazenda Vila Rica · Salão Jacarandá",cidade:"Itu · SP",publico:320,area:210,
-     montagem:"2026-10-16",evIni:"2026-10-17",evFim:"2026-10-17",desmontagem:"2026-10-19",valor:96800,produtor:"Diego Sartori",status:"Aguardando produção",criada:"2026-09-19",
-     itens:[["TRS-Q30",18,6,0],["BAS-P50",6,2,0],["TAL-1T",6,2,0],["SLG-2T",18,40,0],["MAN-3T",20,60,0],["PAR-18",48,8,220],["MOV-W575",8,2,575],["CAD-TIF",320,20,0],["MES-BIS",34,6,0],["LNG-SOF",8,1,0],["PRT-2X1",12,8,0],["CON-M32",1,1,180],["SUB-218",4,1,1400],["CLM-30",4,1,250],["GER-180",1,1,0]].map(x=>({cod:x[0],qtd:x[1]})),
-     solo:{area:210,adm:400,admPont:500,publicoKgm2:300,torres:true,apoios:4,feito:false},
-     aereo:{pontos:6,wllPonto:500,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:9,feito:false},
-     descritivo:"",etapaAtual:"escopo"},
-    {id:"OSV-2026-0150",cliente:"C02",evento:"Bradesco · Convenção de Líderes",local:"Transamérica Expo Center · Pav. A",cidade:"São Paulo · SP",publico:2400,area:620,
-     montagem:"2026-09-28",evIni:"2026-09-30",evFim:"2026-10-01",desmontagem:"2026-10-02",valor:310000,produtor:"Diego Sartori",status:"Liberada",criada:"2026-09-02",
-     itens:[["TRS-Q30",40,6,0],["TRS-Q40",20,4,0],["BAS-P50",10,2,0],["TAL-1T",14,2,0],["SLG-2T",40,40,0],["MAN-3T",46,60,0],["LED-P39",120,20,90],["PRC-600",2,1,80],["MOV-B230",20,2,280],["MOV-W575",10,2,575],["PAR-18",36,8,220],["MES-AVO",1,1,90],["LNA-VT",8,2,700],["SUB-218",6,1,1400],["CON-M32",1,1,180],["PRT-2X1",30,8,0],["PSO-NAV",36,10,0],["CLM-30",8,1,250],["GER-180",1,1,0]].map(x=>({cod:x[0],qtd:x[1]})),
-     solo:{area:620,adm:500,admPont:600,publicoKgm2:300,torres:false,apoios:4,feito:true},
-     aereo:{pontos:14,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:12,feito:true},
-     descritivo:"1. OBJETO\nFornecimento, montagem, operação e desmontagem de estrutura cênica, sonorização, iluminação e painel de LED para a Convenção de Líderes Bradesco 2026.\n\n2. ESTRUTURA\nGrid frontal em Box Truss Q30, vão livre de 12,00 m, suspenso em 14 pontos de ancoragem do pavilhão.\n\n3. RIGGING\nTalhas manuais de 1 t, slings de poliéster WLL 2 t e manilhas âncora 3,25 t. Inspeção visual de acessórios registrada em checklist antes do içamento.\n\n4. ENERGIA\n1 gerador silenciado de 180 kVA com quadro de transferência e aterramento ≤ 10 Ω.\n\n5. CRONOGRAMA\nCarga 28/09 · 06h00 — Desmontagem 02/10 · 23h00.",etapaAtual:"pronto"},
-    {id:"OSV-2026-0151",cliente:"C07",evento:"Feira Hospitalar · Estande Central",local:"Expo Center Norte · Pav. Azul",cidade:"São Paulo · SP",publico:900,area:300,
-     montagem:"2026-09-29",evIni:"2026-09-30",evFim:"2026-10-02",desmontagem:"2026-10-03",valor:148000,produtor:"Diego Sartori",status:"Liberada",criada:"2026-09-05",
-     itens:[["LED-P39",140,20,90],["PRC-600",2,1,80],["TRS-Q30",26,6,0],["BAS-P50",8,2,0],["PAR-18",24,8,220],["MOV-W575",6,2,575],["CLM-30",4,1,250],["MES-BIS",20,6,0],["LNG-SOF",6,1,0],["PRT-2X1",14,8,0]].map(x=>({cod:x[0],qtd:x[1]})),
-     solo:{area:300,adm:500,admPont:600,publicoKgm2:300,torres:true,apoios:4,feito:true},
-     aereo:{pontos:10,wllPonto:600,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:true},
-     descritivo:"Estande central de 300 m² com backdrop de LED P3.9 e grid de iluminação em torres de solo.",etapaAtual:"pronto"},
-    {id:"OSV-2026-0147",cliente:"C06",evento:"Gala Beneficente Instituto Sonhar",local:"Espaço Villa Bisutti",cidade:"São Paulo · SP",publico:420,area:240,
-     montagem:"2026-09-20",evIni:"2026-09-22",evFim:"2026-09-22",desmontagem:"2026-09-24",valor:88400,produtor:"Diego Sartori",status:"Liberada",criada:"2026-08-28",
-     itens:[["TRS-Q30",16,6,0],["BAS-P50",6,2,0],["PAR-18",36,8,220],["MOV-W575",6,2,575],["CAD-TIF",400,20,0],["MES-BIS",42,6,0],["LNG-SOF",6,1,0],["CON-M32",1,1,180],["SUB-218",4,1,1400],["CLM-30",6,1,250]].map(x=>({cod:x[0],qtd:x[1]})),
-     solo:{area:240,adm:400,admPont:500,publicoKgm2:300,torres:true,apoios:4,feito:true},
-     aereo:{pontos:8,wllPonto:500,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:8,feito:true},
-     descritivo:"Jantar de gala com grid perimetral em torres de solo e iluminação cênica de mesas.",etapaAtual:"pronto"}
-  ];
-  const cargas = [
-    {id:"OSC-2026-0311",osId:"OSV-2026-0147",status:"Carregada",carga:"2026-09-20",horaCarga:"07:00",descarga:"2026-09-24",veiculo:"Truck baú 3/4 · PLK-7E42",equipe:"Equipe A · 6 montadores",conferente:"Wellington Alves",
-     itens:os.find(o=>o.id==="OSV-2026-0147").itens.map(i=>({...i})),obs:"Acesso pelo estacionamento G2, pé-direito 4,2 m."},
-    {id:"OSC-2026-0312",osId:"OSV-2026-0150",status:"Em separação",carga:"2026-09-28",horaCarga:"06:00",descarga:"2026-10-02",veiculo:"Carreta sider · QAX-2B09",equipe:"Equipe B · 12 montadores",conferente:"Wellington Alves",
-     itens:os.find(o=>o.id==="OSV-2026-0150").itens.map(i=>({...i})),obs:"Doca 4. Credenciamento de equipe até 26/09."},
-    {id:"OSC-2026-0313",osId:"OSV-2026-0151",status:"Liberada",carga:"2026-09-29",horaCarga:"05:30",descarga:"2026-10-03",veiculo:"Truck baú · PLK-7E42",equipe:"Equipe C · 8 montadores",conferente:"Wellington Alves",
-     itens:os.find(o=>o.id==="OSV-2026-0151").itens.map(i=>({...i})),obs:"Montagem noturna autorizada pelo pavilhão."},
-    {id:"OSC-2026-0309",osId:null,status:"Retornada",carga:"2026-09-10",descarga:"2026-09-14",horaCarga:"08:00",veiculo:"Truck baú · PLK-7E42",equipe:"Equipe A · 6 montadores",conferente:"Wellington Alves",
-     evento:"Ambev · Ativação Verão (encerrado)",
-     itens:[{cod:"PAR-18",qtd:24},{cod:"TRS-Q30",qtd:12},{cod:"CAD-TIF",qtd:120},{cod:"MES-BIS",qtd:16}],obs:"Retorno com 2 PAR LED avariados."}
-  ];
-  const movs = [
-    {id:"M-4411",data:"2026-09-10",tipo:"SAÍDA",oscId:"OSC-2026-0309",ref:"Ambev · Ativação Verão",linhas:[["PAR-18",24,8,220],["TRS-Q30",12,6,0],["CAD-TIF",120,20,0],["MES-BIS",16,6,0]],user:"Wellington Alves"},
-    {id:"M-4426",data:"2026-09-14",tipo:"ENTRADA",oscId:"OSC-2026-0309",ref:"Ambev · Ativação Verão",linhas:[["PAR-18",22,8,220],["TRS-Q30",12,6,0],["CAD-TIF",120,20,0],["MES-BIS",16,6,0]],user:"Wellington Alves",avarias:[["PAR-18",2,8,220]]},
-    {id:"M-4438",data:"2026-09-20",tipo:"SAÍDA",oscId:"OSC-2026-0311",ref:"Gala Beneficente Instituto Sonhar",linhas:os.find(o=>o.id==="OSV-2026-0147").itens.map(i=>[i.cod,i.qtd]),user:"Wellington Alves"}
-  ];
-  return {role:"gerencia",view:"painel",sel:null,aba:"escopo",clientes,negocios,os,cargas,movs,
-    cat:CAT.map(c=>({...c})), per:{de:"2026-09-28",ate:"2026-10-03"}, seq:{osv:151,osc:313,mov:4438,neg:1047}};
+  return {role:"producao",view:"painel",sel:null,aba:"escopo",
+    perfis:[],clientes:[],negocios:[],os:[],cargas:[],movs:[],cat:[],kits:[],frota:[],
+    chats:[],msgs:[],posts:[],notas:[],compromissos:[],notifs:[],lidos:{},
+    per:{de:HOJE,ate:maisDias(HOJE,3)}, seq:{osv:0,osc:0,mov:0,neg:0}};
 }
 
 /* ---------------- estado ---------------- */
 let S = seed();
-const KEY="palcoerp.v1";
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
-function load(){ try{ const r=localStorage.getItem(KEY); if(r){ const p=JSON.parse(r); if(p&&p.os&&p.cat) S=p; } }catch(e){} }
+const KEY="eventflow";
+/* save() é chamado em todo o app; aqui ele enfileira a sincronização com o Supabase.
+   A implementação real está no módulo de dados, no fim do arquivo. */
+let save = () => {};
+let load = () => {};
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
@@ -477,10 +385,10 @@ const dt = s => s ? s.slice(8,10)+"/"+s.slice(5,7) : "—";
 const dtl = s => s ? s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4) : "—";
 const item = c => S.cat.find(i=>i.cod===c) || {cod:c,nome:c,peso:0,total:0,manut:0,un:"pç",cat:"—",rig:"solo",diaria:0};
 const cli = id => S.clientes.find(c=>c.id===id) || {nome:"—"};
-const osById = id => S.os.find(o=>o.id===id);
-const oscById = id => S.cargas.find(c=>c.id===id);
+let osById  = id => S.os.find(o=>o.id===id);
+let oscById = id => S.cargas.find(c=>c.id===id);
 const overlap = (a1,a2,b1,b2) => a1<=b2 && b1<=a2;
-const addDays = (iso,n)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+const addDays = maisDias;
 const diffDays = (a,b)=>Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
 const RESERVA = ["Liberada","Em separação","Carregada"];
 
@@ -585,9 +493,10 @@ const TITLES = {painel:["Painel operacional","Visão geral de vendas, produção
  equipe:["Usuários e permissões","Quem acessa o quê em cada perfil"]};
 
 function renderShell(){
-  const p=PERFIS[S.role];
-  $("#roles").innerHTML = Object.keys(PERFIS).map(r=>`<button data-act="role" data-role="${r}" class="${r===S.role?"on":""}">${PERFIS[r].label}</button>`).join("");
-  $("#who").innerHTML = `<span class="av">${p.ini}</span><span><span class="nm">${esc(p.nome)}</span><span class="rl">${esc(p.cargo)}</span></span>`;
+  const p=PERFIS[S.role]||{label:"—"};
+  const eu=me();
+  $("#who").innerHTML = `<span class="av" style="background:${eu.cor||"var(--accent2)"};color:#FFF">${esc(eu.ini||"··")}</span>
+    <span><span class="nm">${esc(eu.nome||"—")}</span><span class="rl">${esc(p.label)}${eu.cargo?" · "+esc(eu.cargo):""}</span></span>`;
   const t=TITLES[S.view]||["",""];
   $("#crumb").innerHTML = `<h1>${esc(t[0])}</h1><span class="sub">${esc(t[1])}</span>`;
   const cnt = {
@@ -640,7 +549,7 @@ function vPainel(){
       <div class="card"><header><h3>Próximas cargas</h3><span class="hint">saída do galpão</span></header>
         ${prox.length?prox.slice(0,5).map(x=>{const o=x.osId?osById(x.osId):null;const d=diffDays(HOJE,x.carga);
           return `<div class="res"><div class="row" style="cursor:pointer" data-act="osc" data-id="${x.id}">
-            <div class="n"><b style="font-size:12.5px">${esc(o?o.evento:x.evento||x.id)}</b><small>${x.id} · ${esc(x.veiculo)}</small></div>
+            <div class="n"><b style="font-size:12.5px">${esc(o?o.evento:x.evento||x.id)}</b><small>${x.codigo||""} · ${esc(x.veiculo)}</small></div>
             <div class="v">${dt(x.carga)} <u>${x.horaCarga||""}</u><br><span class="pill ${d<=3?"warn":"acc"}" style="margin-top:3px">${d===0?"hoje":"em "+d+" dias"}</span></div></div></div>`;}).join(""):`<div class="empty">Nenhuma carga programada.</div>`}
       </div>
       <div class="card"><header><h3>Retornos previstos</h3><span class="hint">entrada no estoque na descarga</span></header>
@@ -731,7 +640,7 @@ function vVendas(){
   <div class="card"><div class="tblwrap"><table><thead><tr><th>OS</th><th>Evento / cliente</th><th>Local</th><th>Montagem → desmontagem</th><th class="r">Itens</th>${can("ver_valores")?`<th class="r">Valor</th>`:""}<th>Produção</th><th>Equipe</th><th>Status</th></tr></thead><tbody>
   ${S.os.slice().sort((a,b)=>a.montagem<b.montagem?-1:1).map(o=>{const c=cli(o.cliente);const e=etapasOk(o);const done=[e.solo,e.aereo,e.descritivo].filter(Boolean).length;
     return `<tr class="clickable" data-act="osv" data-id="${o.id}">
-    <td><span class="tag">${o.id}</span></td>
+    <td><span class="tag">${o.codigo||""}</span></td>
     <td><b>${esc(o.evento)}</b><br><span class="muted" style="font-size:11.5px">${esc(c.nome)}</span></td>
     <td style="font-size:12px">${esc(o.local)}</td>
     <td class="num" style="font-size:12px">${dt(o.montagem)} → ${dt(o.desmontagem)}<br><span class="muted" style="font-size:11px">evento ${dt(o.evIni)}</span></td>
@@ -750,7 +659,7 @@ function vOSV(){
   return `<div class="between" style="margin-bottom:14px">
     <div><button class="btn sm ghost" data-act="go" data-view="vendas">← OS de Venda</button>
       <h2 style="font-size:19px;margin-top:6px">${esc(o.evento)}</h2>
-      <div class="flex" style="margin-top:5px"><span class="tag">${o.id}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span><span class="pill ${STCOR[o.status]||""}"><span class="dot"></span>${esc(o.status)}</span></div></div>
+      <div class="flex" style="margin-top:5px"><span class="tag">${o.codigo||""}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span><span class="pill ${STCOR[o.status]||""}"><span class="dot"></span>${esc(o.status)}</span></div></div>
     <div class="flex">${can("editar_memorial")?`<button class="btn pri" data-act="go" data-view="producao" data-id="${o.id}">Abrir na produção</button>`:""}
       ${osc?`<button class="btn" data-act="osc" data-id="${osc.id}">Ver ordem de carga ${osc.id}</button>`:""}</div></div>
 
@@ -830,7 +739,7 @@ function vProducao(){
           ${[["Solo",e.solo],["Aéreo",e.aereo],["Descritivo",e.descritivo]].map(x=>`<div class="flex" style="gap:8px"><span class="meter"><i class="${x[1]?"":"warn"}" style="width:${x[1]?100:12}%"></i></span><span style="font-size:12px;color:var(--ink2)">${x[0]}</span><span class="pill ${x[1]?"ok":"warn"}" style="margin-left:auto">${x[1]?"ok":"pendente"}</span></div>`).join("")}
         </div>
         <div class="flex" style="justify-content:flex-end;gap:7px">
-          ${osc?`<span class="pill ok">Carga ${osc.id}</span>`:pr&&can("gerar_osc")?`<button class="btn sm pri" data-act="gerarOSC" data-id="${o.id}">Gerar ordem de carga</button>`:""}
+          ${osc?`<span class="pill ok">Carga ${osc.codigo||""}</span>`:pr&&can("gerar_osc")?`<button class="btn sm pri" data-act="gerarOSC" data-id="${o.id}">Gerar ordem de carga</button>`:""}
           <button class="btn sm" data-act="prod" data-id="${o.id}">Abrir</button></div>
       </div></div>`;}).join("")}</div>`;
 }
@@ -848,9 +757,9 @@ function vProdDet(){
   return `<div class="between" style="margin-bottom:12px">
     <div><button class="btn sm ghost" data-act="go" data-view="producao">← Fila de produção</button>
       <h2 style="font-size:19px;margin-top:6px">${esc(o.evento)}</h2>
-      <div class="flex" style="margin-top:5px"><span class="tag">${o.id}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span>
+      <div class="flex" style="margin-top:5px"><span class="tag">${o.codigo||""}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span>
       <span class="tag">montagem ${dtl(o.montagem)}</span><span class="tag">desmontagem ${dtl(o.desmontagem)}</span></div></div>
-    <div class="flex">${osc?`<span class="pill ok"><span class="dot"></span>Carga ${osc.id} emitida</span><button class="btn" data-act="osc" data-id="${osc.id}">Abrir ordem</button>`
+    <div class="flex">${osc?`<span class="pill ok"><span class="dot"></span>Carga ${osc.codigo||""} emitida</span><button class="btn" data-act="osc" data-id="${osc.id}">Abrir ordem</button>`
       :`<button class="btn pri" data-act="gerarOSC" data-id="${o.id}" ${prontoParaOSC(o)&&can("gerar_osc")?"":"disabled"}>Gerar Ordem de Carga →</button>`}</div></div>
   <div class="steps" style="margin-bottom:14px">${steps.map((s,i)=>`<button class="step ${aba===s[0]?"on":""} ${s[3]?"done":""}" data-act="aba" data-aba="${s[0]}">
     <span class="mk">${s[3]?"✓":i+1}</span><span class="tx">${esc(s[1])}<small>${esc(s[2])}</small></span></button>`).join("")}</div>
@@ -1016,7 +925,7 @@ function vCargas(){
   return `<div class="sechead"><h2>Ordens de Serviço de Carga</h2><p>Emitidas pela produção. O estoque separa, confirma a carga (baixa) e registra o retorno na descarga.</p></div>
   <div class="card"><div class="tblwrap"><table><thead><tr><th>Ordem</th><th>Evento</th><th>Carga</th><th>Descarga</th><th class="r">Peças</th><th>Veículo / equipe</th><th>Status</th><th></th></tr></thead><tbody>
   ${cs.map(c=>{const o=c.osId?osById(c.osId):null;const prox=c.status!=="Retornada"&&c.carga>=HOJE;
-    return `<tr class="clickable" data-act="osc" data-id="${c.id}"><td><span class="tag">${c.id}</span></td>
+    return `<tr class="clickable" data-act="osc" data-id="${c.id}"><td><span class="tag">${c.codigo||""}</span></td>
     <td><b>${esc(o?o.evento:c.evento||"—")}</b><br><span class="muted" style="font-size:11px">${esc(o?cli(o.cliente).nome:"—")}</span></td>
     <td class="num">${dtl(c.carga)}<br><span class="muted" style="font-size:11px">${c.horaCarga||""}</span></td>
     <td class="num">${dtl(c.descarga)}<br><span class="muted" style="font-size:11px">${diffDays(c.carga,c.descarga)} diárias</span></td>
@@ -1040,7 +949,7 @@ function vOSC(){
   return `<div class="between" style="margin-bottom:14px">
     <div><button class="btn sm ghost" data-act="go" data-view="cargas">← Ordens de carga</button>
       <h2 style="font-size:19px;margin-top:6px">${esc(o?o.evento:c.evento||c.id)}</h2>
-      <div class="flex" style="margin-top:5px"><span class="tag">${c.id}</span>${o?`<span class="tag">${o.id}</span>`:""}
+      <div class="flex" style="margin-top:5px"><span class="tag">${c.codigo||""}</span>${o?`<span class="tag">${o.codigo||""}</span>`:""}
       <span class="pill ${OSCCOR[c.status]||""}"><span class="dot"></span>${esc(c.status)}</span></div></div>
     <div class="flex">${acao}${!pode?`<span class="pill warn">somente leitura neste perfil</span>`:""}</div></div>
 
@@ -1078,7 +987,7 @@ function vMovs(){
   const ms=S.movs.slice().sort((a,b)=>a.data<b.data?1:-1);
   return `<div class="sechead"><h2>Livro de movimentações</h2><p>Cada confirmação de carga gera uma baixa datada; cada descarga gera a entrada correspondente.</p></div>
   <div class="card"><div class="tblwrap"><table><thead><tr><th>Lançamento</th><th>Data</th><th>Tipo</th><th>Referência</th><th class="r">Linhas</th><th class="r">Peças</th><th>Responsável</th></tr></thead><tbody>
-  ${ms.map(m=>`<tr class="clickable" data-act="verMov" data-id="${m.id}"><td><span class="tag">${m.id}</span></td><td class="num">${dtl(m.data)}</td>
+  ${ms.map(m=>`<tr class="clickable" data-act="verMov" data-id="${m.id}"><td><span class="tag">${m.codigo||""}</span></td><td class="num">${dtl(m.data)}</td>
     <td><span class="pill ${m.tipo==="SAÍDA"?"warn":"ok"}"><span class="dot"></span>${m.tipo}</span></td>
     <td>${esc(m.ref)}<br><span class="muted" style="font-size:11px">${esc(m.oscId||"")}</span></td>
     <td class="r num">${m.linhas.length}</td><td class="r num">${m.linhas.reduce((s,l)=>s+l[1],0)}</td>
@@ -1094,7 +1003,7 @@ function vAgenda(){
   const pos=d=>((diffDays(ini,d))/n*100);
   const linhas=S.cargas.slice().sort((a,b)=>a.carga<b.carga?-1:1).map(c=>{
     const o=c.osId?osById(c.osId):null;
-    return {tit:o?o.evento:c.evento||c.id, sub:c.id+" · "+c.status, de:c.carga, ate:c.descarga, cls:c.status==="Em separação"?"sep":c.status==="Carregada"?"carr":c.status==="Retornada"?"ret":"", id:c.id, tipo:"osc"};
+    return {tit:o?o.evento:c.evento||c.id, sub:(c.codigo||"")+" · "+c.status, de:c.carga, ate:c.descarga, cls:c.status==="Em separação"?"sep":c.status==="Carregada"?"carr":c.status==="Retornada"?"ret":"", id:c.id, tipo:"osc"};
   });
   const prev=S.os.filter(o=>!oscDaOS(o.id)).map(o=>({tit:o.evento,sub:o.id+" · carga prevista",de:o.montagem,ate:o.desmontagem,cls:"prev",id:o.id,tipo:"osv"}));
   const all=[...linhas,...prev].filter(r=>overlap(r.de,r.ate,ini,fim));
@@ -1136,19 +1045,11 @@ function vEquipe(){
 </script>
 <script>
 /* ================= COMUNICAÇÃO — dados e utilitários ================= */
-const USERS=[
-  {id:"u1",nome:"Patrícia Andrade",cargo:"Diretora de Operações",role:"gerencia",ini:"PA",cor:"#1B1B1E"},
-  {id:"u2",nome:"Diego Sartori",cargo:"Produtor Técnico",role:"producao",ini:"DS",cor:"#403B33"},
-  {id:"u3",nome:"Wellington Alves",cargo:"Chefe de Almoxarifado",role:"estoque",ini:"WA",cor:"#2B3A33"},
-  {id:"u4",nome:"Camila Rocha",cargo:"Assistente de Produção",role:"producao",ini:"CR",cor:"#35313D"},
-  {id:"u5",nome:"Jonas Pereira",cargo:"Conferente de Carga",role:"estoque",ini:"JP",cor:"#2E373E"},
-  {id:"u6",nome:"Rubens Maia",cargo:"Eng. Responsável · CREA-SP 5069841",role:"producao",ini:"RM",cor:"#40302D"},
-  {id:"u7",nome:"Tati Moraes",cargo:"Produtora de Vídeo e Transmissão",role:"producao",ini:"TM",cor:"#2F2A38"},
-  {id:"u8",nome:"Sérgio Lemos",cargo:"Produtor de Som e Luz",role:"producao",ini:"SL",cor:"#3A3327"}
-];
-const ROLE2U={gerencia:"u1",producao:"u2",estoque:"u3"};
+/* as pessoas vêm da tabela perfis */
+const USERS_FALLBACK=[];
+Object.defineProperty(window,"USERS",{get:()=> (S.perfis&&S.perfis.length)?S.perfis:USERS_FALLBACK});
 const usr = id => USERS.find(u=>u.id===id)||{id,nome:"Sistema",ini:"SY",cargo:"",cor:"#7C929C",role:"sistema"};
-const me = () => usr(ROLE2U[S.role]);
+const me = () => usr(S.perfilId) ;
 const av = (u,sz=26) => `<span class="av" style="background:${u.cor};color:#FFF;width:${sz}px;height:${sz}px;font-size:${Math.round(sz*.42)}px" title="${esc(u.nome)}">${u.ini}</span>`;
 
 const nowTs = () => HOJE+"T"+new Date().toTimeString().slice(0,5);
@@ -1170,82 +1071,19 @@ function linkify(txt){
 }
 
 function seedComms(){
-  const chats=[
-    {id:"ch-geral",tipo:"canal",nome:"Geral · Operação",desc:"Avisos que valem para o time inteiro",membros:USERS.map(u=>u.id)},
-    {id:"ch-galpao",tipo:"canal",nome:"Galpão e frota",desc:"Separação, veículos e conferência",membros:["u1","u3","u5"]},
-    {id:"ch-0148",tipo:"os",osId:"OSV-2026-0148",nome:"Vivo Summit de Inovação",membros:["u1","u2","u3","u4","u6"]},
-    {id:"ch-0150",tipo:"os",osId:"OSV-2026-0150",nome:"Bradesco · Convenção de Líderes",membros:["u1","u2","u3","u5"]},
-    {id:"ch-0149",tipo:"os",osId:"OSV-2026-0149",nome:"Casamento Marina & Rafael",membros:["u1","u2","u4"]},
-    {id:"dm-u1-u2",tipo:"dm",membros:["u1","u2"]},
-    {id:"dm-u2-u3",tipo:"dm",membros:["u2","u3"]},
-    {id:"dm-u1-u3",tipo:"dm",membros:["u1","u3"]}
-  ];
-  const M=(chat,autor,ts,txt,extra)=>Object.assign({id:"msg"+(M._n=(M._n||0)+1),chat,autor,ts,txt},extra||{});
-  const msgs=[
-    M("ch-geral","u1","2026-09-21T08:40","Bom dia, time. Semana pesada: carga do Bradesco na segunda 28/09 e a Feira Hospitalar entra no dia seguinte. Atenção ao painel de LED, o saldo está apertado."),
-    M("ch-geral","u3","2026-09-21T08:52","Confirmado. Já sinalizei no sistema: faltam 28 módulos de P3.9 na sobreposição. Vou cotar sublocação com a Ledway hoje."),
-    M("ch-geral","u2","2026-09-21T09:05","Se não fechar a sublocação, consigo redesenhar o backdrop da Feira com 112 módulos sem perder proporção. Me avisem até quinta."),
-    M("ch-geral","u1","2026-09-22T07:58","@Wellington Alves alguma resposta da Ledway?"),
-    M("ch-galpao","u5","2026-09-21T16:20","Truck PLK-7E42 volta da revisão amanhã 10h. Até lá só a carreta para carga pesada."),
-    M("ch-galpao","u3","2026-09-21T16:31","Anotado. A carga do Bradesco vai de carreta mesmo, são 30 praticáveis e 36 chapas de piso naval."),
-    M("ch-galpao","u1","2026-09-22T09:10","Os 2 PAR LED avariados do retorno da Ambev já foram para a bancada?"),
-    M("ch-galpao","u5","2026-09-22T09:14","Foram. Fonte queimada nos dois, troca chega sexta."),
-    M("ch-0148","u1","2026-09-15T14:02","OS OSV-2026-0148 emitida e encaminhada à produção.",{sys:true}),
-    M("ch-0148","u2","2026-09-16T10:12","Peguei. O pavilhão Branco libera 750 kgf por ponto, vou trabalhar com 16 pontos no grid frontal."),
-    M("ch-0148","u6","2026-09-18T11:40","Revisei a planta: os pontos das colunas 7 e 8 estão sobre a passagem técnica. Desloque 1,5 m para o vão seguinte antes de fechar o memorial."),
-    M("ch-0148","u2","2026-09-18T11:58","Ajustado. Memorial de solo fechado, o aéreo eu fecho hoje com essa correção."),
-    M("ch-0148","u4","2026-09-22T09:30","Credenciamento da equipe no Expo Center precisa ser enviado até 02/10. Alguém tem a lista final de montadores?"),
-    M("ch-0148","u3","2026-09-22T09:44","Mando hoje à tarde, ainda estou fechando a escala da Equipe B."),
-    M("ch-0150","u1","2026-09-02T09:00","OS OSV-2026-0150 emitida e encaminhada à produção.",{sys:true}),
-    M("ch-0150","u2","2026-09-12T17:20","Memoriais fechados e descritivo enviado. Ordem de carga OSC-2026-0312 pode ser emitida."),
-    M("ch-0150","u3","2026-09-20T08:15","Separação iniciada. Doca 4 reservada para 28/09 às 6h."),
-    M("ch-0150","u5","2026-09-22T10:02","Conferi 18 dos 20 Moving Beam. Dois estão com a trava do yoke folgada, mandei para ajuste."),
-    M("ch-0149","u1","2026-09-19T15:30","OS OSV-2026-0149 emitida e encaminhada à produção.",{sys:true}),
-    M("ch-0149","u4","2026-09-19T16:05","A cerimonialista pediu troca das capas das mesas para off-white. Já está no contrato?"),
-    M("ch-0149","u1","2026-09-19T16:18","Está, sem custo extra. Registrei na nota da OS."),
-    M("dm-u1-u2","u1","2026-09-22T08:30","Diego, o aéreo do Vivo fecha hoje? Preciso soltar a carga para o Wellington programar a frota."),
-    M("dm-u1-u2","u2","2026-09-22T08:36","Fecho até o fim da tarde. Só estou refazendo a distribuição dos dois pontos que o Rubens apontou."),
-    M("dm-u2-u3","u3","2026-09-22T10:20","Diego, quando sair a ordem de carga do Vivo me avisa. Quero antecipar a separação do truss."),
-    M("dm-u2-u3","u2","2026-09-22T10:25","Fechado. Sai hoje."),
-    M("dm-u1-u3","u1","2026-09-22T07:55","Manda o número final da sublocação de LED assim que tiver.")
-  ];
-  const posts=[
-    {id:"p1",autor:"u1",ts:"2026-09-22T07:50",txt:"Fechamos o Vivo Summit de Inovação: R$ 265.400, maior contrato corporativo do semestre. Obrigada ao time comercial e à produção pelo memorial entregue em tempo recorde.",likes:["u2","u3","u4"],coments:[{autor:"u2",ts:"2026-09-22T08:02",txt:"Show. Já está na fila técnica, OSV-2026-0148."},{autor:"u4",ts:"2026-09-22T08:20",txt:"Parabéns time 🎉"}]},
-    {id:"p2",autor:"u3",ts:"2026-09-21T17:10",txt:"Inventário cíclico do setor de iluminação concluído. Divergência de 2 PAR LED, ambos localizados na bancada de manutenção. Acuracidade do setor: 99,4%.",likes:["u1"],coments:[]},
-    {id:"p3",autor:"u6",ts:"2026-09-20T13:25",txt:"Lembrete: toda ART de montagem precisa ser emitida antes do início da carga, não no dia do evento. O descritivo técnico da OS já traz os dados necessários para o preenchimento.",likes:["u1","u2"],coments:[{autor:"u2",ts:"2026-09-20T14:00",txt:"Combinado. Coloquei como item fixo no checklist da produção."}]},
-    {id:"p4",autor:"u5",ts:"2026-09-19T09:40",txt:"Nova marcação de piso no galpão: corredor de saída da doca 4 agora é exclusivo para carga. Não estacionar empilhadeira na faixa amarela.",likes:["u3"],coments:[]}
-  ];
-  const notas=[
-    {id:"n1",titulo:"Checklist de liberação de carga",txt:"Antes de confirmar a baixa, o conferente precisa validar cada linha do romaneio e registrar as avarias no retorno.",tags:["processo","estoque"],fixada:true,autor:"u3",ts:"2026-09-14T10:00",escopo:"equipe",osId:null,cor:"ok",
-     checklist:[{t:"Romaneio impresso e assinado pelo conferente",ok:true},{t:"Conferência física de cada linha",ok:true},{t:"Foto do carregamento na doca",ok:false},{t:"Lacre do veículo registrado",ok:false},{t:"ART anexada à ordem",ok:false}]},
-    {id:"n2",titulo:"Vivo Summit — pendências técnicas",txt:"Pontos 7 e 8 deslocados 1,5 m conforme apontamento do eng. Rubens. Refazer croqui do grid antes de enviar ao pavilhão.",tags:["produção","rigging"],fixada:true,autor:"u2",ts:"2026-09-18T12:10",escopo:"equipe",osId:"OSV-2026-0148",cor:"warn",
-     checklist:[{t:"Croqui do grid revisado",ok:true},{t:"Memorial aéreo refeito",ok:false},{t:"Enviar planta ao pavilhão",ok:false}]},
-    {id:"n3",titulo:"Casamento Marina & Rafael — combinados",txt:"Capas das mesas em off-white sem custo adicional (acordado com a cerimonialista Bruna em 19/09). Cerimônia às 17h, o barulho de montagem precisa cessar às 15h.",tags:["cliente","social"],fixada:false,autor:"u1",ts:"2026-09-19T16:20",escopo:"equipe",osId:"OSV-2026-0149",cor:"acc",checklist:[]},
-    {id:"n4",titulo:"Fornecedores de sublocação",txt:"LED: Ledway (11) 4002-8922 · falar com Sandro.\nTruss: Alutec (11) 3891-7744.\nGerador: Stemac, prazo de 48h para 180 kVA.\nTenda: Multiplan Estruturas, mínimo de 3 diárias.",tags:["fornecedores"],fixada:false,autor:"u3",ts:"2026-09-10T08:00",escopo:"equipe",osId:null,cor:"",checklist:[]},
-    {id:"n5",titulo:"Minhas prioridades da semana",txt:"Fechar sublocação de LED antes de quinta. Revisar margem da proposta de Campinas.",tags:["pessoal"],fixada:false,autor:"u1",ts:"2026-09-22T07:40",escopo:"privada",osId:null,cor:"",
-     checklist:[{t:"Cotar LED com Ledway",ok:false},{t:"Revisar margem Festival de Inverno",ok:false},{t:"Aprovar escala da Equipe B",ok:true}]}
-  ];
-  const compromissos=[
-    {id:"cp1",titulo:"Visita técnica — Expo Center Norte",data:"2026-09-25",hora:"09:00",dur:120,tipo:"visita",osId:"OSV-2026-0148",resp:["u2","u6"],local:"Pav. Branco · portaria 3",obs:"Medição dos pontos de ancoragem e conferência da passagem técnica."},
-    {id:"cp2",titulo:"Reunião de alinhamento — Bradesco",data:"2026-09-24",hora:"14:00",dur:60,tipo:"reuniao",osId:"OSV-2026-0150",resp:["u1","u2"],local:"Sala de reunião · escritório",obs:"Revisão do cronograma de montagem com o cliente."},
-    {id:"cp3",titulo:"Prazo — credenciamento de equipe Expo Center",data:"2026-10-02",hora:"18:00",dur:0,tipo:"prazo",osId:"OSV-2026-0148",resp:["u4"],local:"",obs:"Lista nominal com RG de todos os montadores."},
-    {id:"cp4",titulo:"Inventário cíclico — som",data:"2026-09-26",hora:"08:00",dur:240,tipo:"prazo",osId:null,resp:["u3","u5"],local:"Galpão · setor C",obs:"Contagem de line array e subwoofers."},
-    {id:"cp5",titulo:"Entrega da ART — Convenção Bradesco",data:"2026-09-26",hora:"12:00",dur:0,tipo:"prazo",osId:"OSV-2026-0150",resp:["u6"],local:"",obs:"Emitir junto ao CREA antes da carga de 28/09."},
-    {id:"cp6",titulo:"Apresentação de proposta — Festival de Inverno",data:"2026-09-29",hora:"10:00",dur:90,tipo:"reuniao",osId:null,resp:["u1"],local:"Prefeitura de Campinas",obs:"Levar memorial descritivo e portfólio de eventos públicos."}
-  ];
-  const notifs=[
-    {id:"nt1",ts:"2026-09-22T10:02",txt:"Jonas Pereira encontrou 2 Moving Beam com trava folgada na separação da OSC-2026-0312.",para:["gerencia","estoque","producao"],view:"cargas",sel:"OSC-2026-0312",tipo:"alerta",lida:{}},
-    {id:"nt2",ts:"2026-09-22T09:30",txt:"Camila Rocha mencionou você no canal do Vivo Summit de Inovação.",para:["gerencia","producao"],view:"chat",sel:"ch-0148",tipo:"mencao",lida:{}},
-    {id:"nt3",ts:"2026-09-22T08:00",txt:"Conflito de disponibilidade: Painel LED P3.9 com 28 peças a descoberto entre 28/09 e 03/10.",para:["gerencia","estoque"],view:"estoque",sel:null,tipo:"alerta",lida:{}},
-    {id:"nt4",ts:"2026-09-21T17:10",txt:"Wellington Alves publicou o resultado do inventário cíclico de iluminação no mural.",para:["gerencia","estoque","producao"],view:"mural",sel:null,tipo:"info",lida:{gerencia:true}}
-  ];
-  /* o time leu tudo até ontem à noite — só as mensagens de hoje chegam como novas */
-  const corte=addDays(HOJE,-1)+"T23:59";
-  const lidos={gerencia:{},producao:{},estoque:{}};
-  for(const r of Object.keys(lidos)) for(const c of chats) lidos[r][c.id]=corte;
-  return {chats,msgs,posts,notas,compromissos,notifs,lidos,chatSel:"ch-geral",notaSel:null,agendaDia:HOJE,agendaMes:"2026-09",notaFiltro:"",muralTxt:""};
+  return {chats:[],msgs:[],posts:[],notas:[],compromissos:[],notifs:[],
+          lidos:{}, chatSel:null, notaSel:null, agendaDia:HOJE, agendaMes:HOJE.slice(0,7),
+          notaFiltro:"", muralTxt:""};
 }
-function ensureComms(){ if(!S.chats||!S.notifs){ Object.assign(S, seedComms()); } if(!S.lidos) S.lidos={gerencia:{},producao:{},estoque:{}}; }
+function ensureComms(){
+  if(!S.chats)  S.chats=[];  if(!S.msgs) S.msgs=[];
+  if(!S.posts)  S.posts=[];  if(!S.notas) S.notas=[];
+  if(!S.compromissos) S.compromissos=[]; if(!S.notifs) S.notifs=[];
+  if(!S.lidos)  S.lidos={};
+  if(!S.lidos[S.role]) S.lidos[S.role]={};
+  if(!S.agendaDia) S.agendaDia=HOJE;
+  if(!S.agendaMes) S.agendaMes=HOJE.slice(0,7);
+}
 
 /* ---- consultas ---- */
 const chatById = id => S.chats.find(c=>c.id===id);
@@ -1282,26 +1120,30 @@ const TIPONOME={reuniao:"Reunião",visita:"Visita técnica",prazo:"Prazo",montag
 /* ---- escrita ---- */
 function postarMsg(chatId,txt,sys){
   if(!txt||!txt.trim()) return;
-  S.msgs.push({id:"msg"+Date.now()+Math.floor(Math.random()*99),chat:chatId,autor:sys?"sistema":me().id,ts:nowTs(),txt:txt.trim(),sys:!!sys});
+  S.msgs.push({id:uid(),chat:chatId,autor:sys?"sistema":me().id,ts:nowTs(),txt:txt.trim(),sys:!!sys});
   marcarLido(chatId);
 }
-function marcarLido(chatId){ if(!S.lidos[S.role]) S.lidos[S.role]={}; S.lidos[S.role][chatId]=nowTs(); }
+function marcarLido(chatId){
+  if(!S.lidos[S.role]) S.lidos[S.role]={};
+  S.lidos[S.role][chatId]=nowTs();
+  if(typeof db!=="undefined" && db.marcarLido) db.marcarLido(chatId);
+}
 function avisar(txt,para,view,sel,tipo){
-  S.notifs.push({id:"nt"+Date.now()+Math.floor(Math.random()*99),ts:nowTs(),txt,para:para||["gerencia","producao","estoque"],view:view||"painel",sel:sel||null,tipo:tipo||"info",lida:{[S.role]:true}});
+  S.notifs.push({id:uid(),ts:nowTs(),txt,para:para||["gerencia","producao","estoque"],view:view||"painel",sel:sel||null,tipo:tipo||"info",lida:{[S.role]:true}});
 }
 function postarMural(txt,sys){
-  S.posts.unshift({id:"p"+Date.now(),autor:sys?"sistema":me().id,ts:nowTs(),txt,likes:[],coments:[],sys:!!sys});
+  S.posts.unshift({id:uid(),autor:sys?"sistema":me().id,ts:nowTs(),txt,likes:[],coments:[],sys:!!sys});
 }
 function canalDaOS(osId){
   let c=S.chats.find(x=>x.osId===osId);
   if(!c){ const o=osById(osId); if(!o) return null;
-    c={id:"ch-"+osId.slice(-4),tipo:"os",osId,nome:o.evento,membros:["u1","u2","u3"]}; S.chats.push(c); }
+    c={id:uid(),tipo:"os",osId,nome:o.evento,membros:[S.perfilId].filter(Boolean)}; S.chats.push(c); }
   return c;
 }
 /* evento de fluxo: notifica, posta no canal da OS e registra no mural quando relevante */
 function fluxo(osId,txt,para,view,sel,mural){
   const c=osId?canalDaOS(osId):null;
-  if(c) S.msgs.push({id:"msg"+Date.now()+Math.floor(Math.random()*99),chat:c.id,autor:"sistema",ts:nowTs(),txt,sys:true});
+  if(c) S.msgs.push({id:uid(),chat:c.id,autor:"sistema",ts:nowTs(),txt,sys:true});
   avisar(txt,para,view,sel,"fluxo");
   if(mural) postarMural(txt,true);
 }
@@ -1493,7 +1335,7 @@ function vNotas(){
     const feitos=n.checklist.filter(c=>c.ok).length;
     return `<article class="note ${n.cor||""}" data-act="abrirNota" data-id="${n.id}"><div class="bar"></div><div class="in">
       <div class="flex" style="gap:7px">${n.fixada?`<span class="pill acc">fixada</span>`:""}${n.escopo==="privada"?`<span class="pill">privada</span>`:""}
-        ${o?`<span class="tag">${o.id}</span>`:""}</div>
+        ${o?`<span class="tag">${o.codigo||""}</span>`:""}</div>
       <h4>${esc(n.titulo)}</h4>
       ${n.txt?`<p>${esc(n.txt)}</p>`:""}
       ${n.checklist.length?`<div class="chk">${n.checklist.slice(0,5).map((c,i)=>`<div class="${c.ok?"on":""}"><i class="${c.ok?"on":""}">${c.ok?"✓":""}</i>${esc(c.t)}</div>`).join("")}
@@ -1586,7 +1428,7 @@ let tmpChk=[];
 function mNota(id){
   const n=id?S.notas.find(x=>x.id===id):null;
   tmpChk = n? n.checklist.map(c=>({...c})) : [];
-  const osOpts=`<option value="">Sem vínculo</option>`+S.os.map(o=>`<option value="${o.id}" ${n&&n.osId===o.id?"selected":""}>${esc(o.id)} · ${esc(o.evento)}</option>`).join("");
+  const osOpts=`<option value="">Sem vínculo</option>`+S.os.map(o=>`<option value="${o.id}" ${n&&n.osId===o.id?"selected":""}>${esc(o.codigo||"")} · ${esc(o.evento)}</option>`).join("");
   modal(n?"Editar nota":"Nova nota",`
     <div class="field"><label for="ntTit">Título</label><input id="ntTit" value="${n?esc(n.titulo):""}" placeholder="Ex.: Combinados com o cliente"></div>
     <div class="field"><label for="ntTxt">Conteúdo</label><textarea id="ntTxt" rows="5" style="font-family:var(--sans)">${n?esc(n.txt):""}</textarea></div>
@@ -1614,7 +1456,7 @@ function pintarChk(){
 }
 function mComp(id,dia){
   const c=id?S.compromissos.find(x=>x.id===id):null;
-  const osOpts=`<option value="">Sem vínculo</option>`+S.os.map(o=>`<option value="${o.id}" ${c&&c.osId===o.id?"selected":""}>${esc(o.id)} · ${esc(o.evento)}</option>`).join("");
+  const osOpts=`<option value="">Sem vínculo</option>`+S.os.map(o=>`<option value="${o.id}" ${c&&c.osId===o.id?"selected":""}>${esc(o.codigo||"")} · ${esc(o.evento)}</option>`).join("");
   modal(c?"Compromisso":"Novo compromisso",`
     <div class="field"><label for="cpTit">Título</label><input id="cpTit" value="${c?esc(c.titulo):""}" placeholder="Ex.: Visita técnica ao pavilhão"></div>
     <div class="row3">
@@ -1735,7 +1577,7 @@ function salvarNota(id){
     fixada:document.getElementById("ntFix").checked, escopo:document.getElementById("ntPriv").checked?"privada":"equipe",
     checklist:tmpChk.map(c=>({...c}))};
   if(id){ Object.assign(S.notas.find(n=>n.id===id), dados); }
-  else { S.notas.unshift(Object.assign({id:"n"+Date.now(),autor:me().id,ts:nowTs()},dados)); }
+  else { S.notas.unshift(Object.assign({id:uid(),autor:me().id,ts:nowTs()},dados)); }
   fecharModal(); save(); render(); toast("Nota salva.");
 }
 function salvarComp(id){
@@ -1746,7 +1588,7 @@ function salvarComp(id){
     osId:document.getElementById("cpOS").value||null,local:document.getElementById("cpLocal").value,
     obs:document.getElementById("cpObs").value,resp};
   if(id) Object.assign(S.compromissos.find(c=>c.id===id),dados);
-  else { S.compromissos.push(Object.assign({id:"cp"+Date.now()},dados));
+  else { S.compromissos.push(Object.assign({id:uid()},dados));
     avisar(me().nome.split(" ")[0]+" marcou “"+tit+"” para "+dtl(dados.data)+" às "+dados.hora+".",["gerencia","producao","estoque"],"agenda",null,"info"); }
   S.agendaDia=dados.data; S.agendaMes=dados.data.slice(0,7);
   fecharModal(); save(); render(); toast("Compromisso salvo na agenda.");
@@ -1923,143 +1765,17 @@ const PAUTA=["Escopo fecha com o que foi vendido ao cliente",
 const vazioFech = () => ({reuniao:"",hora:"",participantes:["u1"],
   pauta:PAUTA.map(t=>({t,ok:false})),decisoes:"",aprovado:false,aprovadoPor:"",aprovadoEm:""});
 
-function seedCRM(){
-  const base=(o)=>Object.assign({brief:vazioBrief(),vt:vazioVT(),tresd:vazio3D(),briefNotas:[],
-    neg:{proposta:0,desconto:0,condicoes:"50% na assinatura · 50% até 5 dias antes da montagem",concorrentes:"",probabilidade:50,previsao:""},
-    tipoEvento:"Corporativo",sala:"",endereco:"",cidade:"São Paulo · SP",publico:0,
-    montagem:"",montagemHora:"07:00",evIni:"",evIniHora:"19:00",evFim:"",evFimHora:"23:00",desmontagem:"",desmontagemHora:"22:00",
-    origem:"Indicação",prazoDecisao:"",recorrente:false,eventosAnteriores:0,temp:"morno",osId:null},o);
-  const ns=[
-    base({id:"N-1042",titulo:"Ativação Corona Sunsets",cliente:"C05",etapa:"briefing",valor:182000,resp:"u1",temp:"quente",
-      recorrente:true,eventosAnteriores:7,tipoEvento:"Corporativo",local:"Clube Náutico Praia Grande",sala:"Deck externo + área de praia",
-      cidade:"Praia Grande · SP",endereco:"Av. Beira Mar, 2400",publico:2500,origem:"Cliente recorrente",prazoDecisao:"2026-10-05",
-      montagem:"2026-11-12",evIni:"2026-11-14",evIniHora:"16:00",evFim:"2026-11-14",evFimHora:"23:00",desmontagem:"2026-11-15",
-      brief:Object.assign(vazioBrief(),{
-        sala:{nome:"Deck externo",area:1200,peDireito:0,cargaPiso:400,pontos:0,energia:250,acesso:"Rampa lateral, sem doca",elevador:false,obs:"Piso de madeira sobre estrutura metálica. Solo arenoso nas laterais."},
-        led:{tem:true,pitch:"P3.9",larg:8,alt:4,obs:"Backdrop do palco principal, formato paisagem."},
-        palco:{tem:true,larg:12,prof:8,alt:1.2,tipo:"Praticável modular",obs:"Altura maior por causa da visão a partir da areia."},
-        estrutura:{tem:true,tipo:"Q40",vao:14,config:"Portal",obs:"Sem pontos no local — portal em torres de solo com contrapeso."},
-        som:{tem:true,porte:"Show",obs:"DJ set + banda de apoio."},
-        luz:{tem:true,movings:16,wash:12,pares:40,obs:"Pôr do sol às 18h40, virada de cena programada."},
-        extras:{climatizacao:false,gerador:true,mobiliario:true,tenda:true,obs:"Lounge para 200 convidados e tenda de apoio para camarim."}}),
-      briefNotas:[{ts:"2026-09-21T15:10",autor:"u1",txt:"Felipe confirmou verba de R$ 180 mil, mas quer o LED maior que ano passado."},
-        {ts:"2026-09-21T15:14",autor:"u1",txt:"Não há pontos de ancoragem — tudo em torre de solo. Avisar o Diego para o memorial."},
-        {ts:"2026-09-21T15:22",autor:"u1",txt:"Vento na orla é o risco: prever lastro extra e plano de contingência."}]}),
-    base({id:"N-1043",titulo:"Festival de Inverno 2026",cliente:"C04",etapa:"tresd",valor:418500,resp:"u1",temp:"morno",
-      recorrente:false,tipoEvento:"Público",local:"Praça Arautos da Paz",sala:"Arena central",cidade:"Campinas · SP",
-      endereco:"Av. Heitor Penteado, s/n",publico:9000,origem:"Licitação",prazoDecisao:"2026-10-20",
-      montagem:"2026-12-01",evIni:"2026-12-05",evIniHora:"18:00",evFim:"2026-12-07",evFimHora:"23:59",desmontagem:"2026-12-09",
-      brief:Object.assign(vazioBrief(),{
-        sala:{nome:"Arena central",area:3200,peDireito:0,cargaPiso:600,pontos:0,energia:400,acesso:"Acesso por via pública, carga até 22h",elevador:false,obs:"Piso de concreto. Necessária licença de ocupação da praça."},
-        led:{tem:true,pitch:"P3.9",larg:10,alt:5,obs:"Telão principal + dois laterais de apoio (fase 2)."},
-        palco:{tem:true,larg:16,prof:12,alt:1.6,tipo:"Praticável modular",obs:"Palco elevado com barreira de contenção."},
-        estrutura:{tem:true,tipo:"Q40",vao:16,config:"Grid",obs:"Cobertura de palco com lona anti-chama e cálculo de vento."},
-        som:{tem:true,porte:"Show",obs:"Line array com delay tower a 30 m."},
-        luz:{tem:true,movings:24,wash:16,pares:60,obs:""},
-        transmissao:{tem:true,porte:"Multicâmera",obs:"Transmissão obrigatória no canal da prefeitura, com Libras em janela."},
-        extras:{climatizacao:false,gerador:true,mobiliario:false,tenda:true,obs:"Camarins em tenda e gerador redundante exigidos no edital."}}),
-      vt:Object.assign(vazioVT(),{feita:true,data:"2026-09-17",hora:"09:00",quem:["u2","u6"],
-        resumo:"Praça com desnível de 40 cm no sentido norte-sul, exige nivelamento do palco com pés reguláveis. Quadro de energia da prefeitura a 60 m do palco, 400 kVA disponíveis mas sem redundância — gerador próprio obrigatório. Acesso de carreta só pela Rua Ataliba, com manobra apertada: prever munck. Solo de concreto em bom estado, sem restrição de carga pontual.",
-        checklist:[{t:"Medida do pé-direito conferida",ok:false},{t:"Pontos de ancoragem localizados",ok:false},
-          {t:"Quadro de energia e carga disponível",ok:true},{t:"Acesso, doca e elevador de carga",ok:true},
-          {t:"Restrições de ruído e horário de montagem",ok:true}]}),
-      tresd:{necessario:true,status:"Enviado ao cliente",resp:"u4",prazo:"2026-09-26",revisoes:2,link:"render-festival-inverno-v3.mp4",
-        obs:"Cliente pediu ajuste na identidade visual do telão e vista da arquibancada. Terceira revisão enviada em 21/09."}}),
-    base({id:"N-1044",titulo:"Convenção de Líderes",cliente:"C02",etapa:"negociacao",valor:310000,resp:"u1",temp:"quente",
-      recorrente:true,eventosAnteriores:12,local:"Transamérica Expo Center",sala:"Pavilhão A",endereco:"Av. Dr. Mário Vilas Boas Rodrigues, 387",
-      publico:2400,origem:"Cliente recorrente",prazoDecisao:"2026-09-24",
-      montagem:"2026-09-28",evIni:"2026-09-30",evIniHora:"09:00",evFim:"2026-10-01",evFimHora:"18:00",desmontagem:"2026-10-02",
-      brief:Object.assign(vazioBrief(),{
-        sala:{nome:"Pavilhão A",area:620,peDireito:9,cargaPiso:500,pontos:14,energia:300,acesso:"Doca 4, nivelada",elevador:true,obs:"Pavilhão libera 750 kgf por ponto conforme memorial da casa."},
-        led:{tem:true,pitch:"P3.9",larg:12,alt:2.5,obs:"Painel panorâmico atrás do palco."},
-        palco:{tem:true,larg:14,prof:6,alt:0.8,tipo:"Praticável modular",obs:""},
-        estrutura:{tem:true,tipo:"Q30",vao:12,config:"Grid",obs:""},
-        som:{tem:true,porte:"Show",obs:""},luz:{tem:true,movings:20,wash:10,pares:36,obs:""},
-        transmissao:{tem:true,porte:"Híbrido · presencial e online",obs:"2.400 presenciais e cerca de 9 mil assistindo de casa. Sinal também vai para as agências."},
-        extras:{climatizacao:true,gerador:true,mobiliario:false,tenda:false,obs:""}}),
-      vt:Object.assign(vazioVT(),{feita:true,data:"2026-09-08",hora:"14:00",quem:["u2","u3"],
-        resumo:"Pavilhão A conforme memorial: pé-direito útil de 9,00 m, 14 pontos disponíveis na treliça da cobertura com WLL de 750 kgf cada. Doca 4 nivelada, acesso direto de carreta. Restrição: montagem sonora só após 22h por causa de evento vizinho no pavilhão B até 21h30.",
-        checklist:[{t:"Medida do pé-direito conferida",ok:true},{t:"Pontos de ancoragem localizados",ok:true},
-          {t:"Quadro de energia e carga disponível",ok:true},{t:"Acesso, doca e elevador de carga",ok:true},
-          {t:"Restrições de ruído e horário de montagem",ok:true}]}),
-      tresd:{necessario:true,status:"Aprovado",resp:"u4",prazo:"2026-09-12",revisoes:1,link:"render-bradesco-conv-final.png",obs:"Aprovado sem ressalvas pelo Marcos em 12/09."},
-      neg:{proposta:310000,desconto:4,condicoes:"40% na assinatura · 60% em 15 dias após o evento",concorrentes:"Wide Eventos, Arena Live",probabilidade:85,previsao:"2026-09-24"},
-      osId:"OSV-2026-0150"}),
-    base({id:"N-1045",titulo:"Summit de Inovação",cliente:"C01",etapa:"ganho",valor:265400,resp:"u1",temp:"quente",
-      recorrente:true,eventosAnteriores:4,local:"Expo Center Norte",sala:"Pavilhão Branco",endereco:"R. José Bernardo Pinto, 333",
-      publico:1800,origem:"Cliente recorrente",prazoDecisao:"2026-09-14",
-      montagem:"2026-10-06",evIni:"2026-10-08",evIniHora:"09:00",evFim:"2026-10-09",evFimHora:"18:00",desmontagem:"2026-10-10",
-      brief:Object.assign(vazioBrief(),{
-        sala:{nome:"Pavilhão Branco",area:480,peDireito:8.5,cargaPiso:500,pontos:16,energia:250,acesso:"Portaria 3, doca coberta",elevador:true,obs:"Passagem técnica sobre as colunas 7 e 8 — pontos deslocados 1,5 m."},
-        led:{tem:true,pitch:"P3.9",larg:12,alt:2,obs:""},palco:{tem:true,larg:12,prof:6,alt:0.6,tipo:"Praticável modular",obs:""},
-        estrutura:{tem:true,tipo:"Q30",vao:12,config:"Grid",obs:""},som:{tem:true,porte:"Show",obs:""},
-        luz:{tem:true,movings:16,wash:12,pares:40,obs:""},
-        transmissao:{tem:true,porte:"Multicâmera",obs:"Gravação das palestras para o canal interno. Corte ao vivo no telão."},
-        extras:{climatizacao:true,gerador:true,mobiliario:false,tenda:false,obs:""}}),
-      vt:Object.assign(vazioVT(),{feita:true,data:"2026-09-11",hora:"10:00",quem:["u2","u6"],
-        resumo:"Pé-direito de 8,50 m livre sob a treliça. 16 pontos liberados a 750 kgf. Conferido com o engenheiro do pavilhão que os pontos das colunas 7 e 8 não podem ser usados por causa da passagem técnica.",
-        checklist:[{t:"Medida do pé-direito conferida",ok:true},{t:"Pontos de ancoragem localizados",ok:true},
-          {t:"Quadro de energia e carga disponível",ok:true},{t:"Acesso, doca e elevador de carga",ok:true},
-          {t:"Restrições de ruído e horário de montagem",ok:true}]}),
-      tresd:{necessario:true,status:"Aprovado",resp:"u4",prazo:"2026-09-10",revisoes:2,link:"render-vivo-summit-v2.png",obs:""},
-      neg:{proposta:265400,desconto:0,condicoes:"50% na assinatura · 50% até 5 dias antes da montagem",concorrentes:"",probabilidade:100,previsao:"2026-09-14"},
-      osId:"OSV-2026-0148"}),
-    base({id:"N-1046",titulo:"Casamento Marina & Rafael",cliente:"C03",etapa:"ganho",valor:96800,resp:"u1",temp:"quente",
-      tipoEvento:"Social",local:"Fazenda Vila Rica",sala:"Salão Jacarandá",cidade:"Itu · SP",endereco:"Estrada do Pau d'Alho, km 6",
-      publico:320,origem:"Cerimonialista",prazoDecisao:"2026-09-19",
-      montagem:"2026-10-16",evIni:"2026-10-17",evIniHora:"17:00",evFim:"2026-10-17",evFimHora:"03:00",desmontagem:"2026-10-19",
-      brief:Object.assign(vazioBrief(),{
-        sala:{nome:"Salão Jacarandá",area:210,peDireito:6,cargaPiso:400,pontos:0,energia:120,acesso:"Alameda de terra, carreta não entra",elevador:false,obs:"Estrutura de madeira no teto, sem ponto de ancoragem liberado."},
-        led:{tem:false,pitch:"P3.9",larg:0,alt:0,obs:"Cliente não quer LED, apenas projeção discreta."},
-        palco:{tem:true,larg:6,prof:4,alt:0.4,tipo:"Praticável modular",obs:"Palco da banda apenas."},
-        estrutura:{tem:true,tipo:"Q30",vao:9,config:"Torre",obs:"Grid perimetral em torres de solo, teto de madeira não recebe carga."},
-        som:{tem:true,porte:"Música ambiente",obs:"Cerimônia + pista."},
-        transmissao:{tem:true,porte:"Registro em vídeo",obs:"Duas câmeras fixas para os avós que não podem vir. Sem transmissão pública."},
-        luz:{tem:true,movings:0,wash:8,pares:48,obs:"Iluminação cênica de mesas em âmbar quente."},
-        extras:{climatizacao:true,gerador:true,mobiliario:true,tenda:false,obs:"320 cadeiras Tiffany e 34 mesas."}}),
-      vt:Object.assign(vazioVT(),{feita:true,data:"2026-09-16",hora:"11:00",quem:["u2","u4"],
-        resumo:"Teto do salão em estrutura de madeira sem laudo — nenhum içamento autorizado. Todo o grid vai em torre de solo com base lastreada. Acesso por alameda de terra: carreta não entra, carga tem de ser transferida para truck na portaria. Cerimônia às 17h, barulho de montagem precisa cessar às 15h.",
-        checklist:[{t:"Medida do pé-direito conferida",ok:true},{t:"Pontos de ancoragem localizados",ok:true},
-          {t:"Quadro de energia e carga disponível",ok:true},{t:"Acesso, doca e elevador de carga",ok:true},
-          {t:"Restrições de ruído e horário de montagem",ok:true}]}),
-      tresd:{necessario:false,status:"Não solicitado",resp:"u4",prazo:"",revisoes:0,link:"",obs:"Cerimonialista envia o projeto decorativo próprio."},
-      neg:{proposta:96800,desconto:8,condicoes:"30% na reserva · 70% até 10 dias antes",concorrentes:"",probabilidade:100,previsao:"2026-09-19"},
-      osId:"OSV-2026-0149"}),
-    base({id:"N-1047",titulo:"Jantar de Gala Beneficente 2027",cliente:"C06",etapa:"qualificacao",valor:74000,resp:"u1",temp:"frio",
-      recorrente:true,eventosAnteriores:2,tipoEvento:"Social",local:"Museu da Casa Brasileira",sala:"Jardim + varanda",
-      endereco:"Av. Brig. Faria Lima, 2705",publico:420,origem:"Cliente recorrente",prazoDecisao:"2026-11-30",
-      montagem:"2027-03-10",evIni:"2027-03-12",evIniHora:"20:00",evFim:"2027-03-12",evFimHora:"01:00",desmontagem:"2027-03-13",
-      briefNotas:[{ts:"2026-09-22T11:05",autor:"u1",txt:"Cláudia ligou para sondar data. Verba do patrocinador só sai em dezembro."}]}),
-    base({id:"N-1048",titulo:"Feira Hospitalar · Estande Central",cliente:"C07",etapa:"vt",valor:148000,resp:"u1",temp:"quente",
-      local:"Expo Center Norte",sala:"Pavilhão Azul",endereco:"R. José Bernardo Pinto, 333",publico:900,origem:"Inbound",prazoDecisao:"2026-09-25",
-      montagem:"2026-09-29",evIni:"2026-09-30",evIniHora:"10:00",evFim:"2026-10-02",evFimHora:"20:00",desmontagem:"2026-10-03",
-      brief:Object.assign(vazioBrief(),{
-        sala:{nome:"Pavilhão Azul",area:300,peDireito:7.5,cargaPiso:500,pontos:10,energia:150,acesso:"Doca 2",elevador:true,obs:"Estande central de ilha, quatro faces abertas."},
-        led:{tem:true,pitch:"P3.9",larg:7,alt:2.5,obs:"Backdrop curvo, conferir raio mínimo do módulo."},
-        palco:{tem:true,larg:7,prof:4,alt:0.4,tipo:"Praticável modular",obs:"Mini palco de demonstração."},
-        estrutura:{tem:true,tipo:"Q30",vao:10,config:"Torre",obs:"Regulamento da feira proíbe içamento na cobertura: torres de solo."},
-        som:{tem:true,porte:"Fala",obs:""},luz:{tem:true,movings:0,wash:6,pares:24,obs:""},
-        extras:{climatizacao:true,gerador:false,mobiliario:true,tenda:false,obs:"Lounge de atendimento."}}),
-      vt:Object.assign(vazioVT(),{feita:false,data:"2026-09-24",hora:"15:00",quem:["u2"],resumo:""})})
-  ];
-  return ns;
-}
+function seedCRM(){ return []; }
 function ensureCRM(){
   CAT.forEach(c=>{ const e=S.cat.find(x=>x.cod===c.cod); if(!e) S.cat.push({...c}); else e.cat=c.cat; });
-  const eq={"OSV-2026-0148":["u2","u7","u4"],"OSV-2026-0149":["u4","u8"],"OSV-2026-0150":["u2","u8","u7"],
-            "OSV-2026-0151":["u7","u4"],"OSV-2026-0147":["u4"]};
-  S.os.forEach(o=>{ if(!o.produtores){ o.produtores = eq[o.id]||["u2"]; o.produtor=usr(o.produtores[0]).nome; } });
-  if(!S.negocios || !S.negocios[0] || !S.negocios[0].brief) S.negocios=seedCRM();
+  S.os.forEach(o=>{ if(!o.produtores) o.produtores=[]; });
+  if(!S.negocios) S.negocios=[];
   S.negocios.forEach(n=>{
     if(n.etapa==="negociacao") n.etapa="orcamento";
     if(n.etapa==="ganho"||n.etapa==="proposta") n.etapa="orcamento";
     if(n.osId) n.etapa="finalizacao";
-    if(!n.fech){ n.fech=vazioFech();
-      if(n.osId){ n.fech.aprovado=true; n.fech.aprovadoPor="u1"; n.fech.aprovadoEm=addDays(n.montagem||HOJE,-21)+"T15:00";
-        n.fech.reuniao=addDays(n.montagem||HOJE,-21); n.fech.hora="15:00"; n.fech.participantes=["u1","u2","u3"];
-        n.fech.pauta.forEach(x=>x.ok=true);
-        n.fech.decisoes="Evento revisado ponto a ponto com produção e almoxarifado. Escopo, cronograma e margem aprovados sem ressalva. Liberado para emissão da OS de Venda."; } }
-    if(!n.produtores) n.produtores = n.osId ? ["u2"] : [];
+    if(!n.fech) n.fech=vazioFech();
+    if(!n.produtores) n.produtores = [];
     if(!n.brief) n.brief=vazioBrief(); if(!n.vt) n.vt=vazioVT(); if(!n.tresd) n.tresd=vazio3D(); if(!n.briefNotas) n.briefNotas=[];
     if(!n.brief.sala.ancoragem||!n.brief.led.porte) inferirPortes(n); });
 }
@@ -2184,7 +1900,7 @@ function vCRM(){
           <div class="meta">${n.montagem?`<span class="tag">${dt(n.montagem)} → ${dt(n.desmontagem)}</span>`:`<span class="tag">datas a definir</span>`}
             ${n.sala?`<span class="tag">${esc(n.sala)}</span>`:""}</div>
           <div class="f">${can("ver_valores")?`<span class="val">${brl(n.valor)}</span>`:`<span class="muted" style="font-size:11px">${esc(n.tipoEvento)}</span>`}
-            ${n.osId?`<span class="pill acc" style="margin-left:auto">${n.osId.slice(-4)}</span>`:""}</div>
+            ${n.osId?`<span class="pill acc" style="margin-left:auto">${((osById(n.osId)||{}).codigo||"").slice(-4)}</span>`:""}</div>
           <div class="prog" title="${pr} de 6 etapas concluídas">${ETAPAS.map((e,i)=>`<i class="${checkEtapas(n)[e[0]]?"on":""}"></i>`).join("")}</div>
         </div>`;}).join("")||`<div class="empty" style="padding:16px 10px;font-size:11.5px">${esc(desc)}</div>`}</div></div>`;
   }).join("")}</div>`;
@@ -2196,17 +1912,19 @@ const podeEditarCRM = aba => S.role==="gerencia" || (S.role==="producao" && (aba
 function vNegocio(){
   const n=neg(S.sel); if(!n) return vCRM();
   const c=cli(n.cliente), aba=S.crmAba||"qualificacao", ck=checkEtapas(n), ix=etapaIx(n.etapa);
-  const body={qualificacao:abaQual,briefing:abaBrief,vt:abaVT,tresd:aba3D,orcamento:abaNeg,fechamento:abaFech,finalizacao:abaGanho}[aba](n);
+  const abas={qualificacao:abaQual,briefing:abaBrief,vt:abaVT,tresd:aba3D,orcamento:abaNeg,fechamento:abaFech,finalizacao:abaGanho};
+  /* aba desconhecida (etapa antiga, link velho) volta para a qualificação em vez de quebrar a tela */
+  const body=(abas[aba]||abaQual)(n);
   const prox=ix<ETAPAS.length-1?ETAPAS[ix+1]:null;
   return `<div class="between" style="margin-bottom:12px">
     <div><button class="btn sm ghost" data-act="go" data-view="crm">← Pipeline</button>
       <h2 style="font-size:19px;margin-top:6px">${esc(n.titulo)}</h2>
-      <div class="flex" style="margin-top:5px"><span class="tag">${n.id}</span><span class="muted">${esc(c.nome)}</span>
+      <div class="flex" style="margin-top:5px"><span class="tag">${n.codigo||""}</span><span class="muted">${esc(c.nome)}</span>
         <span class="pill"><span class="temp ${n.temp}" style="width:7px;height:7px"></span>Lead ${TEMPS[n.temp]}</span>
         ${n.recorrente?`<span class="rec">recorrente · ${n.eventosAnteriores} eventos</span>`:`<span class="pill">primeiro evento</span>`}
         <span class="pill acc">${esc(ETAPAS[ix][1])}</span>${can("ver_valores")?`<span class="tag">${brl(n.valor)}</span>`:""}</div></div>
     <div class="flex">
-      ${n.osId?`<button class="btn" data-act="osv" data-id="${n.osId}">Abrir ${n.osId}</button>`
+      ${n.osId?`<button class="btn" data-act="osv" data-id="${n.osId}">Abrir ${(osById(n.osId)||{}).codigo||""}</button>`
         :prox&&S.role==="gerencia"?`<button class="btn" data-act="avancar" data-id="${n.id}">Avançar para ${esc(prox[1])} →</button>`:""}
       ${n.etapa==="finalizacao"&&!n.osId&&can("criar_osv")?`<button class="btn pri" data-act="gerarOSVdeNegocio" data-id="${n.id}">Gerar OS de Venda</button>`:""}</div></div>
   <div class="tl2">${ETAPAS.map((e,i)=>`<button class="${aba===e[0]?"on":""} ${ck[e[0]]?"done":""}" data-act="crmAba" data-a="${e[0]}" title="${esc(e[2])}">
@@ -2592,8 +2310,8 @@ function abaGanho(n){
       <div class="card"><header><h3>Liberação</h3></header><div class="pad" style="display:grid;gap:10px">
         ${ETAPAS.slice(0,6).map(x=>`<div class="flex" style="gap:9px"><span class="pill ${ck[x[0]]?"ok":"warn"}"><span class="dot"></span>${ck[x[0]]?"ok":"pendente"}</span>
           <span style="font-size:12.5px">${esc(x[1])}</span></div>`).join("")}
-        ${o?`<div class="verdict ok"><div><b>OS emitida</b>${o.id} está na fila de produção com status ${esc(o.status)}.</div></div>
-            <button class="btn pri" style="justify-content:center" data-act="osv" data-id="${o.id}">Abrir ${o.id}</button>`
+        ${o?`<div class="verdict ok"><div><b>OS emitida</b>${o.codigo||""} está na fila de produção com status ${esc(o.status)}.</div></div>
+            <button class="btn pri" style="justify-content:center" data-act="osv" data-id="${o.id}">Abrir ${o.codigo||""}</button>`
           :pend.length?`<div class="verdict warn"><div><b>Faltam etapas</b>${pend.map(p=>esc(p[1])).join(", ")}. Dá para gerar a OS assim mesmo, mas a produção vai receber dados incompletos.</div></div>
             ${can("criar_osv")?`<button class="btn" style="justify-content:center" data-act="gerarOSVdeNegocio" data-id="${n.id}">Gerar OS mesmo assim</button>`:""}`
           :`<div class="verdict ok"><div><b>Pipeline completo</b>Briefing, visita técnica, 3D, orçamento e a reunião de fechamento — tudo aprovado.</div></div>
@@ -2644,7 +2362,7 @@ const _vNegocioBase = vNegocio;
 vNegocio = function(){ const h=_vNegocioBase(); requestAnimationFrame(travarCRM); return h; };
 
 /* ---- fotos da VT ---- */
-function saveGuard(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); return true; }catch(e){ return false; } }
+function saveGuard(){ save(); return true; }
 function lerFotos(negId, files){
   const arr=[...files].filter(f=>f.type.startsWith("image/")).slice(0,12);
   if(!arr.length) return;
@@ -2691,8 +2409,8 @@ function gerarOSVdeNegocio(negId){
   if(!e.length) return toast("O orçamento não tem nenhum item de estoque — não há escopo para transferir.");
   const externos=(n.orc?n.orc.linhas:[]).filter(l=>l.tipo==="externo");
   const b=n.brief, torres = b.sala.pontos<=0;
-  S.seq.osv++;
-  const id="OSV-2026-0"+S.seq.osv;
+  const id=S._novoOsId||uid(), codigo=S._novoOsCodigo||proximoCodigo("OSV",S.os);
+  S._novoOsId=null; S._novoOsCodigo=null;
   const valor=(n.orc&&n.orc.linhas.length)?Math.round(orcTotais(n).total):(Math.round(n.neg.proposta*(1-(n.neg.desconto||0)/100))||n.valor);
   const desc=[
     "1. OBJETO","Fornecimento, montagem, operação e desmontagem para "+n.titulo+", em "+n.local+(n.sala?" · "+n.sala:"")+", "+n.cidade+".","",
@@ -2719,7 +2437,7 @@ function gerarOSVdeNegocio(negId){
     "Montagem "+dtl(n.montagem)+" às "+n.montagemHora+" · Evento "+dtl(n.evIni)+" às "+n.evIniHora+" · Desmontagem "+dtl(n.desmontagem)+" às "+n.desmontagemHora+".","",
     "9. RESPONSABILIDADE TÉCNICA","ART de execução a ser emitida pelo engenheiro responsável junto ao CREA antes do início da montagem."
   ].join("\n");
-  S.os.push({id,cliente:n.cliente,evento:n.titulo,local:n.local+(n.sala?" · "+n.sala:""),cidade:n.cidade,
+  S.os.push({id,codigo,cliente:n.cliente,evento:n.titulo,local:n.local+(n.sala?" · "+n.sala:""),cidade:n.cidade,
     publico:n.publico||0,area:b.sala.area||200,
     montagem:n.montagem,evIni:n.evIni||n.montagem,evFim:n.evFim||n.evIni||n.montagem,desmontagem:n.desmontagem,
     valor,produtores:[...n.produtores],produtor:usr(n.produtores[0]).nome,status:"Aguardando produção",criada:HOJE,negId:n.id,
@@ -2729,10 +2447,10 @@ function gerarOSVdeNegocio(negId){
     descritivo:desc,etapaAtual:"escopo"});
   n.osId=id; n.etapa="finalizacao"; n.valor=valor;
   const ch=canalDaOS(id); if(ch){ ch.nome=n.titulo; ch.membros=[...new Set([...ch.membros,...n.produtores])]; }
-  fluxo(id,"OS "+id+" gerada a partir do negócio "+n.id+" e atribuída a "+n.produtores.map(u=>usr(u).nome).join(", ")+". Escopo, datas e parâmetros do local herdados do briefing e da visita técnica.",
+  fluxo(id,"OS "+codigo+" gerada a partir do negócio "+n.codigo+" e atribuída a "+n.produtores.map(u=>usr(u).nome).join(", ")+". Escopo, datas e parâmetros do local herdados do briefing e da visita técnica.",
     ["gerencia","producao"],"vendas",id,true);
-  if(n.vt.fotos.length) fluxo(id,n.vt.fotos.length+" foto(s) da visita técnica ficaram anexadas ao negócio "+n.id+".",["producao"],"crm",n.id,false);
-  save(); toast("OS "+id+" emitida com o escopo do briefing."); go("vendas",id);
+  if(n.vt.fotos.length) fluxo(id,n.vt.fotos.length+" foto(s) da visita técnica ficaram anexadas ao negócio "+n.codigo+".",["producao"],"crm",n.id,false);
+  save(); toast("OS "+codigo+" emitida com o escopo do briefing."); go("vendas",id);
 }
 
 /* ================= registro e eventos ================= */
@@ -2771,14 +2489,14 @@ document.addEventListener("click", ev=>{
         if(n.etapa==="vt") avisar("Visita técnica pendente em "+n.local+" para o negócio "+n.id+".",["gerencia","producao"],"crm",n.id,"info");
         if(n.etapa==="tresd"&&n.tresd.necessario) avisar("Projeto 3D solicitado para "+n.titulo+".",["gerencia","producao"],"crm",n.id,"info"); }
       break;}
-    case "novoNegocio": {S.seq.neg++;
-      const n=Object.assign({id:"N-"+S.seq.neg,titulo:"Nova oportunidade",cliente:S.clientes[0].id,etapa:"qualificacao",valor:0,resp:"u1",
+    case "novoNegocio": {
+      const n=Object.assign({id:uid(),codigo:proximoCodigo("N",S.negocios),titulo:"Nova oportunidade",cliente:S.clientes[0].id,etapa:"qualificacao",valor:0,resp:"u1",
         temp:"morno",recorrente:false,eventosAnteriores:0,tipoEvento:"Corporativo",local:"",sala:"",endereco:"",cidade:"São Paulo · SP",
         publico:0,origem:"Inbound",prazoDecisao:"",montagem:addDays(HOJE,30),montagemHora:"07:00",evIni:addDays(HOJE,32),evIniHora:"19:00",
         evFim:addDays(HOJE,32),evFimHora:"23:00",desmontagem:addDays(HOJE,33),desmontagemHora:"22:00",osId:null,
         brief:vazioBrief(),vt:vazioVT(),tresd:vazio3D(),briefNotas:[],
         neg:{proposta:0,desconto:0,condicoes:"50% na assinatura · 50% até 5 dias antes da montagem",concorrentes:"",probabilidade:50,previsao:""}});
-      S.negocios.push(n); S.crmAba="qualificacao"; save(); go("crm",n.id); toast("Negócio "+n.id+" criado. Comece pela qualificação."); break;}
+      S.negocios.push(n); S.crmAba="qualificacao"; save(); go("crm",n.id); toast("Negócio "+n.codigo+" criado. Comece pela qualificação."); break;}
     case "gerarOSVdeNegocio": gerarOSVdeNegocio(id); break;
     case "addNota": {const el=document.getElementById("briefNota"); if(!el||!el.value.trim()) break;
       neg(id).briefNotas.push({ts:nowTs(),autor:me().id,txt:el.value.trim()}); el.value="";
@@ -2840,7 +2558,7 @@ const CATORC=[...CATEGORIAS,"Serviços","Logística"];
 const vazioOrc = () => ({linhas:[],desconto:0,condicoes:"50% na assinatura · 50% até 5 dias antes da montagem",
   validade:"",obsGeral:"",probabilidade:50,previsao:"",concorrentes:""});
 let _orcSeq=0;
-const novaLinhaId = () => "L"+(Date.now()%1e7)+(_orcSeq++);
+const novaLinhaId = () => uid();
 
 function ensureOrc(){
   S.negocios.forEach(n=>{
@@ -3103,28 +2821,8 @@ function sincOrc(n){
 </style>
 <script>
 /* ================= KITS E FICHA DE ITEM ================= */
-function seedKits(){
-  const K=(cod,nome,cat,obs,itens)=>({cod,nome,cat,obs,itens:itens.map(x=>({cod:x[0],qtd:x[1]}))});
-  return [
-    K("KIT-VID-01","Kit de Vídeo · corte simples","Vídeo","Palestra com uma tela e gravação. Vai em 4 cases.",
-      [["SWT-4K",1],["PAS-SDI",2],["MON-REF",2],["ENC-STR",1],["INT-WL",1],["LNK-FIB",2]]),
-    K("KIT-VID-02","Kit de Vídeo · multicâmera","Vídeo","Corte ao vivo com PTZ e 4K, para transmissão.",
-      [["SWT-4K",1],["PAS-SDI",4],["CAM-PTZ",2],["CAM-4K",2],["TRI-PRO",3],["MON-REF",4],["ENC-STR",1],["INT-WL",2],["LNK-FIB",2]]),
-    K("KIT-SOM-01","Kit de Som · fala","Som","Palestra, congresso e cerimônia sem banda.",
-      [["CON-M32",1],["MIC-SF",2],["LNA-VT",2],["MON-P12",2]]),
-    K("KIT-SOM-02","Kit de Som · show","Som","Line array completo com monitoração de palco.",
-      [["LNA-VT",12],["SUB-218",8],["CON-M32",2],["MON-P12",6],["MIC-SF",6]]),
-    K("KIT-LUZ-01","Kit de Luz · cênica","Luz","Wash e realce para palco de palestra.",
-      [["PAR-18",36],["MOV-W575",8],["MES-AVO",1],["RCK-DIM",1]]),
-    K("KIT-LUZ-02","Kit de Luz · show","Luz","Beam, wash e PAR para show e festival.",
-      [["MOV-B230",16],["MOV-W575",12],["PAR-18",40],["MES-AVO",1],["RCK-DIM",2]]),
-    K("KIT-RIG-01","Kit de Rigging · 8 pontos","Estrutura","Acessórios de içamento para um grid de 8 pontos.",
-      [["TAL-1T",8],["SLG-2T",24],["MAN-3T",28]]),
-    K("KIT-NET-01","Kit de Internet · público","Internet","Wi-Fi para plateia, com link dedicado.",
-      [["NET-LNK",1],["NET-RTR",1],["NET-APX",8],["NET-SWT",1],["NET-CAB",2]])
-  ];
-}
-function ensureKits(){ if(!S.kits||!S.kits.length) S.kits=seedKits();
+function seedKits(){ return []; }
+function ensureKits(){ if(!S.kits) S.kits=[];
   S.cat.forEach(c=>{ const o=CAT.find(x=>x.cod===c.cod);
     if(c.porCase===undefined) c.porCase=o?o.porCase:1;
     if(c.watts===undefined) c.watts=o?o.watts:0; }); }
@@ -3332,6 +3030,9 @@ Object.assign(window.VEXTRA||(window.VEXTRA={}),{estoque:vEstoqueNovo});
 /* ================= OS DO PRODUTOR ================= */
 function ensureProd(){
   S.os.forEach(o=>{
+    if(!o.itens) o.itens=[];
+    if(!o.solo)  o.solo ={area:0,adm:500,admPont:1500,publicoKgm2:250,apoios:4,torres:false,feito:false};
+    if(!o.aereo) o.aereo={pontos:0,wllPonto:0,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:false};
     o.itens.forEach(i=>{ if(i.aereo===undefined) i.aereo = item(i.cod).rig==="aereo" ? i.qtd : 0; });
     if(!o.ancoragens){
       o.ancoragens = (o.aereo.pontos>0)
@@ -3373,15 +3074,17 @@ function vProdDet(){
     ["aereo","Memorial aéreo","carga por ponto",e.aereo],
     ["descritivo","Descritivo técnico","texto do projeto",e.descritivo],
     ["logistica","Logística","veículos e equipe",(o.logistica&&o.logistica.viagens.length>0)]];
-  const body={escopo:()=>abaEscopo(o,ed),pontos:()=>abaPontos(o,ed),solo:()=>abaSolo(o,!ed),
-    aereo:()=>abaAereo(o,!ed),descritivo:()=>abaDesc(o,!ed),logistica:()=>abaLogistica(o,ed)}[aba]();
+  const abas={escopo:()=>abaEscopo(o,ed),pontos:()=>abaPontos(o,ed),solo:()=>abaSolo(o,!ed),
+    aereo:()=>abaAereo(o,!ed),descritivo:()=>abaDesc(o,!ed),logistica:()=>abaLogistica(o,ed)};
+  /* vindo de outra tela a aba pode não existir aqui; cai no escopo em vez de quebrar */
+  const body=(abas[aba]||abas.escopo)();
   return `<div class="between" style="margin-bottom:12px">
     <div><button class="btn sm ghost" data-act="go" data-view="producao">← Fila de produção</button>
       <h2 style="font-size:19px;margin-top:6px">${esc(o.evento)}</h2>
-      <div class="flex" style="margin-top:5px"><span class="tag">${o.id}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span>
+      <div class="flex" style="margin-top:5px"><span class="tag">${o.codigo||""}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span>
       <span class="tag">montagem ${dtl(o.montagem)}</span><span class="tag">desmontagem ${dtl(o.desmontagem)}</span>
       <div class="membros" style="margin-left:0">${(o.produtores||[]).map(u=>av(usr(u),22)).join("")}</div></div></div>
-    <div class="flex">${osc?`<span class="pill ok"><span class="dot"></span>Carga ${osc.id} emitida</span><button class="btn" data-act="osc" data-id="${osc.id}">Abrir ordem</button>`
+    <div class="flex">${osc?`<span class="pill ok"><span class="dot"></span>Carga ${osc.codigo||""} emitida</span><button class="btn" data-act="osc" data-id="${osc.id}">Abrir ordem</button>`
       :`<button class="btn pri" data-act="gerarOSC" data-id="${o.id}" ${prontoParaOSC(o)&&can("gerar_osc")?"":"disabled"}>Gerar Ordem de Carga →</button>`}</div></div>
   <div class="steps" style="margin-bottom:14px">${steps.map((s,i)=>`<button class="step ${aba===s[0]?"on":""} ${s[3]?"done":""}" data-act="aba" data-aba="${s[0]}">
     <span class="mk">${s[3]?"✓":i+1}</span><span class="tx">${esc(s[1])}<small>${esc(s[2])}</small></span></button>`).join("")}</div>
@@ -3600,7 +3303,7 @@ document.addEventListener("click", ev=>{
       const qtd=Math.max(1,Number(document.getElementById("anQtd").value)||1);
       const wll=Math.max(0,Number(document.getElementById("anWll").value)||0);
       o.ancoragens=o.ancoragens||[];
-      o.ancoragens.push({id:"A"+Date.now().toString(36),nome,qtd,wll});
+      o.ancoragens.push({id:uid(),nome,qtd,wll});
       o.aereo.feito=false; save(); render(); foco("anNome"); toast(qtd+" ponto(s) de "+kg(wll)+" kgf cadastrados."); break;}
     case "rmAnc": o.ancoragens.splice(Number(t.dataset.ix),1); o.aereo.feito=false; save(); render(); break;
   }
@@ -3645,32 +3348,10 @@ document.addEventListener("change", ev=>{
 /* ================= FROTA E LOGÍSTICA ================= */
 const TIPOS_VEIC=["Carreta","Truck baú","VUC 3/4","Van de equipe","Munck","Utilitário de apoio"];
 const FUNCOES=["Coordenação","Rigger","Montagem","Operação de som","Operação de luz","Operação de vídeo","Cenografia","Motorista","Apoio"];
-function seedFrota(){
-  const V=(cod,nome,tipo,placa,capKg,capCases,lugares,obs)=>({cod,nome,tipo,placa,capKg,capCases,lugares,obs,manut:false});
-  return [
-    V("VEI-01","Carreta sider 15 m","Carreta","QAX-2B09",24000,180,2,"Só entra em doca nivelada. Precisa de pátio para manobra."),
-    V("VEI-02","Truck baú 8 t","Truck baú","PLK-7E42",12000,90,3,""),
-    V("VEI-03","Truck baú 8 t","Truck baú","RTM-4C17",12000,90,3,""),
-    V("VEI-04","VUC 3/4 baú","VUC 3/4","SBG-9J55",3500,28,3,"Acessa garagem com 2,90 m de altura."),
-    V("VEI-05","Van de equipe","Van de equipe","HJU-1D80",800,4,9,"Transporte de pessoal, sem carga pesada."),
-    V("VEI-06","Munck 12 t","Munck","TQP-6F31",6000,10,2,"Para içamento de torre e gerador."),
-    V("VEI-07","Fiorino de apoio","Utilitário de apoio","MZK-2A44",650,4,2,"Compras de última hora e reposição.")
-  ];
-}
+function seedFrota(){ return []; }
 function ensureFrota(){
-  if(!S.frota||!S.frota.length) S.frota=seedFrota();
+  if(!S.frota) S.frota=[];
   S.os.forEach(o=>{ if(!o.logistica) o.logistica={viagens:[],obs:""}; });
-  const b=osById("OSV-2026-0150");
-  if(b && !b.logistica.viagens.length){
-    b.logistica.viagens=[
-      {id:"V1",cod:"VEI-01",motorista:"Jonas Pereira",saida:"2026-09-28",hora:"05:00",retorno:"2026-10-02",
-       obs:"Doca 4, nivelada. Credenciamento pela portaria de serviço até 26/09.",
-       equipe:[{nome:"Jonas Pereira",funcao:"Motorista"},{nome:"Diego Sartori",funcao:"Coordenação"}]},
-      {id:"V2",cod:"VEI-05",motorista:"Camila Rocha",saida:"2026-09-28",hora:"07:30",retorno:"2026-10-02",
-       obs:"Leva a equipe técnica e o material de escritório.",
-       equipe:[{nome:"Camila Rocha",funcao:"Motorista"},{nome:"Sérgio Lemos",funcao:"Operação de som"},{nome:"Tati Moraes",funcao:"Operação de vídeo"},{nome:"Rubens Maia",funcao:"Rigger"},{nome:"Equipe B · 12 montadores",funcao:"Montagem"}]}
-    ];
-  }
 }
 const veic = cod => (S.frota||[]).find(v=>v.cod===cod) || {cod,nome:cod,tipo:"—",placa:"—",capKg:0,capCases:0,lugares:0};
 const icVeic = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 4h8v7h-8zM9.5 6.5h2.7L14.5 9v2h-5z"/><circle cx="4.4" cy="12.4" r="1.4"/><circle cx="11.4" cy="12.4" r="1.4"/></svg>`;
@@ -3790,9 +3471,9 @@ function abaLogistica(o,ed){
             <button class="btn go" type="submit" data-act="addPessoa" data-id="${o.id}" data-ix="${ix}">Embarcar</button>
           </div></form>`:""}
       </div>
-      ${v.equipe.length?`<div>${v.equipe.map((p,pi)=>{const u=USERS.find(x=>x.nome===p.nome);
-        return `<div class="pessoa">${u?av(u,24):`<span class="av" style="background:var(--ink3);color:#FFF;width:24px;height:24px;font-size:10px">${esc(p.nome.slice(0,2).toUpperCase())}</span>`}
-        <span>${esc(p.nome)}</span><span class="fn">${esc(p.funcao)}</span>
+      ${v.equipe.length?`<div>${v.equipe.map((p,pi)=>{const nome=String(p.nome||"—"), u=USERS.find(x=>x.nome===nome);
+        return `<div class="pessoa">${u?av(u,24):`<span class="av" style="background:var(--ink3);color:#FFF;width:24px;height:24px;font-size:10px">${esc(nome.slice(0,2).toUpperCase())}</span>`}
+        <span>${esc(nome)}</span><span class="fn">${esc(p.funcao||"")}</span>
         ${ed?`<button class="btn sm ghost" data-act="rmPessoa" data-id="${o.id}" data-ix="${ix}" data-pi="${pi}">×</button>`:""}</div>`;}).join("")}</div>`
         :`<div class="empty" style="padding:14px;font-size:12px">Ninguém embarcado ainda.</div>`}
     </div>`;}).join("")||`<div class="empty">Nenhum veículo alocado. A ordem de carga sai sem frota definida.</div>`}
@@ -3831,7 +3512,7 @@ document.addEventListener("click", ev=>{
       const o=osById(id); if(!o) break;
       const cod=document.getElementById("lgVeic").value; if(!cod) return toast("Não há veículo livre para alocar.");
       if(!veicLivre(cod,o.montagem,o.desmontagem,o.id)) return toast("Esse veículo não está livre nesta janela.");
-      o.logistica.viagens.push({id:"V"+Date.now().toString(36),cod,
+      o.logistica.viagens.push({id:uid(),cod,
         motorista:document.getElementById("lgMot").value.trim(),
         saida:document.getElementById("lgSaida").value,hora:document.getElementById("lgHora").value,
         retorno:o.desmontagem,obs:"",equipe:[]});
@@ -3952,9 +3633,8 @@ function salvarOSV(){
   if(!tmpItens.length) return toast("Inclua ao menos um equipamento no escopo.");
   const mont=$("#fMont").value, desm=$("#fDesm").value;
   if(!mont||!desm||desm<mont) return toast("A descarga precisa ser igual ou posterior à carga.");
-  S.seq.osv++;
-  const id="OSV-2026-0"+S.seq.osv;
-  S.os.push({id,cliente:$("#fCli").value,evento:ev,local:$("#fLoc").value||"A definir",cidade:$("#fCid").value,
+  const id=uid(), codigo=proximoCodigo("OSV",S.os);
+  S.os.push({id,codigo,cliente:$("#fCli").value,evento:ev,local:$("#fLoc").value||"A definir",cidade:$("#fCid").value,
     publico:Number($("#fPub").value)||0,area:Number($("#fArea").value)||100,
     montagem:mont,evIni:addDays(mont,1),evFim:addDays(mont,1),desmontagem:desm,
     valor:Number($("#fVal").value)||0,produtor:PERFIS.producao.nome,status:"Aguardando produção",criada:HOJE,
@@ -3963,9 +3643,9 @@ function salvarOSV(){
     aereo:{pontos:8,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:false},
     descritivo:"",etapaAtual:"escopo"});
   if(S._negOrigem){const n=S.negocios.find(x=>x.id===S._negOrigem); if(n) n.osId=id; S._negOrigem=null;}
-  fluxo(id, "OS "+id+" emitida e encaminhada à produção. Montagem em "+dtl(mont)+", desmontagem em "+dtl(desm)+".",
+  fluxo(id, "OS "+codigo+" emitida e encaminhada à produção. Montagem em "+dtl(mont)+", desmontagem em "+dtl(desm)+".",
     ["gerencia","producao"], "vendas", id, true);
-  S.osvForm=false; save(); toast("OS "+id+" emitida e encaminhada à produção."); go("vendas",id);
+  S.osvForm=false; save(); toast("OS "+codigo+" emitida e encaminhada à produção."); go("vendas",id);
 }
 
 /* ---------------- recálculo ao vivo ---------------- */
@@ -3990,10 +3670,8 @@ document.addEventListener("click", ev=>{
   const a=t.dataset.act, id=t.dataset.id;
   switch(a){
     case "go": go(t.dataset.view, id||null); break;
-    case "role": S.role=t.dataset.role; S.sel=null; if(!podeVer(S.view)) S.view="painel"; save(); render(); toast("Perfil ativo: "+PERFIS[S.role].label); break;
     case "menu": $("#side").classList.toggle("open"); $("#scrim").classList.toggle("on"); break;
     case "tema": aplicarTema(t.dataset.m); break;
-    case "reset": S=seed(); ensureComms(); ensureCRM(); ensureOrc(); ensureKits(); ensureProd(); ensureFrota(); save(); render(); toast("Dados de demonstração restaurados."); break;
     case "osv": go("vendas",id); break;
     case "irOSV": fecharModal(); go("vendas",id); break;
     case "prod": go("producao",id); S.aba="escopo"; render(); break;
@@ -4069,26 +3747,753 @@ document.addEventListener("keydown", ev=>{
   if(par){ ev.preventDefault(); const bt=document.querySelector('[data-act="'+par+'"]'); if(bt) bt.click(); }
 });
 
-/* ---------------- boot ---------------- */
-function temaAtual(){ try{ return localStorage.getItem(KEY+".theme")||"auto"; }catch(e){ return "auto"; } }
+/* ---------------- tema ---------------- */
+function temaAtual(){ try{ return localStorage.getItem(KEY+".tema")||"auto"; }catch(e){ return "auto"; } }
 function aplicarTema(modo){
   if(modo==="auto") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme",modo);
-  try{ localStorage.setItem(KEY+".theme", modo==="auto"?"":modo); }catch(e){}
+  try{ localStorage.setItem(KEY+".tema", modo==="auto"?"":modo); }catch(e){}
   pintarTema();
   if(modo!=="auto") toast("Tema "+(modo==="dark"?"escuro":"claro")+" fixado.");
 }
 function pintarTema(){
   const m=temaAtual();
-  document.querySelectorAll("#themeSel button").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
+  document.querySelectorAll("#themeSel button").forEach(x=>x.classList.toggle("on", x.dataset.m===m));
 }
-(function(){ const m=temaAtual(); if(m!=="auto") document.documentElement.setAttribute("data-theme",m); pintarTema(); })();
-load();
-ensureComms();
-ensureCRM();
-ensureOrc();
-ensureKits();
-ensureProd();
-ensureFrota();
-render();
+(function(){ const m=temaAtual(); if(m!=="auto") document.documentElement.setAttribute("data-theme",m); })();
+
+/* O boot fica no módulo de dados: primeiro autentica, depois carrega, depois renderiza. */
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* =============================================================
+   EventFlow · camada de dados
+   Preencha as duas linhas abaixo com o que está em
+   Supabase → Project Settings → API.
+   ============================================================= */
+const SUPABASE_URL      = "https://shhwlemlxtphbmfhpicu.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_Wstk4liRyPPELnMBJx-_qA_8mktUhk9";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+const configurado = () => !SUPABASE_URL.includes("SEU-PROJETO") && !SUPABASE_ANON_KEY.includes("SUA_ANON");
+
+/* ---------- utilitários ---------- */
+const ini = nome => (nome||"··").split(" ").filter(Boolean).slice(0,2).map(p=>p[0]).join("").toUpperCase();
+const num = v => v==null ? 0 : Number(v);
+const nz  = v => (v===""||v===undefined) ? null : v;
+function erro(e, contexto){
+  console.error(contexto, e);
+  toast((contexto||"Falha")+": "+(e.message||e.error_description||"erro desconhecido"));
+}
+
+/* =============================================================
+   1 · AUTENTICAÇÃO
+   ============================================================= */
+function telaLogin(msg, tipo){
+  document.getElementById("app").hidden = true;
+  document.getElementById("authHost").innerHTML = `
+  <div class="authwrap"><div class="authcard">
+    <div class="brandline"><span class="mk"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="var(--onAccent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h6M2.5 8h8.5M2.5 11.5h6"/><path d="M11.2 4.6L14 8l-2.8 3.4"/></svg></span><b>EventFlow</b></div>
+    <form id="formLogin" autocomplete="on">
+      <div><h2>Entrar na operação</h2>
+        <p class="sub">Use o e-mail cadastrado pela gerência. O que você vê depende do seu perfil.</p></div>
+      ${msg?`<div class="${tipo==="ok"?"ok":"erro"}">${esc(msg)}</div>`:""}
+      <div class="field"><label for="liEmail">E-mail</label>
+        <input id="liEmail" type="email" autocomplete="username" required placeholder="voce@empresa.com.br"></div>
+      <div class="field"><label for="liSenha">Senha</label>
+        <input id="liSenha" type="password" autocomplete="current-password" required></div>
+      <button class="btn pri" type="submit" style="justify-content:center">Entrar</button>
+      <button class="btn ghost" type="button" data-act="recuperar" style="justify-content:center">Esqueci a senha</button>
+    </form>
+    <footer>${configurado()
+      ? "Primeiro acesso? Peça à gerência para criar seu usuário e definir o perfil."
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_ANON_KEY no topo do último bloco de script."}</footer>
+  </div></div>`;
+  const f=document.getElementById("formLogin");
+  f.addEventListener("submit", async ev=>{
+    ev.preventDefault();
+    if(!configurado()) return telaLogin("Preencha SUPABASE_URL e SUPABASE_ANON_KEY no arquivo antes de entrar.");
+    const btn=f.querySelector('button[type="submit"]');
+    btn.disabled=true; btn.textContent="Entrando…";
+    const { error } = await sb.auth.signInWithPassword({
+      email: document.getElementById("liEmail").value.trim(),
+      password: document.getElementById("liSenha").value });
+    if(error){ telaLogin(error.message==="Invalid login credentials"?"E-mail ou senha não conferem.":error.message); return; }
+    iniciar();
+  });
+  document.getElementById("liEmail").focus();
+}
+async function recuperarSenha(){
+  const email=(document.getElementById("liEmail")||{}).value;
+  if(!email) return telaLogin("Informe o e-mail para receber o link de redefinição.");
+  const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.href });
+  telaLogin(error? error.message : "Link de redefinição enviado para "+email.trim()+".", error?null:"ok");
+}
+async function sair(){ await sb.auth.signOut(); location.reload(); }
+
+/* =============================================================
+   2 · CARGA — o banco vira o formato que as telas já usam
+   ============================================================= */
+const mapPerfil = p => ({id:p.id, nome:p.nome, cargo:p.cargo||"", role:p.papel, ini:ini(p.nome), cor:p.cor||"#1B1B1E"});
+const mapItem   = i => ({cod:i.cod, nome:i.nome, cat:i.categoria, un:i.unidade, peso:num(i.peso_kg),
+                         porCase:i.por_case, watts:i.watts, diaria:num(i.diaria),
+                         total:i.quantidade_total, manut:i.em_manutencao, rig:"solo"});
+const mapVeic   = v => ({cod:v.cod, nome:v.nome, tipo:v.tipo, placa:v.placa, capKg:v.capacidade_kg,
+                         capCases:v.capacidade_cases, lugares:v.lugares, obs:v.observacao||"", manut:v.em_manutencao});
+const mapCliente= c => ({id:c.id, nome:c.nome, tipo:c.tipo, doc:c.documento, contato:c.contato,
+                         tel:c.telefone, cidade:c.cidade, desde:c.desde});
+
+function mapNegocio(n){
+  const b=vazioBrief();
+  if(n.negocio_sala){ const s=n.negocio_sala;
+    Object.assign(b.sala,{nome:n.sala||"",area:num(s.area_m2),peDireito:num(s.pe_direito),ancoragem:s.ancoragem,
+      cargaPiso:num(s.carga_piso),energia:num(s.energia_kva),pontos:s.pontos||0,acesso:s.acesso||"",
+      elevador:!!s.elevador,obs:s.observacao||""}); }
+  (n.briefing_blocos||[]).forEach(x=>{ if(b[x.bloco]){ b[x.bloco].tem=x.incluso; b[x.bloco].porte=x.porte||b[x.bloco].porte; b[x.bloco].obs=x.observacao||""; }});
+  const vt=vazioVT();
+  if(n.visitas_tecnicas){ const v=n.visitas_tecnicas;
+    Object.assign(vt,{feita:v.realizada,data:v.data||"",hora:v.hora||"",resumo:v.resumo||""}); }
+  vt.quem=(n.vt_participantes||[]).map(x=>x.perfil_id);
+  if((n.vt_checklist||[]).length) vt.checklist=n.vt_checklist.sort((a,c)=>a.ordem-c.ordem).map(x=>({id:x.id,t:x.texto,ok:x.concluido}));
+  vt.fotos=(n.vt_fotos||[]).map(f=>({id:f.id, nome:f.storage_path.split("/").pop(), legenda:f.legenda||"",
+                                     path:f.storage_path, src:urlFoto(f.storage_path)}));
+  const t3=vazio3D();
+  if(n.projetos_3d){ const p=n.projetos_3d;
+    Object.assign(t3,{necessario:p.necessario,status:p.status,resp:p.responsavel_id,prazo:p.prazo||"",
+      revisoes:p.revisoes,link:p.arquivo||"",obs:p.retorno||""}); }
+  const fch=vazioFech();
+  if(n.fechamentos){ const f=n.fechamentos;
+    Object.assign(fch,{reuniao:f.reuniao||"",hora:f.hora||"",decisoes:f.decisoes||"",aprovado:f.aprovado,
+      aprovadoPor:f.aprovado_por,aprovadoEm:f.aprovado_em||""}); }
+  fch.participantes=(n.fechamento_participantes||[]).map(x=>x.perfil_id);
+  if((n.fechamento_pauta||[]).length) fch.pauta=n.fechamento_pauta.sort((a,c)=>a.ordem-c.ordem).map(x=>({id:x.id,t:x.texto,ok:x.revisado}));
+  const orc=vazioOrc();
+  if(n.orcamentos){ const o=n.orcamentos;
+    Object.assign(orc,{desconto:num(o.desconto),condicoes:o.condicoes||"",validade:o.validade||"",
+      obsGeral:o.observacao||"",probabilidade:o.probabilidade,previsao:o.previsao||"",concorrentes:o.concorrentes||""}); }
+  orc.linhas=(n.orcamento_linhas||[]).sort((a,c)=>a.ordem-c.ordem).map(l=>({id:l.id,tipo:l.tipo,cod:l.item_cod,
+    nome:l.descricao,cat:l.categoria,qtd:num(l.quantidade),dias:l.diarias,unit:num(l.valor_unitario),
+    modo:l.cobranca,fornecedor:l.fornecedor||"",obs:l.observacao||""}));
+  return {id:n.id, codigo:n.codigo, titulo:n.titulo, cliente:n.cliente_id, etapa:n.etapa,
+    temp:n.temperatura, recorrente:n.recorrente, eventosAnteriores:n.eventos_anteriores,
+    tipoEvento:n.tipo_evento, origem:n.origem, resp:n.responsavel_id,
+    local:n.local_nome||"", sala:n.sala||"", endereco:n.endereco||"", cidade:n.cidade||"",
+    publico:n.publico||0, prazoDecisao:n.prazo_decisao||"",
+    montagem:n.montagem||"", montagemHora:n.montagem_hora||"07:00",
+    evIni:n.evento_inicio||"", evIniHora:n.evento_inicio_hora||"19:00",
+    evFim:n.evento_fim||"", evFimHora:n.evento_fim_hora||"23:00",
+    desmontagem:n.desmontagem||"", desmontagemHora:n.desmontagem_hora||"22:00",
+    valor:num(n.valor), osId:n.os_id, produtores:[],
+    brief:b, briefNotas:(n.briefing_notas||[]).map(x=>({ts:x.criado_em,autor:x.autor_id,txt:x.texto})),
+    vt, tresd:t3, fech:fch, orc,
+    neg:{proposta:0,desconto:num((n.orcamentos||{}).desconto),condicoes:orc.condicoes,
+         concorrentes:orc.concorrentes,probabilidade:orc.probabilidade,previsao:orc.previsao}};
+}
+function mapOS(o){
+  const m=o.os_memorial||{};
+  return {id:o.id, codigo:o.codigo, negId:o.negocio_id, cliente:o.cliente_id, evento:o.evento,
+    local:o.local_nome||"", cidade:o.cidade||"", publico:o.publico||0, area:num(o.area_m2),
+    montagem:o.montagem, evIni:o.evento_inicio||o.montagem, evFim:o.evento_fim||o.evento_inicio||o.montagem,
+    desmontagem:o.desmontagem, valor:num(o.valor), status:o.status, descritivo:o.descritivo||"",
+    criada:(o.criado_em||"").slice(0,10),
+    produtores:(o.os_produtores||[]).sort((a,b)=>(b.responsavel?1:0)-(a.responsavel?1:0)).map(p=>p.perfil_id),
+    produtor:"",
+    itens:(o.os_itens||[]).map(i=>({id:i.id,cod:i.item_cod,qtd:i.quantidade,
+      aereo:i.quantidade_aerea===null?null:i.quantidade_aerea, obs:i.observacao||""})),
+    ancoragens:(o.os_ancoragens||[]).map(a=>({id:a.id,nome:a.nome,qtd:a.quantidade,wll:num(a.wll_kgf)})),
+    solo:{area:num(m.area_apoio),adm:num(m.carga_admissivel),admPont:num(m.carga_pontual_admissivel),
+          publicoKgm2:num(m.sobrecarga_publico),apoios:m.apoios_por_equipamento||4,
+          torres:!!m.torre_solo,feito:!!m.solo_concluido},
+    aereo:{pontos:0,wllPonto:0,fd:num(m.fator_dinamico)||1.2,fdes:num(m.fator_desbalanceamento)||1.25,
+           wllAcess:num(m.wll_acessorio)||2000,fsMin:num(m.fs_minimo)||5,vao:num(m.vao_livre)||10,
+           feito:!!m.aereo_concluido},
+    logistica:{obs:(o.os_logistica||{}).observacao||"",
+      viagens:(o.os_viagens||[]).map(v=>({id:v.id,cod:v.veiculo_cod,motorista:v.motorista||"",
+        saida:v.saida||"",hora:v.hora||"",retorno:v.retorno||"",obs:v.observacao||"",
+        equipe:(v.viagem_equipe||[]).map(p=>({id:p.id,nome:p.nome,funcao:p.funcao}))}))},
+    etapaAtual:"escopo"};
+}
+const mapCarga = c => ({id:c.id, codigo:c.codigo, osId:c.os_id, evento:c.evento_avulso||"",
+  status:c.status, carga:c.data_carga, horaCarga:c.hora_carga||"", descarga:c.data_descarga,
+  veiculo:c.veiculo||"", equipe:c.equipe||"", conferente:"", obs:c.observacao||"",
+  itens:(c.osc_itens||[]).map(i=>({cod:i.item_cod,qtd:i.quantidade}))});
+const mapMov = m => ({id:m.id, codigo:m.codigo, data:m.data, tipo:m.tipo==="SAIDA"?"SAÍDA":"ENTRADA",
+  oscId:m.ordem_carga_id, ref:m.referencia||"", quem:m.usuario_id, user:"",
+  linhas:(m.movimento_linhas||[]).map(l=>[l.item_cod,l.quantidade]),
+  avarias:(m.movimento_linhas||[]).filter(l=>l.avaria>0).map(l=>[l.item_cod,l.avaria])});
+
+function urlFoto(path){
+  const { data } = sb.storage.from("vt-fotos").getPublicUrl(path);
+  return data?.publicUrl || "";
+}
+
+async function carregarTudo(){
+  const q = (t,sel) => sb.from(t).select(sel||"*");
+  const [perfis, clientes, itens, kits, frota, negocios, os, cargas, movs,
+         canais, msgs, posts, notas, comps, notifs] = await Promise.all([
+    q("perfis"), q("clientes"), q("v_itens"),
+    q("kits","*, kit_itens(item_cod, quantidade)"), q("frota"),
+    q("negocios", `*, negocio_sala(*), briefing_blocos(*), briefing_notas(*),
+        visitas_tecnicas(*), vt_participantes(perfil_id), vt_checklist(*), vt_fotos(*),
+        projetos_3d(*), orcamentos(*), orcamento_linhas(*),
+        fechamentos(*), fechamento_participantes(perfil_id), fechamento_pauta(*)`),
+    q("v_ordens_venda").then(async r=>{
+      if(r.error||!r.data.length) return r;
+      const ids=r.data.map(x=>x.id);
+      const det = await sb.from("ordens_venda").select(
+        `id, os_produtores(perfil_id,responsavel), os_itens(*), os_ancoragens(*), os_memorial(*),
+         os_logistica(observacao), os_viagens(*, viagem_equipe(*))`).in("id",ids);
+      if(det.error) return det;
+      const byId={}; det.data.forEach(d=>byId[d.id]=d);
+      r.data.forEach(o=>Object.assign(o, byId[o.id]||{}));
+      return r;
+    }),
+    q("ordens_carga","*, osc_itens(item_cod, quantidade)"),
+    q("movimentos","*, movimento_linhas(item_cod, quantidade, avaria)"),
+    q("canais","*, canal_membros(perfil_id, lido_em)"), q("mensagens"),
+    q("posts","*, post_curtidas(perfil_id), post_comentarios(*)"),
+    q("notas","*, nota_checklist(*)"),
+    q("compromissos","*, compromisso_responsaveis(perfil_id)"),
+    q("notificacoes","*, notificacao_leituras(perfil_id)")
+  ]);
+  for(const r of [perfis,clientes,itens,kits,frota,negocios,os,cargas,movs,canais,msgs,posts,notas,comps,notifs])
+    if(r.error) throw r.error;
+
+  S.perfis   = perfis.data.map(mapPerfil);
+  S.clientes = clientes.data.map(mapCliente);
+  S.cat      = itens.data.map(mapItem);
+  S.kits     = kits.data.map(k=>({cod:k.cod,nome:k.nome,cat:k.categoria,obs:k.observacao||"",
+                 itens:(k.kit_itens||[]).map(x=>({cod:x.item_cod,qtd:x.quantidade}))}));
+  S.frota    = frota.data.map(mapVeic);
+  S.negocios = negocios.data.map(mapNegocio);
+  S.os       = os.data.map(mapOS);
+  S.cargas   = cargas.data.map(mapCarga);
+  S.movs     = movs.data.map(mapMov);
+
+  /* liga produtores e nomes que as telas esperam */
+  S.os.forEach(o=>{ o.produtor = o.produtores.length? usr(o.produtores[0]).nome : ""; });
+  S.negocios.forEach(n=>{ const o=S.os.find(x=>x.id===n.osId); n.produtores = o? o.produtores : []; });
+  S.cargas.forEach(c=>{ c.conferente = usr(S.perfilId).nome; });
+  S.movs.forEach(m=>{ m.user = m.quem ? usr(m.quem).nome : "—"; });
+
+  const eu = S.perfilId;
+  S.chats = canais.data.map(c=>({id:c.id,tipo:c.tipo,nome:c.nome||"",desc:c.descricao||"",osId:c.os_id,
+              membros:(c.canal_membros||[]).map(m=>m.perfil_id)}));
+  S.lidos = {[S.role]:{}};
+  canais.data.forEach(c=>{ const m=(c.canal_membros||[]).find(x=>x.perfil_id===eu);
+    if(m) S.lidos[S.role][c.id]=m.lido_em; });
+  S.msgs  = msgs.data.map(m=>({id:m.id,chat:m.canal_id,autor:m.autor_id,txt:m.texto,sys:m.sistema,ts:m.criado_em}));
+  S.posts = posts.data.sort((a,b)=>a.criado_em<b.criado_em?1:-1).map(p=>({id:p.id,autor:p.autor_id,ts:p.criado_em,
+              txt:p.texto,sys:p.sistema,likes:(p.post_curtidas||[]).map(x=>x.perfil_id),
+              coments:(p.post_comentarios||[]).sort((a,b)=>a.criado_em<b.criado_em?-1:1)
+                       .map(c=>({id:c.id,autor:c.autor_id,ts:c.criado_em,txt:c.texto}))}));
+  S.notas = notas.data.map(n=>({id:n.id,titulo:n.titulo,txt:n.conteudo||"",tags:n.etiquetas||[],cor:n.cor||"",
+              fixada:n.fixada,escopo:n.escopo,autor:n.autor_id,osId:n.os_id,ts:n.criado_em,
+              checklist:(n.nota_checklist||[]).sort((a,b)=>a.ordem-b.ordem).map(c=>({id:c.id,t:c.texto,ok:c.concluido}))}));
+  S.compromissos = comps.data.map(c=>({id:c.id,titulo:c.titulo,data:c.data,hora:c.hora||"",dur:c.duracao_min||0,
+              tipo:c.tipo,osId:c.os_id,negId:c.negocio_id,local:c.local||"",obs:c.observacao||"",
+              resp:(c.compromisso_responsaveis||[]).map(r=>r.perfil_id)}));
+  S.notifs = notifs.data.map(n=>({id:n.id,ts:n.criado_em,txt:n.texto,tipo:n.tipo,para:n.destino,
+              view:n.tela||"painel",sel:n.referencia,
+              lida:Object.fromEntries((n.notificacao_leituras||[]).filter(l=>l.perfil_id===eu).map(()=>[S.role,true]))}));
+}
+</script>
+<script>
+/* =============================================================
+   3 · GRAVAÇÃO
+   Todo o app chama save() depois de mexer em S. Aqui isso vira
+   uma comparação com o último estado conhecido, e só o que mudou
+   sobe para o banco.
+   ============================================================= */
+let ultimo = null;               // fotografia do que já está gravado
+let pendente = null;             // timer do debounce
+let gravando = false;
+
+const clone = o => JSON.parse(JSON.stringify(o));
+const igual = (a,b) => JSON.stringify(a)===JSON.stringify(b);
+const porId = arr => Object.fromEntries((arr||[]).map(x=>[x.id||x.cod, x]));
+
+function marcarSincronizado(){ ultimo = clone({
+  cat:S.cat, kits:S.kits, frota:S.frota, clientes:S.clientes,
+  negocios:S.negocios, os:S.os, cargas:S.cargas,
+  notas:S.notas, compromissos:S.compromissos, msgs:S.msgs, posts:S.posts, notifs:S.notifs }); }
+
+function agendarSync(){
+  clearTimeout(pendente);
+  pendente = setTimeout(()=>sincronizar(), 500);
+  const b=document.getElementById("btnSync"); if(b) b.textContent="Salvando…";
+}
+save = agendarSync;
+load = () => {};
+
+async function sincronizar(){
+  if(gravando || !ultimo) return;
+  gravando = true;
+  const b=document.getElementById("btnSync");
+  try{
+    await Promise.all([
+      syncItens(), syncKits(), syncFrota(), syncClientes(),
+      syncNegocios(), syncOS(), syncCargas(),
+      syncNotas(), syncCompromissos(), syncPosts(), syncNotifs()
+    ]);
+    marcarSincronizado();
+    if(b) b.textContent="Atualizar";
+  }catch(e){ erro(e,"Não consegui gravar"); if(b) b.textContent="Erro ao salvar"; }
+  finally{ gravando=false; }
+}
+
+/* ---------- inventário ---------- */
+async function syncItens(){
+  const antes=porId(ultimo.cat), agora=porId(S.cat);
+  const up=S.cat.filter(i=>!igual(i,antes[i.cod])).map(i=>({cod:i.cod,nome:i.nome,categoria:i.cat,
+    unidade:i.un,peso_kg:i.peso,por_case:i.porCase,watts:i.watts,diaria:i.diaria,
+    quantidade_total:i.total,em_manutencao:i.manut}));
+  const del=Object.keys(antes).filter(c=>!agora[c]);
+  if(up.length){ const r=await sb.from("itens").upsert(up); if(r.error) throw r.error; }
+  if(del.length){ const r=await sb.from("itens").delete().in("cod",del); if(r.error) throw r.error; }
+}
+async function syncKits(){
+  const antes=porId(ultimo.kits), agora=porId(S.kits);
+  for(const k of S.kits){
+    if(igual(k,antes[k.cod])) continue;
+    let r=await sb.from("kits").upsert({cod:k.cod,nome:k.nome,categoria:k.cat,observacao:nz(k.obs)});
+    if(r.error) throw r.error;
+    r=await sb.from("kit_itens").delete().eq("kit_cod",k.cod); if(r.error) throw r.error;
+    if(k.itens.length){ r=await sb.from("kit_itens").insert(k.itens.map(x=>({kit_cod:k.cod,item_cod:x.cod,quantidade:x.qtd})));
+      if(r.error) throw r.error; }
+  }
+  const del=Object.keys(antes).filter(c=>!agora[c]);
+  if(del.length){ const r=await sb.from("kits").delete().in("cod",del); if(r.error) throw r.error; }
+}
+async function syncFrota(){
+  const antes=porId(ultimo.frota), agora=porId(S.frota);
+  const up=S.frota.filter(v=>!igual(v,antes[v.cod])).map(v=>({cod:v.cod,nome:v.nome,tipo:v.tipo,placa:nz(v.placa),
+    capacidade_kg:v.capKg,capacidade_cases:v.capCases,lugares:v.lugares,observacao:nz(v.obs),em_manutencao:!!v.manut}));
+  const del=Object.keys(antes).filter(c=>!agora[c]);
+  if(up.length){ const r=await sb.from("frota").upsert(up); if(r.error) throw r.error; }
+  if(del.length){ const r=await sb.from("frota").delete().in("cod",del); if(r.error) throw r.error; }
+}
+async function syncClientes(){
+  const antes=porId(ultimo.clientes);
+  const up=S.clientes.filter(c=>!igual(c,antes[c.id]));
+  if(!up.length) return;
+  const r=await sb.from("clientes").upsert(up.map(c=>({id:c.id,nome:c.nome,tipo:c.tipo,documento:c.doc,
+    contato:c.contato,telefone:c.tel,cidade:c.cidade,desde:c.desde})));
+  if(r.error) throw r.error;
+}
+
+/* ---------- pipeline ---------- */
+async function syncNegocios(){
+  const antes=porId(ultimo.negocios);
+  for(const n of S.negocios){
+    const a=antes[n.id];
+    if(igual(n,a)) continue;
+    let r=await sb.from("negocios").upsert({id:n.id,codigo:n.codigo,titulo:n.titulo,cliente_id:nz(n.cliente),
+      etapa:n.etapa,temperatura:n.temp,recorrente:!!n.recorrente,eventos_anteriores:n.eventosAnteriores||0,
+      tipo_evento:n.tipoEvento,origem:n.origem,responsavel_id:nz(n.resp),
+      local_nome:nz(n.local),sala:nz(n.sala),endereco:nz(n.endereco),cidade:nz(n.cidade),
+      publico:n.publico||0,prazo_decisao:nz(n.prazoDecisao),
+      montagem:nz(n.montagem),montagem_hora:nz(n.montagemHora),
+      evento_inicio:nz(n.evIni),evento_inicio_hora:nz(n.evIniHora),
+      evento_fim:nz(n.evFim),evento_fim_hora:nz(n.evFimHora),
+      desmontagem:nz(n.desmontagem),desmontagem_hora:nz(n.desmontagemHora),
+      valor:n.valor||0,os_id:nz(n.osId)});
+    if(r.error) throw r.error;
+
+    if(!a || !igual(n.brief.sala,a.brief.sala)){
+      r=await sb.from("negocio_sala").upsert({negocio_id:n.id,area_m2:n.brief.sala.area,
+        pe_direito:n.brief.sala.peDireito,ancoragem:n.brief.sala.ancoragem,carga_piso:n.brief.sala.cargaPiso,
+        energia_kva:n.brief.sala.energia,pontos:n.brief.sala.pontos,acesso:nz(n.brief.sala.acesso),
+        elevador:!!n.brief.sala.elevador,observacao:nz(n.brief.sala.obs)});
+      if(r.error) throw r.error;
+    }
+    const blocos=["led","palco","estrutura","som","luz","transmissao","cenografia","internet"];
+    const mudou = blocos.filter(x=>!a||!igual(n.brief[x],a.brief[x]));
+    if(mudou.length){
+      r=await sb.from("briefing_blocos").upsert(mudou.map(x=>({negocio_id:n.id,bloco:x,
+        incluso:!!n.brief[x].tem,porte:nz(n.brief[x].porte),observacao:nz(n.brief[x].obs)})));
+      if(r.error) throw r.error;
+    }
+    if(!a || !igual(n.briefNotas,a.briefNotas)){
+      const novas=n.briefNotas.filter(x=>!x.id);
+      if(novas.length){ r=await sb.from("briefing_notas").insert(novas.map(x=>({negocio_id:n.id,
+        autor_id:nz(x.autor),texto:x.txt}))); if(r.error) throw r.error; }
+    }
+    if(!a || !igual(n.vt,a.vt)) await syncVT(n);
+    if(!a || !igual(n.tresd,a.tresd)){
+      r=await sb.from("projetos_3d").upsert({negocio_id:n.id,necessario:!!n.tresd.necessario,
+        status:n.tresd.status,responsavel_id:nz(n.tresd.resp),prazo:nz(n.tresd.prazo),
+        revisoes:n.tresd.revisoes||0,arquivo:nz(n.tresd.link),retorno:nz(n.tresd.obs)});
+      if(r.error) throw r.error;
+    }
+    if(!a || !igual(n.orc,a.orc)) await syncOrcamento(n);
+    if(!a || !igual(n.fech,a.fech)) await syncFechamento(n);
+  }
+}
+async function syncVT(n){
+  let r=await sb.from("visitas_tecnicas").upsert({negocio_id:n.id,realizada:!!n.vt.feita,
+    data:nz(n.vt.data),hora:nz(n.vt.hora),resumo:nz(n.vt.resumo)});
+  if(r.error) throw r.error;
+  r=await sb.from("vt_participantes").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
+  if(n.vt.quem.length){ r=await sb.from("vt_participantes").insert(n.vt.quem.map(p=>({negocio_id:n.id,perfil_id:p})));
+    if(r.error) throw r.error; }
+  r=await sb.from("vt_checklist").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
+  if(n.vt.checklist.length){ r=await sb.from("vt_checklist").insert(
+      n.vt.checklist.map((c,i)=>({negocio_id:n.id,ordem:i,texto:c.t,concluido:!!c.ok})));
+    if(r.error) throw r.error; }
+  /* a foto em si já foi para o Storage no momento do anexo; aqui só a legenda volta */
+  for(const f of n.vt.fotos){
+    if(!f.path) continue;
+    r=await sb.from("vt_fotos").update({legenda:nz(f.legenda)}).eq("id",f.id);
+    if(r.error) throw r.error;
+  }
+}
+async function syncOrcamento(n){
+  let r=await sb.from("orcamentos").upsert({negocio_id:n.id,desconto:n.orc.desconto||0,
+    condicoes:nz(n.orc.condicoes),validade:nz(n.orc.validade),observacao:nz(n.orc.obsGeral),
+    probabilidade:n.orc.probabilidade||50,previsao:nz(n.orc.previsao),concorrentes:nz(n.orc.concorrentes)});
+  if(r.error) throw r.error;
+  r=await sb.from("orcamento_linhas").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
+  if(n.orc.linhas.length){
+    r=await sb.from("orcamento_linhas").insert(n.orc.linhas.map((l,i)=>({negocio_id:n.id,tipo:l.tipo,
+      item_cod:l.tipo==="estoque"?l.cod:null,descricao:l.nome,categoria:l.cat,quantidade:l.qtd,
+      diarias:Math.max(1,l.dias||1),valor_unitario:l.unit||0,cobranca:l.modo||"diaria",
+      fornecedor:nz(l.fornecedor),observacao:nz(l.obs),ordem:i})));
+    if(r.error) throw r.error;
+  }
+}
+async function syncFechamento(n){
+  let r=await sb.from("fechamentos").upsert({negocio_id:n.id,reuniao:nz(n.fech.reuniao),hora:nz(n.fech.hora),
+    decisoes:nz(n.fech.decisoes),aprovado:!!n.fech.aprovado,aprovado_por:nz(n.fech.aprovadoPor),
+    aprovado_em:nz(n.fech.aprovadoEm)});
+  if(r.error) throw r.error;
+  r=await sb.from("fechamento_participantes").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
+  if(n.fech.participantes.length){ r=await sb.from("fechamento_participantes").insert(
+      n.fech.participantes.map(p=>({negocio_id:n.id,perfil_id:p}))); if(r.error) throw r.error; }
+  r=await sb.from("fechamento_pauta").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
+  if(n.fech.pauta.length){ r=await sb.from("fechamento_pauta").insert(
+      n.fech.pauta.map((x,i)=>({negocio_id:n.id,ordem:i,texto:x.t,revisado:!!x.ok}))); if(r.error) throw r.error; }
+}
+
+/* ---------- ordens de venda ---------- */
+async function syncOS(){
+  const antes=porId(ultimo.os);
+  for(const o of S.os){
+    const a=antes[o.id];
+    if(igual(o,a)) continue;
+    let r=await sb.from("ordens_venda").upsert({id:o.id,codigo:o.codigo,negocio_id:nz(o.negId),
+      cliente_id:nz(o.cliente),evento:o.evento,local_nome:nz(o.local),cidade:nz(o.cidade),
+      publico:o.publico||0,area_m2:o.area||0,montagem:o.montagem,evento_inicio:nz(o.evIni),
+      evento_fim:nz(o.evFim),desmontagem:o.desmontagem,valor:o.valor||0,status:o.status,
+      descritivo:nz(o.descritivo)});
+    if(r.error) throw r.error;
+
+    if(!a || !igual(o.produtores,a.produtores)){
+      r=await sb.from("os_produtores").delete().eq("os_id",o.id); if(r.error) throw r.error;
+      if(o.produtores.length){ r=await sb.from("os_produtores").insert(
+        o.produtores.map((p,i)=>({os_id:o.id,perfil_id:p,responsavel:i===0}))); if(r.error) throw r.error; }
+    }
+    if(!a || !igual(o.itens,a.itens)){
+      r=await sb.from("os_itens").delete().eq("os_id",o.id); if(r.error) throw r.error;
+      if(o.itens.length){ r=await sb.from("os_itens").insert(o.itens.map(i=>({os_id:o.id,item_cod:i.cod,
+        quantidade:i.qtd,quantidade_aerea:i.aereo==null?null:i.aereo,observacao:nz(i.obs)})));
+        if(r.error) throw r.error; }
+    }
+    if(!a || !igual(o.ancoragens,a.ancoragens)){
+      r=await sb.from("os_ancoragens").delete().eq("os_id",o.id); if(r.error) throw r.error;
+      if((o.ancoragens||[]).length){ r=await sb.from("os_ancoragens").insert(
+        o.ancoragens.map(x=>({os_id:o.id,nome:x.nome,quantidade:x.qtd,wll_kgf:x.wll})));
+        if(r.error) throw r.error; }
+    }
+    if(!a || !igual(o.solo,a.solo) || !igual(o.aereo,a.aereo)){
+      r=await sb.from("os_memorial").upsert({os_id:o.id,area_apoio:o.solo.area,carga_admissivel:o.solo.adm,
+        carga_pontual_admissivel:o.solo.admPont,sobrecarga_publico:o.solo.publicoKgm2,
+        apoios_por_equipamento:o.solo.apoios,torre_solo:!!o.solo.torres,solo_concluido:!!o.solo.feito,
+        fator_dinamico:o.aereo.fd,fator_desbalanceamento:o.aereo.fdes,wll_acessorio:o.aereo.wllAcess,
+        fs_minimo:o.aereo.fsMin,vao_livre:o.aereo.vao,aereo_concluido:!!o.aereo.feito});
+      if(r.error) throw r.error;
+    }
+    if(!a || !igual(o.logistica,a.logistica)) await syncLogistica(o);
+  }
+}
+async function syncLogistica(o){
+  let r=await sb.from("os_logistica").upsert({os_id:o.id,observacao:nz(o.logistica.obs)});
+  if(r.error) throw r.error;
+  r=await sb.from("os_viagens").delete().eq("os_id",o.id); if(r.error) throw r.error;
+  for(const v of o.logistica.viagens){
+    const ins=await sb.from("os_viagens").insert({os_id:o.id,veiculo_cod:v.cod,motorista:nz(v.motorista),
+      saida:nz(v.saida),hora:nz(v.hora),retorno:nz(v.retorno),observacao:nz(v.obs)}).select().single();
+    if(ins.error) throw ins.error;
+    if(v.equipe.length){ const e=await sb.from("viagem_equipe").insert(
+      v.equipe.map(p=>({viagem_id:ins.data.id,nome:p.nome,funcao:p.funcao}))); if(e.error) throw e.error; }
+  }
+}
+
+/* ---------- cargas ---------- */
+async function syncCargas(){
+  const antes=porId(ultimo.cargas);
+  for(const c of S.cargas){
+    const a=antes[c.id];
+    if(igual(c,a)) continue;
+    let r=await sb.from("ordens_carga").upsert({id:c.id,codigo:c.codigo,os_id:nz(c.osId),
+      evento_avulso:nz(c.evento),status:c.status,data_carga:c.carga,hora_carga:nz(c.horaCarga),
+      data_descarga:c.descarga,veiculo:nz(c.veiculo),equipe:nz(c.equipe),observacao:nz(c.obs)});
+    if(r.error) throw r.error;
+    if(!a || !igual(c.itens,a.itens)){
+      r=await sb.from("osc_itens").delete().eq("ordem_carga_id",c.id); if(r.error) throw r.error;
+      if(c.itens.length){ r=await sb.from("osc_itens").insert(c.itens.map(i=>({ordem_carga_id:c.id,
+        item_cod:i.cod,quantidade:i.qtd}))); if(r.error) throw r.error; }
+    }
+  }
+}
+
+/* ---------- notas, agenda, mural e avisos ---------- */
+async function syncNotas(){
+  const antes=porId(ultimo.notas), agora=porId(S.notas);
+  for(const n of S.notas){
+    if(igual(n,antes[n.id])) continue;
+    let r=await sb.from("notas").upsert({id:n.id,titulo:n.titulo,conteudo:nz(n.txt),etiquetas:n.tags||[],
+      cor:nz(n.cor),fixada:!!n.fixada,escopo:n.escopo,autor_id:nz(n.autor),os_id:nz(n.osId)});
+    if(r.error) throw r.error;
+    r=await sb.from("nota_checklist").delete().eq("nota_id",n.id); if(r.error) throw r.error;
+    if(n.checklist.length){ r=await sb.from("nota_checklist").insert(
+      n.checklist.map((c,i)=>({nota_id:n.id,ordem:i,texto:c.t,concluido:!!c.ok}))); if(r.error) throw r.error; }
+  }
+  const del=Object.keys(antes).filter(i=>!agora[i]);
+  if(del.length){ const r=await sb.from("notas").delete().in("id",del); if(r.error) throw r.error; }
+}
+async function syncCompromissos(){
+  const antes=porId(ultimo.compromissos), agora=porId(S.compromissos);
+  for(const c of S.compromissos){
+    if(igual(c,antes[c.id])) continue;
+    let r=await sb.from("compromissos").upsert({id:c.id,titulo:c.titulo,data:c.data,hora:nz(c.hora),
+      duracao_min:c.dur||0,tipo:c.tipo,negocio_id:nz(c.negId),os_id:nz(c.osId),local:nz(c.local),
+      observacao:nz(c.obs),criado_por:S.perfilId});
+    if(r.error) throw r.error;
+    r=await sb.from("compromisso_responsaveis").delete().eq("compromisso_id",c.id); if(r.error) throw r.error;
+    if((c.resp||[]).length){ r=await sb.from("compromisso_responsaveis").insert(
+      c.resp.map(p=>({compromisso_id:c.id,perfil_id:p}))); if(r.error) throw r.error; }
+  }
+  const del=Object.keys(antes).filter(i=>!agora[i]);
+  if(del.length){ const r=await sb.from("compromissos").delete().in("id",del); if(r.error) throw r.error; }
+}
+async function syncPosts(){
+  const antes=porId(ultimo.posts);
+  for(const p of S.posts){
+    const a=antes[p.id];
+    if(igual(p,a)) continue;
+    if(!a){ const r=await sb.from("posts").insert({id:p.id,autor_id:nz(p.autor),texto:p.txt,sistema:!!p.sys});
+      if(r.error) throw r.error; }
+    if(!a || !igual(p.likes,a.likes)){
+      const eu=S.perfilId, curti=p.likes.includes(eu), curtiaAntes=a&&a.likes.includes(eu);
+      if(curti && !curtiaAntes){ const r=await sb.from("post_curtidas").insert({post_id:p.id,perfil_id:eu});
+        if(r.error && r.error.code!=="23505") throw r.error; }
+      if(!curti && curtiaAntes){ const r=await sb.from("post_curtidas").delete()
+        .eq("post_id",p.id).eq("perfil_id",eu); if(r.error) throw r.error; }
+    }
+    const novos=p.coments.filter(c=>!c.id);
+    if(novos.length){ const r=await sb.from("post_comentarios").insert(
+      novos.map(c=>({post_id:p.id,autor_id:nz(c.autor),texto:c.txt}))); if(r.error) throw r.error; }
+  }
+}
+async function syncNotifs(){
+  const antes=porId(ultimo.notifs);
+  const novas=S.notifs.filter(n=>!antes[n.id]);
+  if(novas.length){
+    const r=await sb.from("notificacoes").insert(novas.map(n=>({id:n.id,texto:n.txt,tipo:n.tipo,
+      destino:n.para,tela:nz(n.view),referencia:nz(n.sel)})));
+    if(r.error) throw r.error;
+  }
+  const lidas=S.notifs.filter(n=>n.lida[S.role] && (!antes[n.id] || !antes[n.id].lida[S.role]));
+  if(lidas.length){
+    const r=await sb.from("notificacao_leituras").upsert(
+      lidas.map(n=>({notificacao_id:n.id,perfil_id:S.perfilId})));
+    if(r.error && r.error.code!=="23505") throw r.error;
+  }
+}
+</script>
+<script>
+/* =============================================================
+   4 · IDENTIFICADORES
+   O banco usa uuid na chave e guarda o código legível à parte.
+   ============================================================= */
+const uid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
+      const r=Math.random()*16|0; return (c==="x"?r:(r&0x3|0x8)).toString(16); }));
+const ano = () => new Date().getFullYear();
+function proximoCodigo(prefixo, lista){
+  const re=new RegExp("^"+prefixo+"-\\d{4}-(\\d+)$");
+  const max=lista.map(x=>{ const m=re.exec(x.codigo||""); return m?+m[1]:0; }).reduce((a,b)=>Math.max(a,b),0);
+  return prefixo+"-"+ano()+"-"+String(max+1).padStart(4,"0");
+}
+/* busca por uuid ou por código, porque as telas mostram o código */
+osById  = id => S.os.find(o=>o.id===id || o.codigo===id);
+oscById = id => S.cargas.find(c=>c.id===id || c.codigo===id);
+
+/* =============================================================
+   5 · FOTOS DA VISITA TÉCNICA → Supabase Storage
+   ============================================================= */
+async function assinarFotos(){
+  const paths=[];
+  S.negocios.forEach(n=>n.vt.fotos.forEach(f=>{ if(f.path) paths.push(f.path); }));
+  if(!paths.length) return;
+  const { data } = await sb.storage.from("vt-fotos").createSignedUrls(paths, 60*60*8);
+  const mapa=Object.fromEntries((data||[]).map(d=>[d.path,d.signedUrl]));
+  S.negocios.forEach(n=>n.vt.fotos.forEach(f=>{ if(mapa[f.path]) f.src=mapa[f.path]; }));
+}
+lerFotos = function(negId, files){
+  const arr=[...files].filter(f=>f.type.startsWith("image/")).slice(0,12);
+  if(!arr.length) return;
+  const n=neg(negId); if(!n) return;
+  toast("Enviando "+arr.length+" foto(s)…");
+  arr.forEach(f=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      const img=new Image();
+      img.onload=async ()=>{
+        const max=1400, sc=Math.min(1,max/Math.max(img.width,img.height));
+        const cv=document.createElement("canvas");
+        cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
+        cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+        cv.toBlob(async blob=>{
+          const path=negId+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,7)+".jpg";
+          const up=await sb.storage.from("vt-fotos").upload(path, blob, {contentType:"image/jpeg"});
+          if(up.error) return erro(up.error,"Falha ao enviar a foto");
+          const ins=await sb.from("vt_fotos").insert({negocio_id:negId,storage_path:path,
+                       enviado_por:S.perfilId}).select().single();
+          if(ins.error) return erro(ins.error,"Foto enviada, mas não registrada");
+          const { data } = await sb.storage.from("vt-fotos").createSignedUrl(path, 60*60*8);
+          n.vt.fotos.push({id:ins.data.id,nome:f.name.slice(0,40),legenda:"",path,src:data?.signedUrl||""});
+          marcarSincronizado(); render(); toast("Foto anexada à visita técnica.");
+        },"image/jpeg",0.78);
+      };
+      img.src=ev.target.result;
+    };
+    r.readAsDataURL(f);
+  });
+};
+
+/* =============================================================
+   6 · OPERAÇÕES DE ESTOQUE → funções do banco
+   São transações: mudam o status, escrevem o livro razão e
+   mexem na manutenção de uma vez só.
+   ============================================================= */
+gerarOSC = async function(osId){
+  const o=osById(osId); if(!o) return;
+  if(!can("gerar_osc")) return toast("Seu perfil não emite ordem de carga.");
+  await sincronizar();
+  const { data, error } = await sb.rpc("gerar_ordem_carga", { p_os: o.id });
+  if(error) return toast(error.message.replace(/^.*?:\s*/,""));
+  await recarregar();
+  toast("Ordem de carga "+data.codigo+" emitida para o estoque.");
+  go("cargas", data.id);
+};
+confirmarCarga = async function(id){
+  const c=oscById(id); if(!c) return;
+  /* o "Em separação" pode ter acabado de ser clicado e ainda estar na fila */
+  await sincronizar();
+  const { data, error } = await sb.rpc("confirmar_carga", { p_ordem: c.id });
+  if(error) return toast(error.message.replace(/^.*?:\s*/,""));
+  await recarregar();
+  toast("Baixa lançada em "+dtl(data.data)+" · "+c.itens.reduce((s,i)=>s+i.qtd,0)+" peças saíram do galpão.");
+};
+confirmarRetorno = async function(id){
+  const c=oscById(id); if(!c) return;
+  const av={};
+  document.querySelectorAll("[data-av]").forEach(el=>{
+    const q=Math.max(0,Number(el.value)||0); if(q>0) av[el.dataset.av]=q; });
+  await sincronizar();
+  const { data, error } = await sb.rpc("registrar_descarga", { p_ordem: c.id, p_avarias: av });
+  if(error){ fecharModal(); return toast(error.message.replace(/^.*?:\s*/,"")); }
+  fecharModal(); await recarregar();
+  const total=Object.values(av).reduce((s,v)=>s+v,0);
+  toast("Entrada registrada em "+dtl(data.data)+(total?" · "+total+" peça(s) em manutenção.":"."));
+};
+
+/* =============================================================
+   7 · NOVOS REGISTROS COM uuid E CÓDIGO
+   ============================================================= */
+const _gerarOSVBase = gerarOSVdeNegocio;
+gerarOSVdeNegocio = function(negId){
+  const n=neg(negId); if(!n) return;
+  S._novoOsId = uid();
+  S._novoOsCodigo = proximoCodigo("OSV", S.os);
+  _gerarOSVBase(negId);
+};
+
+/* =============================================================
+   8 · BOOT
+   ============================================================= */
+async function recarregar(){
+  const b=document.getElementById("btnSync"); if(b) b.textContent="Atualizando…";
+  try{
+    await carregarTudo();
+    await assinarFotos();
+    ensureComms(); ensureCRM(); ensureOrc(); ensureKits(); ensureProd(); ensureFrota();
+    marcarSincronizado();
+    render();
+    if(b) b.textContent="Atualizar";
+  }catch(e){ erro(e,"Não consegui carregar"); if(b) b.textContent="Erro"; }
+}
+
+function telaCarregando(txt){
+  document.getElementById("authHost").innerHTML =
+    `<div class="carregando"><div>${esc(txt||"Carregando a operação…")}</div></div>`;
+}
+
+async function iniciar(){
+  telaCarregando();
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user){ telaLogin(); return; }
+
+  const { data: perfil, error } = await sb.from("perfis").select("*").eq("id", user.id).single();
+  if(error || !perfil){
+    await sb.auth.signOut();
+    telaLogin("Seu usuário existe, mas ainda não tem perfil na operação. Peça à gerência para liberar.");
+    return;
+  }
+  S.perfilId = perfil.id;
+  S.role     = perfil.papel;
+
+  try{
+    await carregarTudo();
+    await assinarFotos();
+  }catch(e){ erro(e,"Não consegui carregar"); telaLogin("Falha ao carregar: "+(e.message||e)); return; }
+
+  ensureComms(); ensureCRM(); ensureOrc(); ensureKits(); ensureProd(); ensureFrota();
+  marcarSincronizado();
+
+  document.getElementById("authHost").innerHTML="";
+  document.getElementById("app").hidden=false;
+  if(!podeVer(S.view)) S.view="painel";
+  render(); pintarTema();
+  ouvirMudancas();
+}
+
+/* novidades dos outros chegam sozinhas */
+function ouvirMudancas(){
+  sb.channel("operacao")
+    .on("postgres_changes",{event:"*",schema:"public",table:"mensagens"}, () => recarregarSuave())
+    .on("postgres_changes",{event:"*",schema:"public",table:"ordens_carga"}, () => recarregarSuave())
+    .on("postgres_changes",{event:"*",schema:"public",table:"itens"}, () => recarregarSuave())
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"notificacoes"}, () => recarregarSuave())
+    .subscribe();
+}
+let suave=null;
+function recarregarSuave(){ clearTimeout(suave); suave=setTimeout(()=>{ if(!gravando) recarregar(); }, 1200); }
+
+/* ações do cabeçalho e da tela de login */
+document.addEventListener("click", ev=>{
+  const t=ev.target.closest("[data-act]"); if(!t) return;
+  if(t.dataset.act==="sair"){ sair(); }
+  if(t.dataset.act==="recarregar"){ recarregar(); }
+  if(t.dataset.act==="recuperar"){ recuperarSenha(); }
+});
+
+sb.auth.onAuthStateChange((evento)=>{ if(evento==="SIGNED_OUT") location.reload(); });
+iniciar();
+</script>
+</body>
+</html>
