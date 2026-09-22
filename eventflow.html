@@ -3821,20 +3821,22 @@ function pintarTema(){
 
 /* O boot fica no módulo de dados: primeiro autentica, depois carrega, depois renderiza. */
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"></script>
 <script>
 /* =============================================================
    EventFlow · camada de dados
-   Preencha as duas linhas abaixo com o que está em
-   Supabase → Project Settings → API.
-   ============================================================= */
-const SUPABASE_URL      = "https://SEU-PROJETO.supabase.co";
-const SUPABASE_ANON_KEY = "SUA_ANON_KEY";
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+   Projeto Supabase desta instalação. A chave publicável é pública
+   por natureza — quem protege os dados é o RLS, não ela.
+   Para apontar para outro projeto, troque estas duas linhas.
+   ============================================================= */
+const SUPABASE_URL = "https://shhwlemlxtphbmfhpicu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Wstk4liRyPPELnMBJx-_qA_8mktUhk9";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true }
 });
-const configurado = () => !SUPABASE_URL.includes("SEU-PROJETO") && !SUPABASE_ANON_KEY.includes("SUA_ANON");
+const configurado = () => /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(SUPABASE_URL) && SUPABASE_KEY.length > 20;
 
 /* ---------- utilitários ---------- */
 const ini = nome => (nome||"··").split(" ").filter(Boolean).slice(0,2).map(p=>p[0]).join("").toUpperCase();
@@ -3866,12 +3868,12 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Peça à gerência para criar seu usuário e definir o perfil."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_ANON_KEY no topo do último bloco de script."}</footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}</footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
     ev.preventDefault();
-    if(!configurado()) return telaLogin("Preencha SUPABASE_URL e SUPABASE_ANON_KEY no arquivo antes de entrar.");
+    if(!configurado()) return telaLogin("Preencha SUPABASE_URL e SUPABASE_KEY no arquivo antes de entrar.");
     const btn=f.querySelector('button[type="submit"]');
     btn.disabled=true; btn.textContent="Entrando…";
     const { error } = await sb.auth.signInWithPassword({
