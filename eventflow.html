@@ -746,14 +746,17 @@ function vProducao(){
   const todas=S.os.slice().sort((a,b)=>a.montagem<b.montagem?-1:1);
   const minhas=todas.filter(o=>(o.produtores||[]).includes(meuId));
   const outras=todas.filter(o=>!(o.produtores||[]).includes(meuId));
-  const fila=S.role==="producao"?[...minhas,...outras]:todas;
+  /* quem tem OS atribuída vê as suas primeiro — vale para a produção e para
+     a gerência que assumiu a produção de um evento */
+  const souProdutor=minhas.length>0;
+  const fila=souProdutor?[...minhas,...outras]:todas;
   return `<div class="sechead"><h2>Fila de produção técnica</h2><p>Cada OS de Venda precisa de memorial de solo, memorial aéreo e descritivo antes de virar Ordem de Carga.</p>
-    ${S.role==="producao"?`<div style="flex:1"></div><span class="pill acc">${minhas.length} atribuída(s) a você</span>`:""}</div>
+    ${souProdutor?`<div style="flex:1"></div><span class="pill acc">${minhas.length} atribuída(s) a você</span>`:""}</div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr))">
   ${fila.map(o=>{const e=etapasOk(o),c=cli(o.cliente),osc=oscDaOS(o.id),pr=prontoParaOSC(o);
     const minha=(o.produtores||[]).includes(me().id);
-    return `<div class="card" style="${minha&&S.role==="producao"?"border-color:var(--ink2)":""}"><header><h3>${esc(o.evento)}</h3>
-      ${minha&&S.role==="producao"?`<span class="pill acc">sua</span>`:""}<span class="hint">${o.id}</span></header>
+    return `<div class="card" style="${minha?"border-color:var(--ink2)":""}"><header><h3>${esc(o.evento)}</h3>
+      ${minha?`<span class="pill acc">sua</span>`:""}<span class="hint">${o.codigo||""}</span></header>
       <div class="pad" style="display:grid;gap:10px">
         <div class="flex" style="gap:7px"><span class="pill ${STCOR[o.status]||""}"><span class="dot"></span>${esc(o.status)}</span>
           <span class="tag">${dt(o.montagem)} → ${dt(o.desmontagem)}</span><span class="muted" style="font-size:11.5px">${esc(c.nome)}</span>
@@ -1702,7 +1705,10 @@ const ETAPAS=[
 ];
 const etapaIx = k => ETAPAS.findIndex(e=>e[0]===k);
 const CATEGORIAS=["Estrutura","Som","Luz","Vídeo","Cenografia","Internet","Extras"];
-const PRODUTORES = () => USERS.filter(u=>u.role==="producao");
+/* quem pode tocar uma OS: a produção e também a gerência, que muitas vezes
+   assume a produção de um evento em vez de repassar */
+const PRODUTORES = () => USERS.filter(u=>u.role==="producao" || u.role==="gerencia")
+  .sort((a,b)=> (a.role==="producao"?0:1) - (b.role==="producao"?0:1));
 function porCategoria(itens){
   const m={}; CATEGORIAS.forEach(c=>m[c]=[]);
   itens.forEach(i=>{ const c=item(i.cod).cat; (m[c]=m[c]||[]).push(i); });
@@ -2326,10 +2332,10 @@ function abaGanho(n){
       <div class="card"><header><h3>Quem vai produzir</h3>
         <span class="hint">${(n.produtores||[]).length} atribuído(s)</span></header>
         <div class="pad" style="display:grid;gap:10px">
-        <p style="margin:0;font-size:12px;color:var(--ink2);line-height:1.5">A OS de Venda fica disponível para quem estiver marcado aqui. O primeiro da lista responde pela OS.</p>
+        <p style="margin:0;font-size:12px;color:var(--ink2);line-height:1.5">A OS de Venda fica disponível para quem estiver marcado aqui. O primeiro da lista responde pela OS. A gerência também pode assumir a produção de um evento.</p>
         <div style="display:grid;gap:6px">${PRODUTORES().map(u=>{const on=(n.produtores||[]).includes(u.id), lead=(n.produtores||[])[0]===u.id;
           return `<label class="prod ${on?"on":""}"><input type="checkbox" data-prod="${u.id}" ${on?"checked":""} ${S.role==="gerencia"?"":"disabled"} style="width:auto">
-            ${av(u,26)}<span class="tx"><b>${esc(u.nome)}</b><span>${esc(u.cargo)}</span></span>
+            ${av(u,26)}<span class="tx"><b>${esc(u.nome)}</b><span>${esc(u.cargo)}${u.role==="gerencia"?" · gerência":""}</span></span>
             ${lead?`<span class="pill acc">responsável</span>`:on&&S.role==="gerencia"?`<button class="btn sm" data-act="lead" data-id="${n.id}" data-u="${u.id}">tornar responsável</button>`:""}</label>`;}).join("")}</div>
         ${(n.produtores||[]).length?"":`<div class="verdict warn"><div><b>Nenhum produtor definido</b>Escolha pelo menos um antes de emitir a OS.</div></div>`}
       </div></div>
