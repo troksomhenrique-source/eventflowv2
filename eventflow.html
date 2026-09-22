@@ -590,11 +590,34 @@ function vPainel(){
   </div>`;
 }
 
+const SEGMENTOS=["Corporativo","Agência","Cerimonial","Produtora","Associação","Órgão público","Pessoa física"];
+function formCliente(id){
+  const c=id?S.clientes.find(x=>x.id===id):null;
+  const f=(fid,l,val,cls,attrs)=>`<div class="field ${cls||""}"><label for="${fid}">${l}</label><input id="${fid}" value="${esc(String(val==null?"":val))}" ${attrs||""}></div>`;
+  return `<form class="addform" autocomplete="off">
+    <div class="top"><h4>${c?"Cliente · "+esc(c.nome):"Novo cliente"}</h4><div style="flex:1"></div>
+      ${c?`<button class="btn sm ghost" type="button" data-act="fecharCliForm">Fechar</button>`:""}</div>
+    <div class="rowf">
+      ${f("clNome","Razão social ou nome",c?c.nome:"","w",'placeholder="Ex.: Aurora Eventos Ltda." required')}
+      <div class="field"><label for="clTipo">Segmento</label><select id="clTipo">${SEGMENTOS.map(t=>`<option ${c&&c.tipo===t?"selected":""}>${esc(t)}</option>`).join("")}</select></div>
+      ${f("clDoc","CNPJ ou CPF",c?c.doc:"","","placeholder=\"00.000.000/0001-00\"")}
+    </div>
+    <div class="rowf">
+      ${f("clContato","Quem é o contato",c?c.contato:"","",'placeholder="Nome de quem fala com a gente"')}
+      ${f("clTel","Telefone",c?c.tel:"","s",'placeholder="(11) 90000-0000"')}
+      ${f("clCidade","Cidade · UF",c?c.cidade:"São Paulo · SP","s")}
+      <button class="btn pri go" type="submit" data-act="salvarCliente" data-id="${id||""}">${c?"Salvar cliente":"Cadastrar cliente"}</button>
+    </div>
+    <p class="hint">Enter cadastra. Só o nome é obrigatório — o resto dá para completar depois.</p></form>`;
+}
 function vClientes(){
-  return `<div class="card"><header><h3>Carteira de clientes</h3><span class="hint">${S.clientes.length} cadastros</span></header>
+  const pode=can("criar_negocio");
+  return `${pode?`<div style="margin-bottom:14px">${formCliente(S.cliEdit||null)}</div>`:""}
+  ${!S.clientes.length?`<div class="empty" style="margin-bottom:14px">Nenhum cliente cadastrado ainda. O primeiro negócio do funil precisa de um.</div>`:""}
+  <div class="card"><header><h3>Carteira de clientes</h3><span class="hint">${S.clientes.length} cadastros</span></header>
   <div class="tblwrap"><table><thead><tr><th>Cliente</th><th>Segmento</th><th>CNPJ</th><th>Contato</th><th>Praça</th><th class="r">Eventos</th>${can("ver_valores")?`<th class="r">Faturado</th>`:""}</tr></thead><tbody>
   ${S.clientes.map(c=>{const os=S.os.filter(o=>o.cliente===c.id);const fat=os.reduce((s,o)=>s+o.valor,0);
-    return `<tr><td><b>${esc(c.nome)}</b><br><span class="muted" style="font-size:11px">cliente desde ${c.desde}</span></td>
+    return `<tr class="${can("criar_negocio")?"clickable":""}" ${can("criar_negocio")?`data-act="editarCliente" data-id="${c.id}"`:""}><td><b>${esc(c.nome)}</b><br><span class="muted" style="font-size:11px">${c.desde?"cliente desde "+esc(c.desde):"cadastrado agora"}</span></td>
     <td><span class="pill">${esc(c.tipo)}</span></td><td class="num" style="font-size:11.5px">${esc(c.doc)}</td>
     <td>${esc(c.contato)}<br><span class="muted num" style="font-size:11px">${esc(c.tel)}</span></td>
     <td style="font-size:12px">${esc(c.cidade)}</td><td class="r num">${os.length}</td>${can("ver_valores")?`<td class="r num">${fat?brl(fat):"—"}</td>`:""}</tr>`;}).join("")}
@@ -653,7 +676,7 @@ function vVendas(){
 }
 
 function vOSV(){
-  const o=osById(S.sel); if(!o) return vVendas();
+  const o=osById(S.sel); if(!o){ S.sel=null; return vVendas(); }
   const c=cli(o.cliente), e=etapasOk(o), osc=oscDaOS(o.id);
   const dias=Math.max(1,diffDays(o.montagem,o.desmontagem));
   return `<div class="between" style="margin-bottom:14px">
@@ -745,7 +768,7 @@ function vProducao(){
 }
 
 function vProdDet(){
-  const o=osById(S.sel); if(!o) return vProducao();
+  const o=osById(S.sel); if(!o){ S.sel=null; return vProducao(); }
   const e=etapasOk(o), aba=S.aba||"escopo", osc=oscDaOS(o.id), c=cli(o.cliente);
   const ro=!can("editar_memorial");
   const steps=[["escopo","Escopo","itens e pesos",e.escopo],["solo","Memorial solo","NBR 6120",e.solo],["aereo","Memorial aéreo","rigging e FS",e.aereo],["descritivo","Descritivo técnico","texto do projeto",e.descritivo]];
@@ -937,7 +960,7 @@ function vCargas(){
 }
 
 function vOSC(){
-  const c=oscById(S.sel); if(!c) return vCargas();
+  const c=oscById(S.sel); if(!c){ S.sel=null; return vCargas(); }
   const o=c.osId?osById(c.osId):null;
   const pode=can("movimentar");
   let acao="";
@@ -1910,7 +1933,7 @@ function vCRM(){
 /* ================= FICHA DO NEGÓCIO ================= */
 const podeEditarCRM = aba => S.role==="gerencia" || (S.role==="producao" && (aba==="vt"||aba==="tresd"));
 function vNegocio(){
-  const n=neg(S.sel); if(!n) return vCRM();
+  const n=neg(S.sel); if(!n){ S.sel=null; return vCRM(); }
   const c=cli(n.cliente), aba=S.crmAba||"qualificacao", ck=checkEtapas(n), ix=etapaIx(n.etapa);
   const abas={qualificacao:abaQual,briefing:abaBrief,vt:abaVT,tresd:aba3D,orcamento:abaNeg,fechamento:abaFech,finalizacao:abaGanho};
   /* aba desconhecida (etapa antiga, link velho) volta para a qualificação em vez de quebrar a tela */
@@ -1945,6 +1968,9 @@ function abaQual(n){
   return `${ro("qualificacao")}<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr))">
     <div class="card"><header><h3>Evento</h3></header><div class="pad" style="display:grid;gap:11px">
       ${fld("Nome do evento","titulo",n.titulo)}
+      <div class="field"><label for="f_cliente">Cliente</label>
+        <select id="f_cliente" data-neg="cliente">${S.clientes.map(c=>`<option value="${c.id}" ${c.id===n.cliente?"selected":""}>${esc(c.nome)}</option>`).join("")}</select>
+        <span class="hint" style="margin-top:5px">Falta alguém? <a href="#" data-act="go" data-view="clientes" style="color:var(--ink2)">cadastre na carteira</a>.</span></div>
       <div class="row2">${sel("Tipo","tipoEvento",n.tipoEvento,["Corporativo","Social","Público","Híbrido"])}
         ${fld("Público estimado","publico",n.publico,"number",'step="50"')}</div>
       <div class="row2">${sel("Origem do lead","origem",n.origem,["Indicação","Cliente recorrente","Inbound","Cerimonialista","Licitação","Prospecção ativa","Agência"])}
@@ -2446,6 +2472,8 @@ function gerarOSVdeNegocio(negId){
     aereo:{pontos:b.sala.pontos||8,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:b.estrutura.vao||10,feito:false},
     descritivo:desc,etapaAtual:"escopo"});
   n.osId=id; n.etapa="finalizacao"; n.valor=valor;
+  /* a OS nova precisa das estruturas de produção e de logística prontas */
+  ensureProd(); ensureFrota();
   const ch=canalDaOS(id); if(ch){ ch.nome=n.titulo; ch.membros=[...new Set([...ch.membros,...n.produtores])]; }
   fluxo(id,"OS "+codigo+" gerada a partir do negócio "+n.codigo+" e atribuída a "+n.produtores.map(u=>usr(u).nome).join(", ")+". Escopo, datas e parâmetros do local herdados do briefing e da visita técnica.",
     ["gerencia","producao"],"vendas",id,true);
@@ -2458,10 +2486,9 @@ Object.assign(window.VEXTRA||(window.VEXTRA={}),{crm:()=>S.sel?vNegocio():vCRM()
 Object.assign(TITLES,{crm:["Pipeline comercial","Qualificação, briefing, visita técnica, 3D e fechamento"]});
 NAV.forEach(g=>g.items.forEach(i=>{ if(i.id==="crm"){ i.t="Pipeline"; i.roles=["gerencia","producao"]; } }));
 
-document.addEventListener("click", ev=>{
-  const t=ev.target.closest("[data-act]"); if(!t) return;
-  const a=t.dataset.act, id=t.dataset.id;
-  const CRM=["lead","aprovarFech","reabrirFech","setAnc","negocio","crmAba","avancar","novoNegocio","gerarOSVdeNegocio","addNota","usarSugerido","st3d","addFotos","verFoto","rmFoto","salvarLegenda"];
+function acaoCRM(a, id, t){
+  t = t || {dataset:{}};
+  const CRM=["lead","aprovarFech","reabrirFech","setAnc","negocio","crmAba","avancar","novoNegocio","gerarOSVdeNegocio","addNota","usarSugerido","st3d","addFotos","verFoto","rmFoto","salvarLegenda","salvarCliente","editarCliente","fecharCliForm"];
   if(!CRM.includes(a)) return;
   switch(a){
     case "lead": {if(S.role!=="gerencia") break; const n=neg(id), u=t.dataset.u;
@@ -2490,13 +2517,33 @@ document.addEventListener("click", ev=>{
         if(n.etapa==="tresd"&&n.tresd.necessario) avisar("Projeto 3D solicitado para "+n.titulo+".",["gerencia","producao"],"crm",n.id,"info"); }
       break;}
     case "novoNegocio": {
-      const n=Object.assign({id:uid(),codigo:proximoCodigo("N",S.negocios),titulo:"Nova oportunidade",cliente:S.clientes[0].id,etapa:"qualificacao",valor:0,resp:"u1",
+      if(!S.clientes.length){ go("clientes");
+        return toast("Cadastre o cliente primeiro — o negócio nasce ligado a ele."); }
+      const n=Object.assign({id:uid(),codigo:proximoCodigo("N",S.negocios),titulo:"Nova oportunidade",cliente:S.clientes[0].id,etapa:"qualificacao",valor:0,resp:me().id,
         temp:"morno",recorrente:false,eventosAnteriores:0,tipoEvento:"Corporativo",local:"",sala:"",endereco:"",cidade:"São Paulo · SP",
         publico:0,origem:"Inbound",prazoDecisao:"",montagem:addDays(HOJE,30),montagemHora:"07:00",evIni:addDays(HOJE,32),evIniHora:"19:00",
         evFim:addDays(HOJE,32),evFimHora:"23:00",desmontagem:addDays(HOJE,33),desmontagemHora:"22:00",osId:null,
         brief:vazioBrief(),vt:vazioVT(),tresd:vazio3D(),briefNotas:[],
         neg:{proposta:0,desconto:0,condicoes:"50% na assinatura · 50% até 5 dias antes da montagem",concorrentes:"",probabilidade:50,previsao:""}});
-      S.negocios.push(n); S.crmAba="qualificacao"; save(); go("crm",n.id); toast("Negócio "+n.codigo+" criado. Comece pela qualificação."); break;}
+      S.negocios.push(n);
+      /* os normalizadores dão ao negócio novo o orçamento, o fechamento e o
+         resto das estruturas que as abas esperam encontrar prontas */
+      ensureCRM(); ensureOrc();
+      S.crmAba="qualificacao"; save(); go("crm",n.id); toast("Negócio "+n.codigo+" criado. Comece pela qualificação."); break;}
+    case "editarCliente": if(can("criar_negocio")){ S.cliEdit=id; render(); foco("clNome"); } break;
+    case "fecharCliForm": S.cliEdit=null; render(); break;
+    case "salvarCliente": {
+      if(!can("criar_negocio")) break;
+      const g=x=>(document.getElementById(x)||{value:""}).value;
+      const nome=g("clNome").trim();
+      if(!nome) return toast("O nome do cliente é obrigatório.");
+      const dados={nome, tipo:g("clTipo"), doc:g("clDoc").trim(), contato:g("clContato").trim(),
+                   tel:g("clTel").trim(), cidade:g("clCidade").trim()};
+      const ex=id?S.clientes.find(c=>c.id===id):null;
+      if(ex) Object.assign(ex,dados);
+      else S.clientes.push(Object.assign({id:uid(),desde:HOJE.slice(0,4)},dados));
+      S.cliEdit=null; save(); render(); foco("clNome");
+      toast(ex?"Cliente atualizado.":nome+" entrou na carteira."); break;}
     case "gerarOSVdeNegocio": gerarOSVdeNegocio(id); break;
     case "addNota": {const el=document.getElementById("briefNota"); if(!el||!el.value.trim()) break;
       neg(id).briefNotas.push({ts:nowTs(),autor:me().id,txt:el.value.trim()}); el.value="";
@@ -2511,6 +2558,10 @@ document.addEventListener("click", ev=>{
     case "salvarLegenda": {const n=neg(id), f=n.vt.fotos.find(x=>x.id===t.dataset.f);
       if(f) f.legenda=document.getElementById("fotoLeg").value; fecharModal(); saveGuard(); render(); break;}
   }
+}
+document.addEventListener("click", ev=>{
+  const t=ev.target.closest("[data-act]"); if(!t) return;
+  acaoCRM(t.dataset.act, t.dataset.id, t);
 });
 document.addEventListener("input", ev=>{
   const el=ev.target;
@@ -2950,9 +3001,8 @@ function pintarKit(){
 }
 
 /* ---- eventos ---- */
-document.addEventListener("click", ev=>{
-  const t=ev.target.closest("[data-act]"); if(!t) return;
-  const a=t.dataset.act, id=t.dataset.id;
+function acaoEstoque(a, id, t){
+  t = t || {dataset:{}};
   const L=["estTab","novoItem","editarItem","salvarItem","fecharItemForm","fecharKitForm","novoKit","editarKit","salvarKit","apagarKit","addKitItem","rmKitItem","inserirKit"];
   if(!L.includes(a)) return;
   switch(a){
@@ -3006,6 +3056,10 @@ document.addEventListener("click", ev=>{
           qtd:x.qtd*mult,dias,unit:it.diaria,modo:"diaria",obs:k.nome}); });
       sincOrc(n); save(); render(); focarAdicao(); toast(k.nome+" aberto em "+k.itens.length+" linhas."); break;}
   }
+}
+document.addEventListener("click", ev=>{
+  const t=ev.target.closest("[data-act]"); if(!t) return;
+  acaoEstoque(t.dataset.act, t.dataset.id, t);
 });
 Object.assign(window.VEXTRA||(window.VEXTRA={}),{estoque:vEstoqueNovo});
 </script>
@@ -3064,7 +3118,7 @@ function calcAereo(o){
 
 /* ---- abas da produção ---- */
 function vProdDet(){
-  const o=osById(S.sel); if(!o) return vProducao();
+  const o=osById(S.sel); if(!o){ S.sel=null; return vProducao(); }
   const e=etapasOk(o), aba=S.aba||"escopo", osc=oscDaOS(o.id), c=cli(o.cliente);
   const ed=can("editar_memorial");
   const pend=pendentes(o).length;
@@ -3487,9 +3541,8 @@ function abaLogistica(o,ed){
 </script>
 <script>
 /* ---- ações de frota e logística ---- */
-document.addEventListener("click", ev=>{
-  const t=ev.target.closest("[data-act]"); if(!t) return;
-  const a=t.dataset.act, id=t.dataset.id;
+function acaoFrota(a, id, t){
+  t = t || {dataset:{}};
   if(!["novoVeic","editarVeic","salvarVeic","fecharVeicForm","addViagem","rmViagem","addPessoa","rmPessoa"].includes(a)) return;
   switch(a){
     case "novoVeic": if(can("editar_inventario")){ S.veicForm=""; save(); render(); foco("vfCod"); } break;
@@ -3529,6 +3582,10 @@ document.addEventListener("click", ev=>{
     case "rmPessoa": {if(!can("editar_memorial")) break; const o=osById(id);
       o.logistica.viagens[Number(t.dataset.ix)].equipe.splice(Number(t.dataset.pi),1); save(); render(); break;}
   }
+}
+document.addEventListener("click", ev=>{
+  const t=ev.target.closest("[data-act]"); if(!t) return;
+  acaoFrota(t.dataset.act, t.dataset.id, t);
 });
 document.addEventListener("input", ev=>{
   const el=ev.target; if(!can("editar_memorial")) return;
@@ -3771,8 +3828,8 @@ function pintarTema(){
    Preencha as duas linhas abaixo com o que está em
    Supabase → Project Settings → API.
    ============================================================= */
-const SUPABASE_URL      = "https://shhwlemlxtphbmfhpicu.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_Wstk4liRyPPELnMBJx-_qA_8mktUhk9";
+const SUPABASE_URL      = "https://SEU-PROJETO.supabase.co";
+const SUPABASE_ANON_KEY = "SUA_ANON_KEY";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true }
