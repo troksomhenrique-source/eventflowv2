@@ -134,6 +134,17 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+
+<style>
+.sync-status{font-size:12px;color:var(--ink2);line-height:1.4;padding:8px 18px;background:var(--surface);border-bottom:1px solid var(--line)}
+.sync-status:empty{display:none}
+.who .nm,.who .rl{display:block}
+.sync-status[data-erro="true"]{color:var(--crit);font-weight:600}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+button:disabled{cursor:not-allowed;opacity:.6}
+@media(max-width:700px){.top{flex-wrap:wrap;height:auto;min-height:60px;padding:12px}.sync-status{padding:9px 16px}.modal{width:calc(100vw - 24px);max-height:90dvh}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
 </head>
 <body>
 <style>
@@ -303,13 +314,14 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
       <button class="btn sm" data-act="recarregar" title="Buscar novidades do servidor" id="btnSync">Atualizar</button>
       <div class="who" id="who"></div>
     </header>
+    <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
     <main class="view"><div class="wrap" id="view"></div></main>
   </div>
 </div>
 <div id="authHost"></div>
 <div id="printHost"></div>
 <div id="modalHost"></div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 "use strict";
 const HOJE = new Date().toISOString().slice(0,10);
@@ -328,7 +340,7 @@ const NAV = [
     {id:"crm", t:"Funil de vendas", roles:["gerencia"], ic:"funnel"},
     {id:"clientes", t:"Clientes", roles:["gerencia"], ic:"users"},
     {id:"freelas", t:"Freelancers", roles:["gerencia","producao"], ic:"badge"},
-    {id:"vendas", t:"OS de Venda", roles:["gerencia","producao"], ic:"doc"}
+    {id:"vendas", t:"Ordem de Serviço", roles:["gerencia","producao"], ic:"doc"}
   ]},
   {g:"Produção", items:[
     {id:"producao", t:"Memoriais e OS", roles:["gerencia","producao"], ic:"ruler"}
@@ -626,7 +638,7 @@ const podeVer = v => { const all=NAV.flatMap(g=>g.items); const f=all.find(i=>i.
 const TITLES = {painel:["Painel operacional","Visão geral de vendas, produção e logística"],
  crm:["Funil de vendas","Oportunidades por etapa de negociação"],
  clientes:["Clientes","Cadastro e histórico de contratantes"],
- vendas:["OS de Venda","Pedidos fechados enviados à produção"],
+ vendas:["Ordem de Serviço","Pedidos fechados enviados à produção"],
  producao:["Produção técnica","Memorial de solo, memorial aéreo e descritivo"],
  cargas:["Ordens de Serviço de Carga","Separação, carregamento e retorno"],
  estoque:["Inventário","Disponibilidade por período de carga e descarga"],
@@ -675,7 +687,7 @@ function vPainel(){
   const pipeline=S.negocios.filter(n=>n.etapa!=="ganho").reduce((s,n)=>s+n.valor,0);
 
   const kpis=[
-    {v:abertas.length,k:"OS de Venda ativas",d:`${emProd.length} na fila de produção`,c:"acc"},
+    {v:abertas.length,k:"Ordens de Serviço ativas",d:`${emProd.length} na fila de produção`,c:"acc"},
     can("ver_valores")?{v:brl(pipeline),k:"Pipeline em negociação",d:`${S.negocios.filter(n=>n.etapa!=="ganho").length} oportunidades abertas`,c:""}:null,
     {v:pecasCampo.toLocaleString("pt-BR"),k:"Peças em campo agora",d:`${carregadas.length} ordem(ns) carregada(s)`,c:"ok"},
     {v:c.length,k:"Conflitos de disponibilidade",d:c.length?"Exige remanejamento ou sublocação":"Nenhuma sobreposição no período",c:c.length?"crit":"ok"}
@@ -724,7 +736,7 @@ function vPainel(){
 
     <div class="card"><header><h3>Fluxo de trabalho por perfil</h3><span class="hint">onde cada etapa acontece</span></header>
       <div class="pad" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">
-        ${[["Gerência","Fecha o negócio no funil e gera a OS de Venda com escopo, datas e valores.","gerencia"],
+        ${[["Gerência","Fecha o negócio no funil e gera a Ordem de Serviço com escopo, datas e valores.","gerencia"],
            ["Produção","Recebe a OS, calcula memorial de solo e aéreo, escreve o descritivo técnico e gera a Ordem de Carga.","producao"],
            ["Estoque","Separa, confirma a carga (baixa na data de carga) e registra o retorno na descarga.","estoque"]].map((x,n)=>`
           <div style="border:1px solid var(--line);border-radius:var(--r);padding:12px;background:${x[2]===S.role?"var(--accentSoft)":"var(--surface2)"}">
@@ -769,11 +781,11 @@ function vClientes(){
   </tbody></table></div></div>`;
 }
 
-/* ---------------- OS de Venda ---------------- */
+/* ---------------- Ordem de Serviço ---------------- */
 function formOSV(){
   const porCat={}; S.cat.forEach(c=>{(porCat[c.cat]=porCat[c.cat]||[]).push(c);});
   return `<form class="addform" autocomplete="off">
-    <div class="top"><h4>Nova OS de Venda</h4><div style="flex:1"></div>
+    <div class="top"><h4>Nova Ordem de Serviço</h4><div style="flex:1"></div>
       <span class="hint">Normalmente a OS nasce do pipeline; use este formulário para um pedido avulso.</span>
       <button class="btn sm ghost" type="button" data-act="fecharOSVForm">Fechar</button></div>
     <div class="rowf">
@@ -795,7 +807,7 @@ function formOSV(){
       </select></div>
       <div class="field s"><label for="fQtd">Qtd</label><input id="fQtd" type="number" value="10" min="1"></div>
       <button class="btn go" type="button" data-act="addItem">Incluir no escopo</button>
-      <button class="btn pri go" type="submit" data-act="salvarOSV">Emitir OS de Venda</button>
+      <button class="btn pri go" type="submit" data-act="salvarOSV">Emitir Ordem de Serviço</button>
     </div>
     <div class="picklist" id="pick"></div>
     <p class="hint">Enter no campo de quantidade inclui o item. Enter nos campos de cima emite a OS.</p></form>`;
@@ -803,7 +815,7 @@ function formOSV(){
 const STCOR={"Aguardando produção":"warn","Em produção":"acc","Liberada":"ok","Encerrada":""};
 function vVendas(){
   return `<div class="sechead"><h2>Ordens de Serviço de Venda</h2><p>Geradas pela gerência a partir de um negócio ganho e encaminhadas ao produtor responsável.</p>
-    <div style="flex:1"></div>${can("criar_osv")?`<button class="btn ${S.osvForm?"":"pri"}" data-act="${S.osvForm?"fecharOSVForm":"novaOSV"}">${S.osvForm?"Fechar formulário":"+ Nova OS de Venda"}</button>`:""}</div>
+    <div style="flex:1"></div>${can("criar_osv")?`<button class="btn ${S.osvForm?"":"pri"}" data-act="${S.osvForm?"fecharOSVForm":"novaOSV"}">${S.osvForm?"Fechar formulário":"+ Nova Ordem de Serviço"}</button>`:""}</div>
   ${can("criar_osv")&&S.osvForm?`<div style="margin-bottom:14px">${formOSV()}</div>`:""}
   <div class="card"><div class="tblwrap"><table><thead><tr><th>OS</th><th>Evento / cliente</th><th>Local</th><th>Montagem → desmontagem</th><th class="r">Itens</th>${can("ver_valores")?`<th class="r">Valor</th>`:""}<th>Produção</th><th>Equipe</th><th>Status</th></tr></thead><tbody>
   ${S.os.slice().sort((a,b)=>a.montagem<b.montagem?-1:1).map(o=>{const c=cli(o.cliente);const e=etapasOk(o);const done=[e.solo,e.aereo,e.descritivo].filter(Boolean).length;
@@ -825,7 +837,7 @@ function vOSV(){
   const c=cli(o.cliente), e=etapasOk(o), osc=oscDaOS(o.id);
   const dias=Math.max(1,diffDays(o.montagem,o.desmontagem));
   return `<div class="between" style="margin-bottom:14px">
-    <div><button class="btn sm ghost" data-act="go" data-view="vendas">← OS de Venda</button>
+    <div><button class="btn sm ghost" data-act="go" data-view="vendas">← Ordem de Serviço</button>
       <h2 style="font-size:19px;margin-top:6px">${esc(o.evento)}</h2>
       <div class="flex" style="margin-top:5px"><span class="tag">${o.codigo||""}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span><span class="pill ${STCOR[o.status]||""}"><span class="dot"></span>${esc(o.status)}</span></div></div>
     <div class="flex">${can("editar_memorial")?`<button class="btn pri" data-act="go" data-view="producao" data-id="${o.id}">Abrir na produção</button>`:""}
@@ -909,7 +921,7 @@ function vProducao(){
      a gerência que assumiu a produção de um evento */
   const souProdutor=minhas.length>0;
   const fila=souProdutor?[...minhas,...outras]:todas;
-  return `<div class="sechead"><h2>Fila de produção técnica</h2><p>Cada OS de Venda precisa de memorial de solo, memorial aéreo e descritivo antes de virar Ordem de Carga.</p>
+  return `<div class="sechead"><h2>Fila de produção técnica</h2><p>Cada Ordem de Serviço precisa de memorial de solo, memorial aéreo e descritivo antes de virar Ordem de Carga.</p>
     ${souProdutor?`<div style="flex:1"></div><span class="pill acc">${minhas.length} atribuída(s) a você</span>`:""}</div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr))">
   ${fila.map(o=>{const e=etapasOk(o),c=cli(o.cliente),osc=oscDaOS(o.id),pr=prontoParaOSC(o);
@@ -1200,7 +1212,7 @@ function vAgenda(){
   });
   const prev=S.os.filter(o=>!oscDaOS(o.id)).map(o=>({tit:o.evento,sub:o.id+" · carga prevista",de:o.montagem,ate:o.desmontagem,cls:"prev",id:o.id,tipo:"osv"}));
   const all=[...linhas,...prev].filter(r=>overlap(r.de,r.ate,ini,fim));
-  return `<div class="sechead"><h2>Ocupação do galpão</h2><p>Barras sólidas são ordens emitidas; tracejadas são OS de Venda ainda sem ordem de carga.</p>
+  return `<div class="sechead"><h2>Ocupação do galpão</h2><p>Barras sólidas são ordens emitidas; tracejadas são Ordem de Serviço ainda sem ordem de carga.</p>
     <div style="flex:1"></div><div class="flex" style="gap:8px">
     <span class="pill acc"><span class="dot"></span>liberada</span><span class="pill warn"><span class="dot"></span>em separação</span>
     <span class="pill ok"><span class="dot"></span>carregada</span><span class="pill"><span class="dot"></span>retornada</span></div></div>
@@ -1219,7 +1231,7 @@ function vAgenda(){
 /* ---------------- permissões ---------------- */
 function vEquipe(){
   const mods=NAV.flatMap(g=>g.items);
-  const rows=[["Visualizar valores e contratos","ver_valores"],["Criar oportunidades no funil","criar_negocio"],["Emitir OS de Venda","criar_osv"],
+  const rows=[["Visualizar valores e contratos","ver_valores"],["Criar oportunidades no funil","criar_negocio"],["Emitir Ordem de Serviço","criar_osv"],
     ["Editar memoriais e descritivo","editar_memorial"],["Gerar Ordem de Carga","gerar_osc"],["Baixar e dar entrada no estoque","movimentar"],
     ["Ajustar inventário e manutenção","editar_inventario"],["Gerenciar usuários e permissões","gerenciar_usuarios"]];
   return `<div class="grid" style="gap:14px">
@@ -1598,7 +1610,7 @@ function vAgendaCal(){
             ${evs.length?`<span class="dots">${evs.slice(0,6).map(e=>`<i style="width:5px;height:5px;border-radius:50%;display:inline-block;background:var(--${TIPOCOR[e.tipo]==="ok"?"ok":TIPOCOR[e.tipo]==="warn"?"warn":TIPOCOR[e.tipo]==="crit"?"crit":TIPOCOR[e.tipo]==="acc"?"accent":"ink3"})"></i>`).join("")}</span>`:""}
           </div>`;}).join("")}
       </div>
-      <p class="muted" style="font-size:11px;margin:10px 2px 0">Montagem, evento e desmontagem vêm das OS de Venda; carga e descarga vêm das Ordens de Carga. Reuniões, visitas técnicas e prazos são lançados aqui.</p>
+      <p class="muted" style="font-size:11px;margin:10px 2px 0">Montagem, evento e desmontagem vêm das Ordem de Serviço; carga e descarga vêm das Ordens de Carga. Reuniões, visitas técnicas e prazos são lançados aqui.</p>
     </div>
     <div class="card"><header><h3>${sel===HOJE?"Hoje":dtl(sel)}</h3><span class="hint">${lista.length} compromisso(s)</span></header>
       ${lista.length?`<div class="res" style="border:0;border-radius:0">${lista.map(c=>{
@@ -1873,7 +1885,7 @@ const ETAPAS=[
   ["tresd","Projeto 3D","Render para aprovação do cliente"],
   ["orcamento","Orçamento","Proposta, condições e margem"],
   ["fechamento","Fechamento","Reunião dos gerentes sobre o evento inteiro"],
-  ["finalizacao","Finalização","Contrato fechado · gerar a OS de Venda"]
+  ["finalizacao","Finalização","Contrato fechado · gerar a Ordem de Serviço"]
 ];
 const etapaIx = k => ETAPAS.findIndex(e=>e[0]===k);
 const CATEGORIAS=["Estrutura","Som","Luz","Vídeo","Cenografia","Internet","Extras"];
@@ -2044,7 +2056,7 @@ function alertasFech(n){
     const falta=base.filter(i=>disponivel(i.cod,n.montagem,n.desmontagem)<i.qtd);
     if(falta.length) out.push(["crit",falta.length+" item(ns) sem saldo na janela: "+falta.slice(0,3).map(i=>item(i.cod).nome).join(", ")+(falta.length>3?"…":"")+"."]);
   }
-  if(!out.length) out.push(["ok","Nenhum ponto crítico. Evento pronto para virar OS de Venda."]);
+  if(!out.length) out.push(["ok","Nenhum ponto crítico. Evento pronto para virar Ordem de Serviço."]);
   return out;
 }
 
@@ -2107,7 +2119,7 @@ function vCRM(){
   const tot=lista.filter(n=>n.etapa!=="ganho").reduce((s,n)=>s+n.valor,0);
   return `<div class="between" style="margin-bottom:12px">
     <div><h2 style="font-size:15px">Pipeline de pré-produção</h2>
-      <p style="margin:2px 0 0;font-size:11.5px;color:var(--ink3)">Da primeira ligação à OS de Venda. Clique num negócio para abrir a ficha completa.</p></div>
+      <p style="margin:2px 0 0;font-size:11.5px;color:var(--ink3)">Da primeira ligação à Ordem de Serviço. Clique num negócio para abrir a ficha completa.</p></div>
     <div class="flex" style="gap:8px">
       <input id="crmQ" placeholder="Buscar negócio ou cliente…" value="${esc(S.crmQ||"")}" data-crmq="1" style="width:210px">
       ${can("ver_valores")?`<span class="pill">em aberto · ${brl(tot)}</span>`:""}
@@ -2161,7 +2173,7 @@ function vNegocio(){
     <div class="flex">
       ${n.osId?`<button class="btn" data-act="osv" data-id="${n.osId}">Abrir ${(osById(n.osId)||{}).codigo||""}</button>`
         :prox&&S.role==="gerencia"?`<button class="btn" data-act="avancar" data-id="${n.id}">Avançar para ${esc(prox[1])} →</button>`:""}
-      ${n.etapa==="finalizacao"&&!n.osId&&can("criar_osv")?`<button class="btn pri" data-act="gerarOSVdeNegocio" data-id="${n.id}">Gerar OS de Venda</button>`:""}</div></div>
+      ${n.etapa==="finalizacao"&&!n.osId&&can("criar_osv")?`<button class="btn pri" data-act="gerarOSVdeNegocio" data-id="${n.id}">Gerar Ordem de Serviço</button>`:""}</div></div>
   <div class="tl2">${ETAPAS.map((e,i)=>`<button class="${aba===e[0]?"on":""} ${ck[e[0]]?"done":""}" data-act="crmAba" data-a="${e[0]}" title="${esc(e[2])}">
     <span class="mk">${ck[e[0]]?"✓":i+1}</span><span class="tx">${esc(e[1])}</span></button>`).join("")}</div>
   ${body}`;
@@ -2513,7 +2525,7 @@ function abaFech(n){
           ${USERS.map(u=>`<label class="flex" style="gap:6px;font-size:12px;border:1px solid ${f.participantes.includes(u.id)?"var(--ink2)":"var(--line)"};border-radius:20px;padding:3px 10px 3px 4px;cursor:pointer">
             <input type="checkbox" data-fechp="${u.id}" ${f.participantes.includes(u.id)?"checked":""} ${ed?"":"disabled"} style="width:auto">${av(u,20)}${esc(u.nome.split(" ")[0])}</label>`).join("")}</div></div>
         ${f.aprovado
-          ? `<div class="verdict ok"><div><b>Fechamento aprovado</b>Liberado por ${esc(usr(f.aprovadoPor).nome)} em ${dtl(tsData(f.aprovadoEm))} às ${tsHora(f.aprovadoEm)}. O evento pode virar OS de Venda.</div></div>
+          ? `<div class="verdict ok"><div><b>Fechamento aprovado</b>Liberado por ${esc(usr(f.aprovadoPor).nome)} em ${dtl(tsData(f.aprovadoEm))} às ${tsHora(f.aprovadoEm)}. O evento pode virar Ordem de Serviço.</div></div>
              ${ed?`<button class="btn" style="justify-content:center" data-act="reabrirFech" data-id="${n.id}">Reabrir para revisão</button>`:""}`
           : `<div class="verdict ${feitos===f.pauta.length?"ok":"warn"}"><div><b>${feitos===f.pauta.length?"Pauta revisada":"Reunião em aberto"}</b>${feitos===f.pauta.length?"Todos os pontos foram passados. Aprove para liberar a Finalização.":"Faltam "+(f.pauta.length-feitos)+" ponto(s) da pauta."}</div></div>
              ${ed?`<button class="btn pri" style="justify-content:center" data-act="aprovarFech" data-id="${n.id}">Aprovar e liberar para a OS</button>`:""}`}
@@ -2538,7 +2550,7 @@ function abaGanho(n){
   const pend=ETAPAS.slice(0,6).filter(x=>!ck[x[0]]);
   const o=n.osId?osById(n.osId):null;
   return `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,330px);gap:14px;align-items:start">
-    <div class="card"><header><h3>O que vai para a OS de Venda</h3><span class="hint">tudo herdado do pipeline</span></header>
+    <div class="card"><header><h3>O que vai para a Ordem de Serviço</h3><span class="hint">tudo herdado do pipeline</span></header>
       <div class="res" style="border:0">
         ${[["Evento",n.titulo],["Contratante",cli(n.cliente).nome],["Local",(n.local||"—")+(n.sala?" · "+n.sala:"")],
            ["Cidade",n.cidade],["Público",(n.publico||0).toLocaleString("pt-BR")+" pessoas"],
@@ -2564,7 +2576,7 @@ function abaGanho(n){
       <div class="card"><header><h3>Quem vai produzir</h3>
         <span class="hint">${(n.produtores||[]).length} atribuído(s)</span></header>
         <div class="pad" style="display:grid;gap:10px">
-        <p style="margin:0;font-size:12px;color:var(--ink2);line-height:1.5">A OS de Venda fica disponível para quem estiver marcado aqui. O primeiro da lista responde pela OS. A gerência também pode assumir a produção de um evento.</p>
+        <p style="margin:0;font-size:12px;color:var(--ink2);line-height:1.5">A Ordem de Serviço fica disponível para quem estiver marcado aqui. O primeiro da lista responde pela OS. A gerência também pode assumir a produção de um evento.</p>
         <div style="display:grid;gap:6px">${PRODUTORES().map(u=>{const on=(n.produtores||[]).includes(u.id), lead=(n.produtores||[])[0]===u.id;
           return `<label class="prod ${on?"on":""}"><input type="checkbox" data-prod="${u.id}" ${on?"checked":""} ${S.role==="gerencia"?"":"disabled"} style="width:auto">
             ${av(u,26)}<span class="tx"><b>${esc(u.nome)}</b><span>${esc(u.cargo)}${u.role==="gerencia"?" · gerência":""}</span></span>
@@ -2579,7 +2591,7 @@ function abaGanho(n){
           :pend.length?`<div class="verdict warn"><div><b>Faltam etapas</b>${pend.map(p=>esc(p[1])).join(", ")}. Dá para gerar a OS assim mesmo, mas a produção vai receber dados incompletos.</div></div>
             ${can("criar_osv")?`<button class="btn" style="justify-content:center" data-act="gerarOSVdeNegocio" data-id="${n.id}">Gerar OS mesmo assim</button>`:""}`
           :`<div class="verdict ok"><div><b>Pipeline completo</b>Briefing, visita técnica, 3D, orçamento e a reunião de fechamento — tudo aprovado.</div></div>
-            ${can("criar_osv")?`<button class="btn pri" style="justify-content:center" data-act="gerarOSVdeNegocio" data-id="${n.id}">Gerar OS de Venda</button>`:""}`}
+            ${can("criar_osv")?`<button class="btn pri" style="justify-content:center" data-act="gerarOSVdeNegocio" data-id="${n.id}">Gerar Ordem de Serviço</button>`:""}`}
       </div></div>
       <div class="card"><header><h3>Escopo por categoria</h3><span class="hint">como o estoque separa</span></header>
         <div class="res" style="border:0;border-radius:0">${porCategoria(e).map(([c,its])=>`<div class="row">
@@ -2677,6 +2689,8 @@ function gerarOSVdeNegocio(negId){
   const n=neg(negId); if(!n) return;
   if(n.osId) return toast("Este negócio já gerou a OS "+n.osId+".");
   if(!n.montagem||!n.desmontagem) return toast("Defina montagem e desmontagem na Qualificação antes de gerar a OS.");
+  if(n.desmontagem<n.montagem) return toast("A desmontagem não pode ocorrer antes da montagem.");
+  if((n.orc?.linhas||[]).some(l=>!Number.isInteger(Number(l.qtd))||Number(l.qtd)<=0)) return toast("Para gerar a OS, use quantidades inteiras maiores que zero em cada linha do orçamento.");
   if(!n.fech.aprovado) return toast("A reunião de fechamento precisa ser aprovada antes de emitir a OS.");
   if(!(n.produtores||[]).length) return toast("Defina ao menos um produtor na Finalização antes de emitir a OS.");
   const e=(n.orc&&n.orc.linhas.length)?escopoDaOS(n):escopoDoBriefing(n);
@@ -2757,7 +2771,7 @@ function acaoCRM(a, id, t){
       if(!n.fech.reuniao){ n.fech.reuniao=HOJE; n.fech.hora=tsHora(nowTs()); }
       if(etapaIx(n.etapa)<etapaIx("finalizacao")) n.etapa="finalizacao";
       S.crmAba="finalizacao"; save(); render();
-      avisar("Fechamento de "+n.titulo+" aprovado na reunião de gerência. Liberado para emissão da OS de Venda.",["gerencia","producao"],"crm",n.id,"fluxo");
+      avisar("Fechamento de "+n.titulo+" aprovado na reunião de gerência. Liberado para emissão da Ordem de Serviço.",["gerencia","producao"],"crm",n.id,"fluxo");
       toast("Fechamento aprovado — pode gerar a OS."); break;}
     case "reabrirFech": {if(S.role!=="gerencia") break; const n=neg(id);
       n.fech.aprovado=false; n.fech.aprovadoPor=""; n.fech.aprovadoEm="";
@@ -3436,10 +3450,14 @@ function acaoEstoque(a, id, t){
         peso:Number(g("itPeso"))||0,porCase:Math.max(1,Number(g("itCase"))||1),watts:Number(g("itW"))||0,
         diaria:Number(g("itDiaria"))||0,
         total:Number(g("itTotal"))||0,manut:Number(g("itManut"))||0};
+      if([dados.peso,dados.watts,dados.diaria,dados.total,dados.manut].some(v=>!Number.isFinite(v)||v<0)) return toast("Use valores positivos ou zero nos campos do item.");
+      if([dados.porCase,dados.watts,dados.total,dados.manut].some(v=>!Number.isInteger(v))) return toast("Case, consumo e quantidades precisam ser números inteiros.");
+      if(dados.manut>dados.total) return toast("A quantidade em manutenção não pode superar o estoque total.");
       const ex=S.cat.find(x=>x.cod===cod);
+      if(ex&&!id) return toast("Esse código já existe. Abra o item para editar ou escolha outro código.");
       if(ex) Object.assign(ex,dados);
       else { if(id) return; S.cat.push(Object.assign({cod,rig:"solo"},dados)); }
-      S.itemForm=null; save(); render(); toast("Item "+cod+" salvo."); break;}
+      S.itemForm=null; save(); render(); toast("Item "+cod+" na fila de gravação. Confira a confirmação no topo."); break;}
     case "novoKit": if(can("editar_inventario")){ tmpKit=[]; S.kitForm=""; save(); render(); pintarKit(); foco("ktCod"); } break;
     case "editarKit": if(can("editar_inventario")){ const kk=kitById(id); tmpKit=kk?kk.itens.map(x=>({...x})):[];
       S.estTab="kits"; S.kitForm=id; save(); render(); pintarKit(); foco("ktNome"); } break;
@@ -3547,6 +3565,7 @@ function ensureProd(){
     o.ambientes.forEach(a=>{ const m=memAmb(o,a.id);
       if(m.ancoragens===null || !m.ancoragens) m.ancoragens = (m.aereo.pontos>0)
         ? [{id:uid(),nome:"Pontos da estrutura do local",qtd:m.aereo.pontos,wll:m.aereo.wllPonto}] : [];
+      zonasDe(o,a.id); estruturasDe(o,a.id);
     });
   });
 }
@@ -5911,12 +5930,33 @@ function render(){
 
 /* ---------------- modal ---------------- */
 let tmpItens=[];
+let focoAntesModal=null;
 function modal(title, body, footer){
-  $("#modalHost").innerHTML = `<div class="ovl" data-act="fecharModal"><div class="modal" data-stop="1">
-    <header><h3>${esc(title)}</h3><button class="x" data-act="fecharModal" aria-label="Fechar">×</button></header>
+  focoAntesModal=document.activeElement;
+  $("#modalHost").innerHTML = `<div class="ovl" data-act="fecharModal"><div class="modal" data-stop="1" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
+    <header><h3 id="modalTitle">${esc(title)}</h3><button class="x" data-act="fecharModal" aria-label="Fechar">×</button></header>
     <div class="body">${body}</div><footer>${footer}</footer></div></div>`;
 }
-const fecharModal = ()=>{ $("#modalHost").innerHTML=""; };
+const fecharModal = ()=>{ $("#modalHost").innerHTML=""; if(focoAntesModal?.isConnected) focoAntesModal.focus(); };
+document.addEventListener("keydown",ev=>{
+  const dlg=document.querySelector("#modalHost .modal"); if(!dlg) return;
+  if(ev.key==="Escape"){ev.preventDefault();fecharModal();return;}
+  if(ev.key!=="Tab") return;
+  const els=[...dlg.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')].filter(e=>e.getClientRects().length);
+  if(!els.length){ev.preventDefault();dlg.focus();return;}
+  const first=els[0],last=els[els.length-1];
+  if(!dlg.contains(document.activeElement)||(!ev.shiftKey&&document.activeElement===last)) {ev.preventDefault();first.focus();}
+  else if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last.focus();}
+});
+new MutationObserver(()=>{
+  const dlg=document.querySelector("#modalHost .modal");
+  if(dlg&&!dlg.contains(document.activeElement)) (dlg.querySelector("input,select,textarea,button")||dlg).focus();
+}).observe(document.getElementById("modalHost"),{childList:true});
+// Os handlers antigos usam click; respeitar validação HTML antes de executá-los.
+document.addEventListener("click",ev=>{
+  const btn=ev.target.closest('button[data-act^="salvar"]');
+  if(btn?.form&&!btn.form.reportValidity()){ev.preventDefault();ev.stopImmediatePropagation();}
+},true);
 
 function mRetorno(c){
   modal("Registrar descarga · "+c.id, `
@@ -6191,10 +6231,20 @@ const nz  = v => (v===""||v===undefined) ? null : v;
    "invalid input syntax for type uuid". Aqui ele vira nulo e o resto passa. */
 const EH_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const pid  = v => (typeof v==="string" && EH_UUID.test(v)) ? v : null;
-const pids = a => (a||[]).map(pid).filter(Boolean);
+const pids = a => [...new Set((a||[]).map(pid).filter(Boolean))];
+function mensagemErro(e){
+  const mensagens={"23503":"Há um vínculo ausente ou um registro ainda em uso. Confira os cadastros relacionados.",
+    "23505":"Já existe um registro com esse código ou nome. Confira antes de tentar novamente.",
+    "23514":"Um valor ou uma data está fora do intervalo permitido.",
+    "42501":"O banco recusou o acesso a estes dados. Confira se a migração 0007 foi aplicada e se o perfil está autorizado.",
+    "PGRST202":"A atualização do banco está pendente. Aplique a migração 0007.",
+    "PGRST205":"Uma tabela não foi encontrada. Confira as migrações do banco.",
+    "22P02":"Um campo tem formato inválido. Confira códigos, números e datas."};
+  return mensagens[e.code]||e.message||e.error_description||"Falha de conexão. Tente novamente.";
+}
 function erro(e, contexto){
   console.error(contexto, e);
-  toast((contexto||"Falha")+": "+(e.message||e.error_description||"erro desconhecido"));
+  toast((contexto||"Falha")+": "+mensagemErro(e));
 }
 
 /* =============================================================
@@ -6218,7 +6268,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Peça à gerência para criar seu usuário e definir o perfil."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}</footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.1 · compatível com migração 0007</span></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -6240,7 +6290,7 @@ async function recuperarSenha(){
   const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.href });
   telaLogin(error? error.message : "Link de redefinição enviado para "+email.trim()+".", error?null:"ok");
 }
-async function sair(){ await sb.auth.signOut(); location.reload(); }
+async function sair(){ if(!await sincronizar()) return; await sb.auth.signOut(); location.reload(); }
 
 /* =============================================================
    2 · CARGA — o banco vira o formato que as telas já usam
@@ -6349,7 +6399,7 @@ function mapOS(o){
   /* no app a plenária tem id fixo; as B.U. ficam com o uuid do banco */
   const appId=id=>id===idPlen?PLENARIA:id;
   const m=memDe(idPlen);
-  return {id:o.id, codigo:o.codigo, negId:o.negocio_id, cliente:o.cliente_id, evento:o.evento,
+  return {id:o.id, principalDb:idPlen, codigo:o.codigo, negId:o.negocio_id, cliente:o.cliente_id, evento:o.evento,
     local:o.local_nome||"", cidade:o.cidade||"", publico:o.publico||0, area:num(o.area_m2),
     montagem:o.montagem, evIni:o.evento_inicio||o.montagem, evFim:o.evento_fim||o.evento_inicio||o.montagem,
     desmontagem:o.desmontagem, valor:num(o.valor), status:o.status, descritivo:o.descritivo||"",
@@ -6398,22 +6448,35 @@ function urlFoto(path){
 }
 
 async function carregarTudo(){
-  const q = (t,sel) => sb.from(t).select(sel||"*");
+  const inicioRevisao=revisaoLocal;
+  const q = async(t,sel)=>{
+    const data=[], tamanho=200, chave=["v_itens","kits","frota"].includes(t)?"cod":"id";
+    for(let de=0;;de+=tamanho){
+      const r=await sb.from(t).select(sel||"*").order(chave).range(de,de+tamanho-1);
+      if(r.error){r.error.message=t+": "+r.error.message;return r;}
+      data.push(...(r.data||[])); if((r.data||[]).length<tamanho) return {data,error:null};
+    }
+  };
   const [perfis, clientes, itens, kits, frota, negocios, os, cargas, movs,
          canais, msgs, posts, notas, comps, notifs, freelas, reembolsos] = await Promise.all([
     q("perfis"), q("clientes"), q("v_itens"),
     q("kits","*, kit_itens(item_cod, quantidade)"), q("frota"),
-    q("negocios", `*, negocio_sala(*), negocio_ambientes(*), briefing_blocos(*), briefing_notas(*),
+    q("v_negocios").then(async r=>{
+      if(r.error||!r.data.length) return r;
+      const det=await q("negocios", `id, negocio_sala(*), negocio_ambientes(*), briefing_blocos(*), briefing_notas(*),
         visitas_tecnicas(*), vt_participantes(perfil_id), vt_checklist(*), vt_fotos(*),
         projetos_3d(*), orcamentos(*), orcamento_linhas(*),
-        fechamentos(*), fechamento_participantes(perfil_id), fechamento_pauta(*)`),
+        fechamentos(*), fechamento_participantes(perfil_id), fechamento_pauta(*)`);
+      if(det.error) return det;
+      const byId=porId(det.data); r.data.forEach(n=>Object.assign(n,byId[n.id]||{})); return r;
+    }),
     q("v_ordens_venda").then(async r=>{
       if(r.error||!r.data.length) return r;
       const ids=r.data.map(x=>x.id);
-      const det = await sb.from("ordens_venda").select(
+      const det = await q("ordens_venda",
         `id, os_produtores(perfil_id,responsavel), os_ambientes(*), os_estruturas(*), os_zonas(*),
          os_itens(*), os_ancoragens(*), os_memorial(*),
-         os_logistica(observacao), os_veiculo_dias(*), os_escala(*)`).in("id",ids);
+         os_logistica(observacao), os_veiculo_dias(*), os_escala(*)`);
       if(det.error) return det;
       const byId={}; det.data.forEach(d=>byId[d.id]=d);
       r.data.forEach(o=>Object.assign(o, byId[o.id]||{}));
@@ -6431,6 +6494,7 @@ async function carregarTudo(){
   for(const r of [perfis,clientes,itens,kits,frota,negocios,os,cargas,movs,canais,msgs,posts,notas,comps,notifs,freelas,reembolsos])
     if(r.error) throw r.error;
 
+  if(inicioRevisao!==revisaoLocal || temAlteracoes()) return false;
   S.perfis   = perfis.data.map(mapPerfil);
   S.clientes = clientes.data.map(mapCliente);
   S.cat      = itens.data.map(mapItem);
@@ -6470,6 +6534,7 @@ async function carregarTudo(){
   S.notifs = notifs.data.map(n=>({id:n.id,ts:n.criado_em,txt:n.texto,tipo:n.tipo,para:n.destino,
               view:n.tela||"painel",sel:n.referencia,
               lida:Object.fromEntries((n.notificacao_leituras||[]).filter(l=>l.perfil_id===eu).map(()=>[S.role,true]))}));
+  return true;
 }
 </script>
 <script>
@@ -6479,97 +6544,116 @@ async function carregarTudo(){
    uma comparação com o último estado conhecido, e só o que mudou
    sobe para o banco.
    ============================================================= */
-let ultimo = null;               // fotografia do que já está gravado
-let pendente = null;             // timer do debounce
+let ultimo = null;
+let pendente = null;
 let gravando = false;
-
+let promessaSync = null;
+let revisaoLocal = 0;
+let carregandoDados = false;
 const clone = o => JSON.parse(JSON.stringify(o));
 const igual = (a,b) => JSON.stringify(a)===JSON.stringify(b);
 const porId = arr => Object.fromEntries((arr||[]).map(x=>[x.id||x.cod, x]));
-
-function marcarSincronizado(){ ultimo = clone({
-  cat:S.cat, kits:S.kits, frota:S.frota, clientes:S.clientes,
-  negocios:S.negocios, os:S.os, cargas:S.cargas, freelas:S.freelas, reembolsos:S.reembolsos,
-  notas:S.notas, compromissos:S.compromissos, msgs:S.msgs, posts:S.posts, notifs:S.notifs }); }
-
+const MODULOS = ["cat","kits","frota","clientes","freelas","negocios","os","cargas",
+  "chats","notas","compromissos","msgs","posts","notifs","reembolsos"];
+function marcarSincronizado(){ ultimo=Object.fromEntries(MODULOS.map(k=>[k,clone(S[k]||[])])); }
+function temAlteracoes(){ return !!ultimo && MODULOS.some(k=>!igual(S[k]||[],ultimo[k])); }
+function statusSync(txt, falha=false){
+  const e=document.getElementById("syncStatus"); if(e){ e.textContent=txt; e.dataset.erro=String(falha); }
+  const b=document.getElementById("btnSync"); if(b){ b.textContent=falha?"Tentar novamente":"Atualizar"; b.disabled=gravando||carregandoDados; }
+}
 function agendarSync(){
+  ensureProd(); ensureFrota();
+  revisaoLocal++;
   clearTimeout(pendente);
-  pendente = setTimeout(()=>sincronizar(), 500);
-  const b=document.getElementById("btnSync"); if(b) b.textContent="Salvando…";
+  if(!temAlteracoes()) return;
+  statusSync("Alterações pendentes");
+  pendente=setTimeout(()=>{pendente=null;sincronizar();},500);
 }
-save = agendarSync;
-load = () => {};
-
-/* Cada módulo marca o próprio progresso. Antes a fotografia só era atualizada
-   quando os onze passavam; bastava um tropeçar para todos serem reenviados na
-   tentativa seguinte — e o que já tinha entrado voltava como chave duplicada. */
-async function passo(chave, fn){
-  const foto = clone(S[chave]);   // exatamente o que esta rodada vai gravar
-  await fn();
-  ultimo[chave] = foto;           // o que o usuário mexeu no meio fica para a próxima
+save=agendarSync;
+load=()=>{};
+async function passo(chave,fn,estado){
+  if(igual(estado[chave]||[],ultimo[chave])) return;
+  try { await fn(estado); ultimo[chave]=clone(estado[chave]||[]); }
+  catch(e){ e.modulo=chave; throw e; }
 }
-
-async function sincronizar(){
-  if(gravando || !ultimo) return;
-  gravando = true;
-  const b=document.getElementById("btnSync");
-  const r = await Promise.allSettled([
-    passo("cat",          syncItens),
-    passo("kits",         syncKits),
-    passo("frota",        syncFrota),
-    passo("clientes",     syncClientes),
-    passo("negocios",     syncNegocios),
-    passo("os",           syncOS),
-    passo("cargas",       syncCargas),
-    passo("notas",        syncNotas),
-    passo("compromissos", syncCompromissos),
-    passo("msgs",         syncMsgs),
-    passo("posts",        syncPosts),
-    passo("notifs",       syncNotifs),
-    passo("freelas",      syncFreelas),
-    passo("reembolsos",   syncReembolsos),
-  ]);
-  gravando = false;
-  const falhou = r.filter(x=>x.status==="rejected");
-  if(!falhou.length){ if(b) b.textContent="Atualizar"; return; }
-  erro(falhou[0].reason, "Não consegui gravar");
-  if(b) b.textContent="Erro ao salvar";
+function sincronizar(){
+  clearTimeout(pendente); pendente=null;
+  if(promessaSync) return promessaSync;
+  if(!ultimo) return Promise.resolve(false);
+  gravando=true; statusSync("Salvando…");
+  promessaSync=(async()=>{
+    try{
+      do {
+        const estado=clone(S);
+        // Pais antes dos filhos. A OS e o vínculo de volta são concluídos depois do negócio.
+        for(const [k,fn] of [["cat",syncItens],["kits",syncKits],["frota",syncFrota],
+          ["clientes",syncClientes],["freelas",syncFreelas],["negocios",syncNegocios],
+          ["os",syncOS],["cargas",syncCargas],["chats",syncChats],["notas",syncNotas],
+          ["compromissos",syncCompromissos],["msgs",syncMsgs],["posts",syncPosts],
+          ["notifs",syncNotifs],["reembolsos",syncReembolsos]]) await passo(k,fn,estado);
+      } while(temAlteracoes());
+      statusSync("Todas as alterações salvas");
+      return true;
+    }catch(e){
+      erro(e,"Não foi possível salvar"+(e.modulo?" · "+e.modulo:""));
+      statusSync("Alterações não salvas. "+mensagemErro(e),true);
+      return false;
+    }finally{
+      gravando=false; promessaSync=null;
+      const b=document.getElementById("btnSync"); if(b) b.disabled=carregandoDados;
+    }
+  })();
+  return promessaSync;
+}
+window.addEventListener("beforeunload",e=>{ if(temAlteracoes()||gravando){e.preventDefault();e.returnValue="";} });
+// INSERT/UPDATE separados: UPSERT exige SELECT inclusive das colunas sigilosas.
+async function gravarRegistro(tabela,dados,chave,existe){
+  const q=sb.from(tabela);
+  const r=existe ? await q.update(dados).eq(chave,dados[chave]).select(chave).single()
+    : await q.insert(dados).select(chave).single();
+  if(r.error) throw r.error;
+}
+async function substituirRelacoes(tabela,chave,valor,linhas){
+  const r=await sb.rpc("substituir_relacoes",{p_tabela:tabela,p_chave:chave,p_valor:String(valor),p_linhas:linhas});
+  if(r.error) throw r.error;
 }
 
 /* ---------- inventário ---------- */
-async function syncItens(){
-  const antes=porId(ultimo.cat), agora=porId(S.cat);
-  const up=S.cat.filter(i=>!igual(i,antes[i.cod])).map(i=>({cod:i.cod,nome:i.nome,categoria:i.cat,
+async function syncItens(estado){
+  const antes=porId(ultimo.cat), agora=porId(estado.cat);
+  const up=estado.cat.filter(i=>!igual(i,antes[i.cod])).map(i=>({cod:i.cod,nome:i.nome,categoria:i.cat,
     unidade:i.un,peso_kg:i.peso,por_case:i.porCase,watts:i.watts,diaria:i.diaria,
     quantidade_total:i.total,em_manutencao:i.manut}));
   const del=Object.keys(antes).filter(c=>!agora[c]);
-  if(up.length){ const r=await sb.from("itens").upsert(up); if(r.error) throw r.error; }
+  for(const d of up){
+    if(estado.role!=="gerencia") delete d.diaria;
+    const ex=await sb.from("itens").select("cod").eq("cod",d.cod).maybeSingle(); if(ex.error) throw ex.error;
+    await gravarRegistro("itens",d,"cod",!!ex.data);
+  }
   if(del.length){ const r=await sb.from("itens").delete().in("cod",del); if(r.error) throw r.error; }
 }
-async function syncKits(){
-  const antes=porId(ultimo.kits), agora=porId(S.kits);
-  for(const k of S.kits){
+async function syncKits(estado){
+  const antes=porId(ultimo.kits), agora=porId(estado.kits);
+  for(const k of estado.kits){
     if(igual(k,antes[k.cod])) continue;
     let r=await sb.from("kits").upsert({cod:k.cod,nome:k.nome,categoria:k.cat,observacao:nz(k.obs)});
     if(r.error) throw r.error;
-    r=await sb.from("kit_itens").delete().eq("kit_cod",k.cod); if(r.error) throw r.error;
-    if(k.itens.length){ r=await sb.from("kit_itens").insert(k.itens.map(x=>({kit_cod:k.cod,item_cod:x.cod,quantidade:x.qtd})));
-      if(r.error) throw r.error; }
+    await substituirRelacoes("kit_itens","kit_cod",k.cod,k.itens.map(x=>({kit_cod:k.cod,item_cod:x.cod,quantidade:x.qtd})));
   }
   const del=Object.keys(antes).filter(c=>!agora[c]);
   if(del.length){ const r=await sb.from("kits").delete().in("cod",del); if(r.error) throw r.error; }
 }
-async function syncFrota(){
-  const antes=porId(ultimo.frota), agora=porId(S.frota);
-  const up=S.frota.filter(v=>!igual(v,antes[v.cod])).map(v=>({cod:v.cod,nome:v.nome,tipo:v.tipo,placa:nz(v.placa),
+async function syncFrota(estado){
+  const antes=porId(ultimo.frota), agora=porId(estado.frota);
+  const up=estado.frota.filter(v=>!igual(v,antes[v.cod])).map(v=>({cod:v.cod,nome:v.nome,tipo:v.tipo,placa:nz(v.placa),
     capacidade_kg:v.capKg,capacidade_cases:v.capCases,lugares:v.lugares,observacao:nz(v.obs),em_manutencao:!!v.manut}));
   const del=Object.keys(antes).filter(c=>!agora[c]);
   if(up.length){ const r=await sb.from("frota").upsert(up); if(r.error) throw r.error; }
   if(del.length){ const r=await sb.from("frota").delete().in("cod",del); if(r.error) throw r.error; }
 }
-async function syncClientes(){
+async function syncClientes(estado){
   const antes=porId(ultimo.clientes);
-  const up=S.clientes.filter(c=>!igual(c,antes[c.id]));
+  const up=estado.clientes.filter(c=>!igual(c,antes[c.id]));
   if(!up.length) return;
   const r=await sb.from("clientes").upsert(up.map(c=>({id:c.id,nome:c.nome,tipo:c.tipo,documento:c.doc,
     contato:c.contato,telefone:c.tel,cidade:c.cidade,desde:c.desde})));
@@ -6577,12 +6661,14 @@ async function syncClientes(){
 }
 
 /* ---------- pipeline ---------- */
-async function syncNegocios(){
+async function syncNegocios(estado){
   const antes=porId(ultimo.negocios);
-  for(const n of S.negocios){
+  for(const n of estado.negocios){
     const a=antes[n.id];
     if(igual(n,a)) continue;
-    let r=await sb.from("negocios").upsert({id:n.id,codigo:n.codigo,titulo:n.titulo,cliente_id:nz(n.cliente),
+    let r={};
+    if(estado.role==="gerencia"){
+      const dados={id:n.id,codigo:n.codigo,titulo:n.titulo,cliente_id:nz(n.cliente),
       etapa:n.etapa,temperatura:n.temp,recorrente:!!n.recorrente,eventos_anteriores:n.eventosAnteriores||0,
       tipo_evento:n.tipoEvento,origem:n.origem,responsavel_id:pid(n.resp),
       local_nome:nz(n.local),sala:nz(n.sala),endereco:nz(n.endereco),cidade:nz(n.cidade),
@@ -6591,7 +6677,10 @@ async function syncNegocios(){
       evento_inicio:nz(n.evIni),evento_inicio_hora:nz(n.evIniHora),
       evento_fim:nz(n.evFim),evento_fim_hora:nz(n.evFimHora),
       desmontagem:nz(n.desmontagem),desmontagem_hora:nz(n.desmontagemHora),
-      valor:n.valor||0,os_id:nz(n.osId)});
+      valor:n.valor||0};
+      const ex=await sb.from("negocios").select("id").eq("id",n.id).maybeSingle(); if(ex.error) throw ex.error;
+      await gravarRegistro("negocios",dados,"id",!!ex.data);
+    }
     if(r.error) throw r.error;
 
     if(!a || !igual(n.brief.sala,a.brief.sala) || !igual(n.brief.ambientes,a.brief.ambientes)){
@@ -6634,41 +6723,45 @@ async function syncNegocios(){
     }
     const blocos=["led","palco","estrutura","som","luz","transmissao","cenografia","internet"];
     const mudou = blocos.filter(x=>!a||!igual(n.brief[x],a.brief[x]));
-    if(mudou.length){
+    if(estado.role==="gerencia" && mudou.length){
       r=await sb.from("briefing_blocos").upsert(mudou.map(x=>({negocio_id:n.id,bloco:x,
         incluso:!!n.brief[x].tem,porte:nz(n.brief[x].porte),observacao:nz(n.brief[x].obs)})));
       if(r.error) throw r.error;
     }
-    if(!a || !igual(n.briefNotas,a.briefNotas)){
+    if(estado.role==="gerencia" && (!a || !igual(n.briefNotas,a.briefNotas))){
       const antesNotas=porId((a&&a.briefNotas)||[]);
       const novas=n.briefNotas.filter(x=>!antesNotas[x.id]);
       if(novas.length){ r=await sb.from("briefing_notas").upsert(novas.map(x=>({id:x.id,negocio_id:n.id,
         autor_id:pid(x.autor),texto:x.txt})), {onConflict:"id",ignoreDuplicates:true}); if(r.error) throw r.error; }
     }
-    if(!a || !igual(n.vt,a.vt)) await syncVT(n);
+    if(!a || !igual(n.vt,a.vt)) await syncVT(n,a?.vt);
     if(!a || !igual(n.tresd,a.tresd)){
       r=await sb.from("projetos_3d").upsert({negocio_id:n.id,necessario:!!n.tresd.necessario,
         status:n.tresd.status,responsavel_id:pid(n.tresd.resp),prazo:nz(n.tresd.prazo),
         revisoes:n.tresd.revisoes||0,arquivo:nz(n.tresd.link),retorno:nz(n.tresd.obs)});
       if(r.error) throw r.error;
     }
-    if(!a || !igual(n.orc,a.orc)) await syncOrcamento(n);
-    if(!a || !igual(n.fech,a.fech)) await syncFechamento(n);
+    if(estado.role==="gerencia" && (!a || !igual(n.orc,a.orc))) await syncOrcamento(n);
+    if(estado.role==="gerencia" && (!a || !igual(n.fech,a.fech))) await syncFechamento(n);
   }
 }
-async function syncVT(n){
+async function syncVT(n,antesVT){
   let r=await sb.from("visitas_tecnicas").upsert({negocio_id:n.id,realizada:!!n.vt.feita,
     data:nz(n.vt.data),hora:nz(n.vt.hora),resumo:nz(n.vt.resumo)});
   if(r.error) throw r.error;
-  r=await sb.from("vt_participantes").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
+  
   const vtQuem=pids(n.vt.quem);
-  if(vtQuem.length){ r=await sb.from("vt_participantes").insert(vtQuem.map(p=>({negocio_id:n.id,perfil_id:p})));
-    if(r.error) throw r.error; }
-  r=await sb.from("vt_checklist").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
-  if(n.vt.checklist.length){ r=await sb.from("vt_checklist").insert(
+  await substituirRelacoes("vt_participantes","negocio_id",n.id,vtQuem.map(p=>({negocio_id:n.id,perfil_id:p})));
+  await substituirRelacoes("vt_checklist","negocio_id",n.id,
       n.vt.checklist.map((c,i)=>({negocio_id:n.id,ordem:i,texto:c.t,concluido:!!c.ok})));
-    if(r.error) throw r.error; }
-  /* a foto em si já foi para o Storage no momento do anexo; aqui só a legenda volta */
+  const removidas=(antesVT?.fotos||[]).filter(f=>!n.vt.fotos.some(x=>x.id===f.id));
+  if(removidas.length){
+    const del=await sb.from("vt_fotos").delete().eq("negocio_id",n.id).in("id",removidas.map(f=>f.id));
+    if(del.error) throw del.error;
+    const paths=removidas.map(f=>f.path).filter(Boolean);
+    if(paths.length){const rm=await sb.storage.from("vt-fotos").remove(paths);if(rm.error) throw rm.error;}
+  }
+  /* A foto já foi enviada; apenas as legendas precisam de atualização. */
   for(const f of n.vt.fotos){
     if(!f.path) continue;
     r=await sb.from("vt_fotos").update({legenda:nz(f.legenda)}).eq("id",f.id);
@@ -6678,21 +6771,19 @@ async function syncVT(n){
 async function syncOrcamento(n){
   let r=await sb.from("orcamentos").upsert({negocio_id:n.id,desconto:n.orc.desconto||0,
     condicoes:nz(n.orc.condicoes),validade:nz(n.orc.validade),observacao:nz(n.orc.obsGeral),
-    probabilidade:n.orc.probabilidade||50,previsao:nz(n.orc.previsao),concorrentes:nz(n.orc.concorrentes)});
+    probabilidade:n.orc.probabilidade??50,previsao:nz(n.orc.previsao),concorrentes:nz(n.orc.concorrentes)});
   if(r.error) throw r.error;
-  r=await sb.from("orcamento_linhas").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
-  if(n.orc.linhas.length){
+  {
     /* a plenária é PLENARIA no app e uuid no banco; a tradução é aqui */
     const pl=await sb.from("negocio_ambientes").select("id").eq("negocio_id",n.id).eq("principal",true);
     if(pl.error) throw pl.error;
     const idPlen=(pl.data&&pl.data[0])?pl.data[0].id:null;
     const amb=l=>{ const a=ambDaLinha(l); return a===PLENARIA?idPlen:a; };
-    r=await sb.from("orcamento_linhas").insert(n.orc.linhas.map((l,i)=>({negocio_id:n.id,tipo:l.tipo,
+    await substituirRelacoes("orcamento_linhas","negocio_id",n.id,n.orc.linhas.map((l,i)=>({negocio_id:n.id,tipo:l.tipo,
       ambiente_id:amb(l),
       item_cod:l.tipo==="estoque"?l.cod:null,descricao:l.nome,categoria:l.cat,quantidade:l.qtd,
       diarias:Math.max(1,l.dias||1),valor_unitario:l.unit||0,cobranca:l.modo||"diaria",
       fornecedor:nz(l.fornecedor),observacao:nz(l.obs),ordem:i})));
-    if(r.error) throw r.error;
   }
 }
 async function syncFechamento(n){
@@ -6700,138 +6791,73 @@ async function syncFechamento(n){
     decisoes:nz(n.fech.decisoes),aprovado:!!n.fech.aprovado,aprovado_por:pid(n.fech.aprovadoPor),
     aprovado_em:nz(n.fech.aprovadoEm)});
   if(r.error) throw r.error;
-  r=await sb.from("fechamento_participantes").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
-  if(n.fech.participantes.length){ r=await sb.from("fechamento_participantes").insert(
-      pids(n.fech.participantes).map(p=>({negocio_id:n.id,perfil_id:p}))); if(r.error) throw r.error; }
-  r=await sb.from("fechamento_pauta").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
-  if(n.fech.pauta.length){ r=await sb.from("fechamento_pauta").insert(
-      n.fech.pauta.map((x,i)=>({negocio_id:n.id,ordem:i,texto:x.t,revisado:!!x.ok}))); if(r.error) throw r.error; }
+  await substituirRelacoes("fechamento_participantes","negocio_id",n.id,
+      pids(n.fech.participantes).map(p=>({negocio_id:n.id,perfil_id:p})));
+  await substituirRelacoes("fechamento_pauta","negocio_id",n.id,
+      n.fech.pauta.map((x,i)=>({negocio_id:n.id,ordem:i,texto:x.t,revisado:!!x.ok})));
 }
 
 /* ---------- ordens de venda ---------- */
-async function syncOS(){
+async function syncOS(estado){
   const antes=porId(ultimo.os);
-  for(const o of S.os){
-    const a=antes[o.id];
-    if(igual(o,a)) continue;
-    let r=await sb.from("ordens_venda").upsert({id:o.id,codigo:o.codigo,negocio_id:nz(o.negId),
-      cliente_id:nz(o.cliente),evento:o.evento,local_nome:nz(o.local),cidade:nz(o.cidade),
-      publico:o.publico||0,area_m2:o.area||0,montagem:o.montagem,evento_inicio:nz(o.evIni),
-      evento_fim:nz(o.evFim),desmontagem:o.desmontagem,valor:o.valor||0,status:o.status,
-      descritivo:nz(o.descritivo)});
-    if(r.error) throw r.error;
-
-    if(!a || !igual(o.produtores,a.produtores)){
-      r=await sb.from("os_produtores").delete().eq("os_id",o.id); if(r.error) throw r.error;
-      if(o.produtores.length){ r=await sb.from("os_produtores").insert(
-        pids(o.produtores).map((p,i)=>({os_id:o.id,perfil_id:p,responsavel:i===0}))); if(r.error) throw r.error; }
-    }
-    /* as salas primeiro: elas são a chave de tudo o que vem depois.
-       A correspondência é pela ordem, não pelo nome: renomear uma sala é
-       renomear a linha que existe, nunca criar outra — senão a primeira
-       entraria de novo como principal e bateria em um_principal_por_os. */
+  for(const o of estado.os){
+    const a=antes[o.id]; if(igual(o,a)) continue;
     const as=ambsOS(o);
-    const reg0=await sb.from("os_ambientes").select("id,nome,principal,ordem")
-      .eq("os_id",o.id).order("ordem");
-    if(reg0.error) throw reg0.error;
-    const havia=reg0.data||[];
-    const noBanco={};
-    for(let i=0;i<as.length;i++){
-      const dados={os_id:o.id,nome:as[i].nome,principal:i===0,ordem:i};
-      const velho=havia[i];
-      if(velho){
-        r=await sb.from("os_ambientes").update(dados).eq("id",velho.id);
-        if(r.error) throw r.error;
-        noBanco[as[i].id]=velho.id;
-      } else {
-        const ins=await sb.from("os_ambientes").insert(dados).select("id").single();
-        if(ins.error) throw ins.error;
-        noBanco[as[i].id]=ins.data.id;
-      }
-    }
-    /* sala que sumiu do app sai do banco, com o que dependia dela */
-    for(const velho of havia.slice(as.length)){
-      r=await sb.from("os_ambientes").delete().eq("id",velho.id);
-      if(r.error) throw r.error;
-    }
-
-    /* estruturas, zonas, pontos e memorial de cada sala.
-       Zonas primeiro, porque a estrutura em torre aponta para uma delas. */
-    r=await sb.from("os_ancoragens").delete().eq("os_id",o.id); if(r.error) throw r.error;
-    r=await sb.from("os_estruturas").delete().eq("os_id",o.id); if(r.error) throw r.error;
-    r=await sb.from("os_zonas").delete().eq("os_id",o.id); if(r.error) throw r.error;
-    const memoriais=[], idZona={}, idEstr={};
-    for(const x of as){
-      const bid=noBanco[x.id]; if(!bid) continue;
-      const m=memAmb(o,x.id);
-      const zs=zonasDe(o,x.id), es=estruturasDe(o,x.id);
-      const insZ=await sb.from("os_zonas").insert(zs.map((z,k)=>({os_id:o.id,ambiente_id:bid,
-        nome:z.nome,area_m2:z.area||0,carga_admissivel:z.adm||500,ordem:k}))).select("id,nome,ordem");
-      if(insZ.error) throw insZ.error;
-      zs.forEach((z,k)=>{ const achou=(insZ.data||[]).find(y=>y.ordem===k); if(achou) idZona[z.id]=achou.id; });
-      const insE=await sb.from("os_estruturas").insert(es.map((e,k)=>({os_id:o.id,ambiente_id:bid,
-        nome:e.nome,torre_solo:!!e.torres,zona_id:idZona[e.zona]||idZona[zs[0].id]||null,ordem:k})))
-        .select("id,nome,ordem");
-      if(insE.error) throw insE.error;
-      es.forEach((e,k)=>{ const achou=(insE.data||[]).find(y=>y.ordem===k); if(achou) idEstr[e.id]=achou.id; });
-      const pts=[];
-      es.forEach(e=>(e.pontos||[]).forEach(pt=>pts.push({os_id:o.id,ambiente_id:bid,
-        estrutura_id:idEstr[e.id],nome:pt.nome,quantidade:pt.qtd,wll_kgf:pt.wll})));
-      if(pts.length){ r=await sb.from("os_ancoragens").insert(pts); if(r.error) throw r.error; }
-      memoriais.push({ambiente_id:bid,os_id:o.id,area_apoio:m.solo.area,carga_admissivel:m.solo.adm,
-        carga_pontual_admissivel:m.solo.admPont,sobrecarga_publico:m.solo.publicoKgm2,
-        apoios_por_equipamento:m.solo.apoios,torre_solo:!!m.solo.torres,solo_concluido:!!m.solo.feito,
+    const reg=await sb.from("os_ambientes").select("id,principal").eq("os_id",o.id);
+    if(reg.error) throw reg.error;
+    const principal=(reg.data||[]).find(x=>x.principal);
+    const ids=Object.fromEntries(as.map((x,i)=>[x.id,i===0?(principal?.id||o.principalDb||uid()):x.id]));
+    const grafo={os_ambientes:[],os_zonas:[],os_estruturas:[],os_ancoragens:[],os_memorial:[],
+      os_itens:[],os_veiculo_dias:[],os_escala:[]};
+    for(const [ordem,x] of as.entries()){
+      const bid=ids[x.id], m=memAmb(o,x.id), zs=zonasDe(o,x.id), es=estruturasDe(o,x.id);
+      grafo.os_ambientes.push({id:bid,os_id:o.id,nome:x.nome,principal:ordem===0,ordem});
+      zs.forEach((z,k)=>grafo.os_zonas.push({id:z.id,os_id:o.id,ambiente_id:bid,nome:z.nome,
+        area_m2:z.area??0,carga_admissivel:z.adm??500,ordem:k}));
+      es.forEach((e,k)=>{
+        grafo.os_estruturas.push({id:e.id,os_id:o.id,ambiente_id:bid,nome:e.nome,
+          torre_solo:!!e.torres,zona_id:e.zona||zs[0]?.id||null,ordem:k});
+        (e.pontos||[]).forEach(pt=>grafo.os_ancoragens.push({id:pt.id||uid(),os_id:o.id,
+          ambiente_id:bid,estrutura_id:e.id,nome:pt.nome,quantidade:pt.qtd,wll_kgf:pt.wll}));
+      });
+      grafo.os_memorial.push({ambiente_id:bid,os_id:o.id,area_apoio:m.solo.area,
+        carga_admissivel:m.solo.adm,carga_pontual_admissivel:m.solo.admPont,
+        sobrecarga_publico:m.solo.publicoKgm2,apoios_por_equipamento:m.solo.apoios,
+        torre_solo:!!m.solo.torres,solo_concluido:!!m.solo.feito,
         fator_dinamico:m.aereo.fd,fator_desbalanceamento:m.aereo.fdes,wll_acessorio:m.aereo.wllAcess,
         fs_minimo:m.aereo.fsMin,vao_livre:m.aereo.vao,aereo_concluido:!!m.aereo.feito});
     }
-    if(memoriais.length){ r=await sb.from("os_memorial").upsert(memoriais,{onConflict:"ambiente_id"});
-      if(r.error) throw r.error; }
-    /* as linhas só agora, porque dependem dos ids de vara e zona no banco */
-    if(o.itens.length){
-      r=await sb.from("os_itens").delete().eq("os_id",o.id); if(r.error) throw r.error;
-      r=await sb.from("os_itens").insert(o.itens.map(i=>{
-        const amb=i.amb||as[0].id;
-        const e=i.cod?estrDaLinha(o,amb,i):null, z=i.cod?zonaDaLinha(o,amb,i):null;
-        return {os_id:o.id, ambiente_id:noBanco[amb]||noBanco[as[0].id],
-          estrutura_id:e?(idEstr[e.id]||null):null, zona_id:z?(idZona[z.id]||null):null,
-          item_cod:i.cod||null, descricao:i.cod?null:(i.nome||"Linha avulsa"),
-          categoria:i.cod?null:nz(i.cat),
-          quantidade:i.qtd, quantidade_aerea:i.aereo==null?null:i.aereo, observacao:nz(i.obs)};}));
-      if(r.error) throw r.error;
-    }
-    if(!a || !igual(o.logistica,a.logistica)) await syncLogistica(o);
-  }
-}
-/* A escala é pequena e muda muito: apagar e reescrever a da OS sai mais
-   barato do que caçar a diferença linha a linha — e não deixa órfão. */
-async function syncLogistica(o){
-  const lg=o.logistica||{};
-  let r=await sb.from("os_logistica").upsert({os_id:o.id,observacao:nz(lg.obs)});
-  if(r.error) throw r.error;
-
-  r=await sb.from("os_veiculo_dias").delete().eq("os_id",o.id); if(r.error) throw r.error;
-  const vd=(lg.veicDias||[]).filter(v=>v.cod&&v.data);
-  if(vd.length){
-    r=await sb.from("os_veiculo_dias").insert(vd.map(v=>({id:v.id,os_id:o.id,veiculo_cod:v.cod,
-      data:v.data,hora:nz(v.hora),motorista:nz(v.motorista),observacao:nz(v.obs)})));
-    if(r.error) throw r.error;
-  }
-  r=await sb.from("os_escala").delete().eq("os_id",o.id); if(r.error) throw r.error;
-  const es=(lg.escala||[]).filter(e=>e.data&&e.nome);
-  if(es.length){
-    r=await sb.from("os_escala").insert(es.map(e=>({id:e.id,os_id:o.id,data:e.data,
-      freelancer_id:pid(e.freela), perfil_id:pid(e.perfil), nome:e.nome,
-      funcao:e.funcao||"Apoio", veiculo_cod:e.cod||null, hora:nz(e.hora), observacao:nz(e.obs)})));
+    grafo.os_itens=o.itens.map(i=>{
+      const amb=i.amb||as[0].id;
+      if(!ids[amb]) throw new Error("Há um item vinculado a uma sala removida. Revise o escopo da OS.");
+      const e=i.cod?estrDaLinha(o,amb,i):null,z=i.cod?zonaDaLinha(o,amb,i):null;
+      return {id:i.id||uid(),os_id:o.id,ambiente_id:ids[amb],estrutura_id:e?.id||null,zona_id:z?.id||null,
+        item_cod:i.cod||null,descricao:i.cod?null:(i.nome||"Linha avulsa"),categoria:i.cod?null:nz(i.cat),
+        quantidade:i.qtd,quantidade_aerea:i.aereo??null,observacao:nz(i.obs)};
+    });
+    const lg=o.logistica||{};
+    grafo.os_veiculo_dias=(lg.veicDias||[]).map(v=>({id:v.id,os_id:o.id,veiculo_cod:v.cod,
+      data:v.data,hora:nz(v.hora),motorista:nz(v.motorista),observacao:nz(v.obs)}));
+    grafo.os_escala=(lg.escala||[]).map(e=>({id:e.id,os_id:o.id,data:e.data,
+      freelancer_id:pid(e.freela),perfil_id:pid(e.perfil),nome:e.nome,funcao:e.funcao||"Apoio",
+      veiculo_cod:e.cod||null,hora:nz(e.hora),observacao:nz(e.obs)}));
+    const cab={id:o.id,codigo:o.codigo,negocio_id:nz(o.negId),cliente_id:nz(o.cliente),evento:o.evento,
+      local_nome:nz(o.local),cidade:nz(o.cidade),publico:o.publico||0,area_m2:o.area||0,
+      montagem:o.montagem,evento_inicio:nz(o.evIni),evento_fim:nz(o.evFim),desmontagem:o.desmontagem,
+      status:o.status,descritivo:nz(o.descritivo)};
+    if(estado.role==="gerencia") cab.valor=o.valor||0;
+    const produtores=estado.role==="gerencia"?pids(o.produtores).map((p,i)=>({os_id:o.id,perfil_id:p,responsavel:i===0})):null;
+    const r=await sb.rpc("salvar_os_completa",{p_cab: cab,p_grafo:grafo,p_produtores:produtores,p_obs:nz(lg.obs)});
     if(r.error) throw r.error;
   }
 }
 
 /* ---------- freelancers ---------- */
-async function syncFreelas(){
-  const antes=porId(ultimo.freelas||[]), agora=porId(S.freelas||[]);
-  const mudou=(S.freelas||[]).filter(f=>!igual(f,antes[f.id]));
+async function syncFreelas(estado){
+  const antes=porId(ultimo.freelas||[]), agora=porId(estado.freelas||[]);
+  const mudou=(estado.freelas||[]).filter(f=>!igual(f,antes[f.id]));
   if(mudou.length){
-    const r=await sb.from("freelancers").upsert(mudou.map(f=>{
+    const linhas=mudou.map(f=>{
       const base={id:f.id,nome:f.nome,apelido:nz(f.apelido),telefone:nz(f.tel),email:nz(f.email),
         cidade:nz(f.cidade),especialidades:f.especialidades||[],
         veiculo_proprio:!!f.veicProprio,veiculo_desc:nz(f.veicDesc),
@@ -6842,8 +6868,11 @@ async function syncFreelas(){
         cpf:nz(f.cpf),rg:nz(f.rg),nascimento:nz(f.nasc),banco:nz(f.banco),agencia:nz(f.agencia),
         conta:nz(f.conta),tipo_conta:nz(f.tipoConta),titular:nz(f.titular),pix:nz(f.pix)});
       return base;
-    }));
-    if(r.error) throw r.error;
+    });
+    for(const d of linhas){
+      const ex=await sb.from("freelancers").select("id").eq("id",d.id).maybeSingle(); if(ex.error) throw ex.error;
+      await gravarRegistro("freelancers",d,"id",!!ex.data);
+    }
   }
   const del=Object.keys(antes).filter(i=>!agora[i]);
   if(del.length){ const r=await sb.from("freelancers").delete().in("id",del); if(r.error) throw r.error; }
@@ -6852,9 +6881,9 @@ async function syncFreelas(){
 /* ---------- reembolsos ---------- */
 const refDB = (r,pre) => ({[pre+"_freela"]:pid((r||{}).freela), [pre+"_perfil"]:pid((r||{}).perfil),
                            [pre+"_nome"]:nz((r||{}).nome)});
-async function syncReembolsos(){
-  const antes=porId(ultimo.reembolsos||[]), agora=porId(S.reembolsos||[]);
-  const mudou=(S.reembolsos||[]).filter(r=>!igual(r,antes[r.id]));
+async function syncReembolsos(estado){
+  const antes=porId(ultimo.reembolsos||[]), agora=porId(estado.reembolsos||[]);
+  const mudou=(estado.reembolsos||[]).filter(r=>!igual(r,antes[r.id]));
   if(mudou.length){
     const r=await sb.from("reembolsos").upsert(mudou.map(x=>Object.assign({
       id:x.id, os_id:pid(x.osId), data:x.data||HOJE, descricao:x.descricao,
@@ -6868,9 +6897,9 @@ async function syncReembolsos(){
 }
 
 /* ---------- cargas ---------- */
-async function syncCargas(){
+async function syncCargas(estado){
   const antes=porId(ultimo.cargas);
-  for(const c of S.cargas){
+  for(const c of estado.cargas){
     const a=antes[c.id];
     if(igual(c,a)) continue;
     let r=await sb.from("ordens_carga").upsert({id:c.id,codigo:c.codigo,os_id:nz(c.osId),
@@ -6878,65 +6907,74 @@ async function syncCargas(){
       data_descarga:c.descarga,veiculo:nz(c.veiculo),equipe:nz(c.equipe),observacao:nz(c.obs)});
     if(r.error) throw r.error;
     if(!a || !igual(c.itens,a.itens)){
-      r=await sb.from("osc_itens").delete().eq("ordem_carga_id",c.id); if(r.error) throw r.error;
-      if(c.itens.length){ r=await sb.from("osc_itens").insert(c.itens.map(i=>({ordem_carga_id:c.id,
+      await substituirRelacoes("osc_itens","ordem_carga_id",c.id,c.itens.map(i=>({ordem_carga_id:c.id,
         item_cod:i.cod||null, descricao:i.cod?null:(i.nome||"Linha avulsa"),
-        quantidade:i.qtd, observacao:nz(i.obs)}))); if(r.error) throw r.error; }
+        quantidade:i.qtd, observacao:nz(i.obs)})));
     }
   }
 }
 
 /* ---------- notas, agenda, mural e avisos ---------- */
-async function syncNotas(){
-  const antes=porId(ultimo.notas), agora=porId(S.notas);
-  for(const n of S.notas){
+async function syncNotas(estado){
+  const antes=porId(ultimo.notas), agora=porId(estado.notas);
+  for(const n of estado.notas){
     if(igual(n,antes[n.id])) continue;
     let r=await sb.from("notas").upsert({id:n.id,titulo:n.titulo,conteudo:nz(n.txt),etiquetas:n.tags||[],
       cor:nz(n.cor),fixada:!!n.fixada,escopo:n.escopo,autor_id:pid(n.autor),os_id:nz(n.osId)});
     if(r.error) throw r.error;
-    r=await sb.from("nota_checklist").delete().eq("nota_id",n.id); if(r.error) throw r.error;
-    if(n.checklist.length){ r=await sb.from("nota_checklist").insert(
-      n.checklist.map((c,i)=>({nota_id:n.id,ordem:i,texto:c.t,concluido:!!c.ok}))); if(r.error) throw r.error; }
+    await substituirRelacoes("nota_checklist","nota_id",n.id,
+      n.checklist.map((c,i)=>({nota_id:n.id,ordem:i,texto:c.t,concluido:!!c.ok})));
   }
   const del=Object.keys(antes).filter(i=>!agora[i]);
   if(del.length){ const r=await sb.from("notas").delete().in("id",del); if(r.error) throw r.error; }
 }
-async function syncCompromissos(){
-  const antes=porId(ultimo.compromissos), agora=porId(S.compromissos);
-  for(const c of S.compromissos){
+async function syncCompromissos(estado){
+  const antes=porId(ultimo.compromissos), agora=porId(estado.compromissos);
+  for(const c of estado.compromissos){
     if(igual(c,antes[c.id])) continue;
     let r=await sb.from("compromissos").upsert({id:c.id,titulo:c.titulo,data:c.data,hora:nz(c.hora),
       duracao_min:c.dur||0,tipo:c.tipo,negocio_id:nz(c.negId),os_id:nz(c.osId),local:nz(c.local),
-      observacao:nz(c.obs),criado_por:S.perfilId});
+      observacao:nz(c.obs),criado_por:estado.perfilId});
     if(r.error) throw r.error;
-    r=await sb.from("compromisso_responsaveis").delete().eq("compromisso_id",c.id); if(r.error) throw r.error;
-    if((c.resp||[]).length){ r=await sb.from("compromisso_responsaveis").insert(
-      pids(c.resp).map(p=>({compromisso_id:c.id,perfil_id:p}))); if(r.error) throw r.error; }
+    await substituirRelacoes("compromisso_responsaveis","compromisso_id",c.id,
+      pids(c.resp).map(p=>({compromisso_id:c.id,perfil_id:p})));
   }
   const del=Object.keys(antes).filter(i=>!agora[i]);
   if(del.length){ const r=await sb.from("compromissos").delete().in("id",del); if(r.error) throw r.error; }
 }
+async function syncChats(estado){
+  const antes=porId(ultimo.chats);
+  for(const c of estado.chats){
+    if(igual(c,antes[c.id])) continue;
+    if(estado.role!=="gerencia") throw new Error("Peça à gerência para criar o canal desta OS.");
+    const r=await sb.from("canais").upsert({id:c.id,tipo:c.tipo,nome:c.nome||null,os_id:c.osId||null,descricao:c.desc||null});
+    if(r.error) throw r.error;
+    const membros=pids([...(c.membros||[]),estado.perfilId]);
+    const m=await sb.from("canal_membros").upsert(membros.map(id=>({canal_id:c.id,perfil_id:id})),{onConflict:"canal_id,perfil_id",ignoreDuplicates:true});
+    if(m.error) throw m.error;
+  }
+}
 /* As mensagens do chat só existiam na memória do navegador. */
-async function syncMsgs(){
+async function syncMsgs(estado){
   const antes=porId(ultimo.msgs);
-  const novas=S.msgs.filter(m=>!antes[m.id] && m.chat);
+  const novas=estado.msgs.filter(m=>!antes[m.id] && m.chat);
   if(!novas.length) return;
   const r=await sb.from("mensagens").upsert(novas.map(m=>({id:m.id,canal_id:m.chat,
-    autor_id:m.sys?null:pid(m.autor), texto:m.txt, sistema:!!m.sys})),
+    autor_id:m.sys?estado.perfilId:pid(m.autor), texto:m.txt, sistema:!!m.sys})),
     {onConflict:"id",ignoreDuplicates:true});
   if(r.error) throw r.error;
 }
 
-async function syncPosts(){
+async function syncPosts(estado){
   const antes=porId(ultimo.posts);
-  for(const p of S.posts){
+  for(const p of estado.posts){
     const a=antes[p.id];
     if(igual(p,a)) continue;
-    if(!a){ const r=await sb.from("posts").upsert({id:p.id,autor_id:pid(p.autor),texto:p.txt,sistema:!!p.sys},
+    if(!a){ const r=await sb.from("posts").upsert({id:p.id,autor_id:p.sys?estado.perfilId:pid(p.autor),texto:p.txt,sistema:!!p.sys},
         {onConflict:"id",ignoreDuplicates:true});
       if(r.error) throw r.error; }
     if(!a || !igual(p.likes,a.likes)){
-      const eu=S.perfilId, curti=p.likes.includes(eu), curtiaAntes=a&&a.likes.includes(eu);
+      const eu=estado.perfilId, curti=p.likes.includes(eu), curtiaAntes=a&&a.likes.includes(eu);
       if(curti && !curtiaAntes){ const r=await sb.from("post_curtidas").insert({post_id:p.id,perfil_id:eu});
         if(r.error && r.error.code!=="23505") throw r.error; }
       if(!curti && curtiaAntes){ const r=await sb.from("post_curtidas").delete()
@@ -6949,19 +6987,19 @@ async function syncPosts(){
       {onConflict:"id",ignoreDuplicates:true}); if(r.error) throw r.error; }
   }
 }
-async function syncNotifs(){
+async function syncNotifs(estado){
   const antes=porId(ultimo.notifs);
-  const novas=S.notifs.filter(n=>!antes[n.id]);
+  const novas=estado.notifs.filter(n=>!antes[n.id]);
   if(novas.length){
     /* a linha pode já estar lá de uma tentativa anterior: reenviar não pode explodir */
     const r=await sb.from("notificacoes").upsert(novas.map(n=>({id:n.id,texto:n.txt,tipo:n.tipo,
       destino:n.para,tela:nz(n.view),referencia:nz(n.sel)})), {onConflict:"id",ignoreDuplicates:true});
     if(r.error) throw r.error;
   }
-  const lidas=S.notifs.filter(n=>n.lida[S.role] && (!antes[n.id] || !antes[n.id].lida[S.role]));
+  const lidas=estado.notifs.filter(n=>n.lida[estado.role] && (!antes[n.id] || !antes[n.id].lida[estado.role]));
   if(lidas.length){
     const r=await sb.from("notificacao_leituras").upsert(
-      lidas.map(n=>({notificacao_id:n.id,perfil_id:S.perfilId})));
+      lidas.map(n=>({notificacao_id:n.id,perfil_id:estado.perfilId})));
     if(r.error && r.error.code!=="23505") throw r.error;
   }
 }
@@ -7002,7 +7040,8 @@ async function assinarFotos(){
     (S.reembolsos||[]).forEach(r=>{ if(mapa[r.path]) r.src=mapa[r.path]; });
   }
 }
-lerFotos = function(negId, files){
+lerFotos = async function(negId, files){
+  if(!await sincronizar()) return;
   const arr=[...files].filter(f=>f.type.startsWith("image/")).slice(0,12);
   if(!arr.length) return;
   const n=neg(negId); if(!n) return;
@@ -7022,10 +7061,10 @@ lerFotos = function(negId, files){
           if(up.error) return erro(up.error,"Falha ao enviar a foto");
           const ins=await sb.from("vt_fotos").insert({negocio_id:negId,storage_path:path,
                        enviado_por:S.perfilId}).select().single();
-          if(ins.error) return erro(ins.error,"Foto enviada, mas não registrada");
+          if(ins.error){ await sb.storage.from("vt-fotos").remove([path]); return erro(ins.error,"Falha ao registrar a foto"); }
           const { data } = await sb.storage.from("vt-fotos").createSignedUrl(path, 60*60*8);
           n.vt.fotos.push({id:ins.data.id,nome:f.name.slice(0,40),legenda:"",path,src:data?.signedUrl||""});
-          marcarSincronizado(); render(); toast("Foto anexada à visita técnica.");
+          save(); render(); toast("Foto anexada à visita técnica.");
         },"image/jpeg",0.78);
       };
       img.src=ev.target.result;
@@ -7037,7 +7076,8 @@ lerFotos = function(negId, files){
 /* Comprovante de reembolso: a foto do papel amassado do bolso. Vai para um
    bucket próprio, redimensionada, e o caminho fica na nota. A nota já tem de
    existir — o botão só aparece depois que ela foi salva. */
-lerNota = function(reembId, files){
+lerNota = async function(reembId, files){
+  if(!await sincronizar()) return;
   const r0=reembById(reembId); if(!r0) return;
   const f=[...files].find(x=>x.type.startsWith("image/"));
   if(!f) return toast("Anexe uma imagem do comprovante.");
@@ -7055,13 +7095,13 @@ lerNota = function(reembId, files){
         const up=await sb.storage.from("reembolsos").upload(path, blob, {contentType:"image/jpeg"});
         if(up.error) return erro(up.error,"Falha ao enviar o comprovante");
         const antigo=r0.path;
+        const gr=await sb.from("reembolsos").update({comprovante_path:path}).eq("id",reembId).select("id").single();
+        if(gr.error){ await sb.storage.from("reembolsos").remove([path]); return erro(gr.error,"Falha ao registrar o comprovante"); }
         r0.path=path;
-        const gr=await sb.from("reembolsos").update({comprovante_path:path}).eq("id",reembId);
-        if(gr.error){ r0.path=antigo; return erro(gr.error,"Comprovante enviado, mas não registrado"); }
         if(antigo) await sb.storage.from("reembolsos").remove([antigo]);
         const { data } = await sb.storage.from("reembolsos").createSignedUrl(path, 60*60*8);
         r0.src=data?.signedUrl||"";
-        marcarSincronizado(); render(); toast("Comprovante anexado à nota.");
+        save(); render(); toast("Comprovante anexado à nota.");
       },"image/jpeg",0.8);
     };
     img.src=ev.target.result;
@@ -7077,7 +7117,7 @@ lerNota = function(reembId, files){
 gerarOSC = async function(osId){
   const o=osById(osId); if(!o) return;
   if(!can("gerar_osc")) return toast("Seu perfil não emite ordem de carga.");
-  await sincronizar();
+  if(!await sincronizar()) return;
   const { data, error } = await sb.rpc("gerar_ordem_carga", { p_os: o.id });
   if(error) return toast(error.message.replace(/^.*?:\s*/,""));
   await recarregar();
@@ -7087,7 +7127,7 @@ gerarOSC = async function(osId){
 confirmarCarga = async function(id){
   const c=oscById(id); if(!c) return;
   /* o "Em separação" pode ter acabado de ser clicado e ainda estar na fila */
-  await sincronizar();
+  if(!await sincronizar()) return;
   const { data, error } = await sb.rpc("confirmar_carga", { p_ordem: c.id });
   if(error) return toast(error.message.replace(/^.*?:\s*/,""));
   await recarregar();
@@ -7098,7 +7138,7 @@ confirmarRetorno = async function(id){
   const av={};
   document.querySelectorAll("[data-av]").forEach(el=>{
     const q=Math.max(0,Number(el.value)||0); if(q>0) av[el.dataset.av]=q; });
-  await sincronizar();
+  if(!await sincronizar()) return;
   const { data, error } = await sb.rpc("registrar_descarga", { p_ordem: c.id, p_avarias: av });
   if(error){ fecharModal(); return toast(error.message.replace(/^.*?:\s*/,"")); }
   fecharModal(); await recarregar();
@@ -7121,15 +7161,23 @@ gerarOSVdeNegocio = function(negId){
    8 · BOOT
    ============================================================= */
 async function recarregar(){
+  if(carregandoDados) return false;
+  if(!await sincronizar()) return false;
+  carregandoDados=true;
+  const inicioRevisao=revisaoLocal;
+  const app=document.getElementById("app"); if(app) app.inert=true;
   const b=document.getElementById("btnSync"); if(b) b.textContent="Atualizando…";
   try{
-    await carregarTudo();
+    if(await carregarTudo()===false) return false;
     await assinarFotos();
     ensureComms(); ensureCRM(); ensureOrc(); ensureKits(); ensureProd(); ensureFrota(); ensureFreelas();
+    if(inicioRevisao!==revisaoLocal){statusSync("Novas alterações pendentes");return false;}
     marcarSincronizado();
     render();
-    if(b) b.textContent="Atualizar";
-  }catch(e){ erro(e,"Não consegui carregar"); if(b) b.textContent="Erro"; }
+    statusSync("Dados atualizados");
+    return true;
+  }catch(e){ erro(e,"Não consegui carregar"); statusSync("Falha ao atualizar. Seus dados foram mantidos.",true); return false; }
+  finally { carregandoDados=false; if(app) app.inert=false; if(b) b.disabled=false; }
 }
 
 function telaCarregando(txt){
@@ -7143,7 +7191,7 @@ async function iniciar(){
   if(!user){ telaLogin(); return; }
 
   const { data: perfil, error } = await sb.from("perfis").select("*").eq("id", user.id).single();
-  if(error || !perfil){
+  if(error || !perfil || !perfil.ativo){
     await sb.auth.signOut();
     telaLogin("Seu usuário existe, mas ainda não tem perfil na operação. Peça à gerência para liberar.");
     return;
@@ -7154,7 +7202,7 @@ async function iniciar(){
   try{
     await carregarTudo();
     await assinarFotos();
-  }catch(e){ erro(e,"Não consegui carregar"); telaLogin("Falha ao carregar: "+(e.message||e)); return; }
+  }catch(e){ erro(e,"Não consegui carregar"); telaLogin("Falha ao carregar: "+mensagemErro(e)); return; }
 
   ensureComms(); ensureCRM(); ensureOrc(); ensureKits(); ensureProd(); ensureFrota(); ensureFreelas();
   marcarSincronizado();
@@ -7176,7 +7224,7 @@ function ouvirMudancas(){
     .subscribe();
 }
 let suave=null;
-function recarregarSuave(){ clearTimeout(suave); suave=setTimeout(()=>{ if(!gravando) recarregar(); }, 1200); }
+function recarregarSuave(){ clearTimeout(suave); suave=setTimeout(()=>{ if(!gravando && !temAlteracoes() && !document.querySelector("input:focus,textarea:focus,select:focus,#modalHost .modal")) recarregar(); }, 1200); }
 
 /* ações do cabeçalho e da tela de login */
 document.addEventListener("click", ev=>{
