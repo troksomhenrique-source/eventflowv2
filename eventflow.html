@@ -1625,7 +1625,7 @@ document.addEventListener("keydown", ev=>{
     const btn=document.querySelector('[data-act="enviarMsg"]'); if(btn) btn.click(); }
   if(ev.target.dataset && ev.target.dataset.cmt && ev.key==="Enter"){
     const p=S.posts.find(x=>x.id===ev.target.dataset.cmt);
-    if(p && ev.target.value.trim()){ p.coments.push({autor:me().id,ts:nowTs(),txt:ev.target.value.trim()}); save(); render(); }
+    if(p && ev.target.value.trim()){ p.coments.push({id:uid(),autor:me().id,ts:nowTs(),txt:ev.target.value.trim()}); save(); render(); }
   }
   if(ev.target.id==="ntChk" && ev.key==="Enter"){ ev.preventDefault(); const b=document.querySelector('[data-act="addChk"]'); if(b) b.click(); }
 });
@@ -2552,7 +2552,7 @@ function acaoCRM(a, id, t){
       toast(ex?"Cliente atualizado.":nome+" entrou na carteira."); break;}
     case "gerarOSVdeNegocio": gerarOSVdeNegocio(id); break;
     case "addNota": {const el=document.getElementById("briefNota"); if(!el||!el.value.trim()) break;
-      neg(id).briefNotas.push({ts:nowTs(),autor:me().id,txt:el.value.trim()}); el.value="";
+      neg(id).briefNotas.push({id:uid(),ts:nowTs(),autor:me().id,txt:el.value.trim()}); el.value="";
       save(); document.getElementById("notasLista").innerHTML=notasHTML(neg(id)); break;}
     case "usarSugerido": {const n=neg(id); n.valor=valorSugerido(n); n.neg.proposta=n.valor; save(); render(); toast("Valor atualizado para "+brl(n.valor)+"."); break;}
     case "st3d": {const n=neg(id); n.tresd.status=t.dataset.s; n.tresd.necessario=true;
@@ -3951,7 +3951,7 @@ function mapNegocio(n){
     evFim:n.evento_fim||"", evFimHora:n.evento_fim_hora||"23:00",
     desmontagem:n.desmontagem||"", desmontagemHora:n.desmontagem_hora||"22:00",
     valor:num(n.valor), osId:n.os_id, produtores:[],
-    brief:b, briefNotas:(n.briefing_notas||[]).map(x=>({ts:x.criado_em,autor:x.autor_id,txt:x.texto})),
+    brief:b, briefNotas:(n.briefing_notas||[]).map(x=>({id:x.id,ts:x.criado_em,autor:x.autor_id,txt:x.texto})),
     vt, tresd:t3, fech:fch, orc,
     neg:{proposta:0,desconto:num((n.orcamentos||{}).desconto),condicoes:orc.condicoes,
          concorrentes:orc.concorrentes,probabilidade:orc.probabilidade,previsao:orc.previsao}};
@@ -4093,20 +4093,38 @@ function agendarSync(){
 save = agendarSync;
 load = () => {};
 
+/* Cada módulo marca o próprio progresso. Antes a fotografia só era atualizada
+   quando os onze passavam; bastava um tropeçar para todos serem reenviados na
+   tentativa seguinte — e o que já tinha entrado voltava como chave duplicada. */
+async function passo(chave, fn){
+  const foto = clone(S[chave]);   // exatamente o que esta rodada vai gravar
+  await fn();
+  ultimo[chave] = foto;           // o que o usuário mexeu no meio fica para a próxima
+}
+
 async function sincronizar(){
   if(gravando || !ultimo) return;
   gravando = true;
   const b=document.getElementById("btnSync");
-  try{
-    await Promise.all([
-      syncItens(), syncKits(), syncFrota(), syncClientes(),
-      syncNegocios(), syncOS(), syncCargas(),
-      syncNotas(), syncCompromissos(), syncPosts(), syncNotifs()
-    ]);
-    marcarSincronizado();
-    if(b) b.textContent="Atualizar";
-  }catch(e){ erro(e,"Não consegui gravar"); if(b) b.textContent="Erro ao salvar"; }
-  finally{ gravando=false; }
+  const r = await Promise.allSettled([
+    passo("cat",          syncItens),
+    passo("kits",         syncKits),
+    passo("frota",        syncFrota),
+    passo("clientes",     syncClientes),
+    passo("negocios",     syncNegocios),
+    passo("os",           syncOS),
+    passo("cargas",       syncCargas),
+    passo("notas",        syncNotas),
+    passo("compromissos", syncCompromissos),
+    passo("msgs",         syncMsgs),
+    passo("posts",        syncPosts),
+    passo("notifs",       syncNotifs),
+  ]);
+  gravando = false;
+  const falhou = r.filter(x=>x.status==="rejected");
+  if(!falhou.length){ if(b) b.textContent="Atualizar"; return; }
+  erro(falhou[0].reason, "Não consegui gravar");
+  if(b) b.textContent="Erro ao salvar";
 }
 
 /* ---------- inventário ---------- */
@@ -4182,9 +4200,10 @@ async function syncNegocios(){
       if(r.error) throw r.error;
     }
     if(!a || !igual(n.briefNotas,a.briefNotas)){
-      const novas=n.briefNotas.filter(x=>!x.id);
-      if(novas.length){ r=await sb.from("briefing_notas").insert(novas.map(x=>({negocio_id:n.id,
-        autor_id:nz(x.autor),texto:x.txt}))); if(r.error) throw r.error; }
+      const antesNotas=porId((a&&a.briefNotas)||[]);
+      const novas=n.briefNotas.filter(x=>!antesNotas[x.id]);
+      if(novas.length){ r=await sb.from("briefing_notas").upsert(novas.map(x=>({id:x.id,negocio_id:n.id,
+        autor_id:nz(x.autor),texto:x.txt})), {onConflict:"id",ignoreDuplicates:true}); if(r.error) throw r.error; }
     }
     if(!a || !igual(n.vt,a.vt)) await syncVT(n);
     if(!a || !igual(n.tresd,a.tresd)){
@@ -4344,12 +4363,24 @@ async function syncCompromissos(){
   const del=Object.keys(antes).filter(i=>!agora[i]);
   if(del.length){ const r=await sb.from("compromissos").delete().in("id",del); if(r.error) throw r.error; }
 }
+/* As mensagens do chat só existiam na memória do navegador. */
+async function syncMsgs(){
+  const antes=porId(ultimo.msgs);
+  const novas=S.msgs.filter(m=>!antes[m.id] && m.chat);
+  if(!novas.length) return;
+  const r=await sb.from("mensagens").upsert(novas.map(m=>({id:m.id,canal_id:m.chat,
+    autor_id:m.sys?null:nz(m.autor), texto:m.txt, sistema:!!m.sys})),
+    {onConflict:"id",ignoreDuplicates:true});
+  if(r.error) throw r.error;
+}
+
 async function syncPosts(){
   const antes=porId(ultimo.posts);
   for(const p of S.posts){
     const a=antes[p.id];
     if(igual(p,a)) continue;
-    if(!a){ const r=await sb.from("posts").insert({id:p.id,autor_id:nz(p.autor),texto:p.txt,sistema:!!p.sys});
+    if(!a){ const r=await sb.from("posts").upsert({id:p.id,autor_id:nz(p.autor),texto:p.txt,sistema:!!p.sys},
+        {onConflict:"id",ignoreDuplicates:true});
       if(r.error) throw r.error; }
     if(!a || !igual(p.likes,a.likes)){
       const eu=S.perfilId, curti=p.likes.includes(eu), curtiaAntes=a&&a.likes.includes(eu);
@@ -4358,17 +4389,20 @@ async function syncPosts(){
       if(!curti && curtiaAntes){ const r=await sb.from("post_curtidas").delete()
         .eq("post_id",p.id).eq("perfil_id",eu); if(r.error) throw r.error; }
     }
-    const novos=p.coments.filter(c=>!c.id);
-    if(novos.length){ const r=await sb.from("post_comentarios").insert(
-      novos.map(c=>({post_id:p.id,autor_id:nz(c.autor),texto:c.txt}))); if(r.error) throw r.error; }
+    const antesCom=porId((a&&a.coments)||[]);
+    const novos=p.coments.filter(c=>!antesCom[c.id]);
+    if(novos.length){ const r=await sb.from("post_comentarios").upsert(
+      novos.map(c=>({id:c.id,post_id:p.id,autor_id:nz(c.autor),texto:c.txt})),
+      {onConflict:"id",ignoreDuplicates:true}); if(r.error) throw r.error; }
   }
 }
 async function syncNotifs(){
   const antes=porId(ultimo.notifs);
   const novas=S.notifs.filter(n=>!antes[n.id]);
   if(novas.length){
-    const r=await sb.from("notificacoes").insert(novas.map(n=>({id:n.id,texto:n.txt,tipo:n.tipo,
-      destino:n.para,tela:nz(n.view),referencia:nz(n.sel)})));
+    /* a linha pode já estar lá de uma tentativa anterior: reenviar não pode explodir */
+    const r=await sb.from("notificacoes").upsert(novas.map(n=>({id:n.id,texto:n.txt,tipo:n.tipo,
+      destino:n.para,tela:nz(n.view),referencia:nz(n.sel)})), {onConflict:"id",ignoreDuplicates:true});
     if(r.error) throw r.error;
   }
   const lidas=S.notifs.filter(n=>n.lida[S.role] && (!antes[n.id] || !antes[n.id].lida[S.role]));
