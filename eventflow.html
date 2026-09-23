@@ -3666,6 +3666,46 @@ function barraAmb(o){
       <b>${esc(a.nome)}</b><span>${feito?"memoriais fechados":m.solo.feito?"falta o aéreo":m.aereo.feito?"falta o solo":"memoriais abertos"}</span></button>`;}).join("")}</div>`;
 }
 
+/* Salas descobertas pela produção entram diretamente na OS. */
+function podeAdicionarSalaOS(o){
+  return !!o && o.status!=="Encerrada" && (S.role==="gerencia" ||
+    (S.role==="producao" && (o.produtores||[]).includes(S.perfilId)));
+}
+function mNovaSalaOS(o){
+  if(!podeAdicionarSalaOS(o)) return toast("Somente a gerência ou um produtor escalado pode adicionar salas a uma OS aberta.");
+  modal("Adicionar sala à OS",`
+    <form id="formSalaOS" autocomplete="off">
+      <p class="hint">A sala terá seus próprios equipamentos, estruturas, pontos e memoriais. Depois do cadastro, selecione os itens que serão usados nela.</p>
+      <div class="field"><label for="osSalaNome">Nome da sala</label>
+        <input id="osSalaNome" required maxlength="80" placeholder="Ex.: Sala B.U. 2, Foyer, Auditório"></div>
+      <div class="field" style="margin-top:12px"><label for="osSalaArea">Área da sala (m²) — opcional</label>
+        <input id="osSalaArea" type="number" min="0" max="99999999.99" step="0.01" placeholder="Informe quando confirmada"></div>
+      <p id="osSalaErro" role="alert" style="color:var(--crit);margin-top:10px"></p>
+      ${oscDaOS(o.id)?`<div class="verdict warn"><div><b>Já existe ordem de carga</b>A sala será adicionada à OS. Os itens da ordem de carga já emitida não serão atualizados automaticamente; revise a separação com o estoque.</div></div>`:""}
+    </form>`,
+    `<button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" type="submit" form="formSalaOS">Adicionar sala</button>`);
+  document.getElementById("formSalaOS").addEventListener("submit",ev=>{
+    ev.preventDefault();ev.stopPropagation();
+    const atual=osById(o.id),campo=document.getElementById("osSalaNome");
+    const nome=campo.value.trim().replace(/\s+/g," ");
+    const area=Number(document.getElementById("osSalaArea").value||0);
+    const aviso=document.getElementById("osSalaErro");
+    if(!podeAdicionarSalaOS(atual)){aviso.textContent="Você não pode editar esta OS.";return;}
+    if(!nome){aviso.textContent="Informe o nome da sala.";campo.focus();return;}
+    if(ambsOS(atual).some(a=>a.nome.trim().replace(/\s+/g," ").toLocaleLowerCase("pt-BR")===nome.toLocaleLowerCase("pt-BR"))){
+      aviso.textContent="Já existe uma sala com esse nome nesta OS.";campo.focus();return;
+    }
+    if(!Number.isFinite(area)||area<0||area>99999999.99){aviso.textContent="Informe uma área válida, maior ou igual a zero.";return;}
+    if(!atual.ambientes?.length) atual.ambientes=[...ambsOS(atual)];
+    const id=uid();atual.ambientes.push({id,nome,principal:false});
+    const m=contAmb(atual,id);m.solo.area=area;m.solo.feito=false;m.aereo.feito=false;
+    S.ambSel=id;S.aba="escopo";limparSel();
+    fecharModal();save();render();
+    toast("Sala "+nome+" adicionada à OS. Inclua os equipamentos e confira os memoriais.");
+  });
+  document.getElementById("osSalaNome").focus();
+}
+
 /* ---- abas da produção ---- */
 function vProdDet(){
   const o=osById(S.sel); if(!o){ S.sel=null; return vProducao(); }
@@ -3689,7 +3729,7 @@ function vProdDet(){
       <div class="flex" style="margin-top:5px"><span class="tag">${o.codigo||""}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span>
       <span class="tag">montagem ${dtl(o.montagem)}</span><span class="tag">desmontagem ${dtl(o.desmontagem)}</span>
       <div class="membros" style="margin-left:0">${(o.produtores||[]).map(u=>av(usr(u),22)).join("")}</div></div></div>
-    <div class="flex">${osc?`<span class="pill ok"><span class="dot"></span>Carga ${osc.codigo||""} emitida</span><button class="btn" data-act="osc" data-id="${osc.id}">Abrir ordem</button>`
+    <div class="flex">${podeAdicionarSalaOS(o)?`<button class="btn" data-act="novaSalaOS" data-id="${o.id}">+ Adicionar sala</button>`:""}${osc?`<span class="pill ok"><span class="dot"></span>Carga ${osc.codigo||""} emitida</span><button class="btn" data-act="osc" data-id="${osc.id}">Abrir ordem</button>`
       :`<button class="btn pri" data-act="gerarOSC" data-id="${o.id}" ${prontoParaOSC(o)&&can("gerar_osc")?"":"disabled"}>Gerar Ordem de Carga →</button>`}</div></div>
   <div class="steps" style="margin-bottom:14px">${steps.map((s,i)=>`<button class="step ${aba===s[0]?"on":""} ${s[3]?"done":""}" data-act="aba" data-aba="${s[0]}">
     <span class="mk">${s[3]?"✓":i+1}</span><span class="tx">${esc(s[1])}<small>${esc(s[2])}</small></span></button>`).join("")}</div>
@@ -4022,6 +4062,7 @@ function aeVer(r,p){
 /* ---- ações ---- */
 function acaoProd(a, id, t){
   t = t || {dataset:{}};
+  if(a==="novaSalaOS"){const o=osById(id);if(o)mNovaSalaOS(o);return;}
   if(!["addItemOS","rmItemOS","aplOS","addAnc","rmAnc","ambSel","addAvulso","osModo",
        "addEstr","rmEstr","addPto","rmPto","addZona","rmZona",
        "loteApl","loteRm","loteNada"].includes(a)) return;
@@ -6268,7 +6309,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Peça à gerência para criar seu usuário e definir o perfil."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.1 · compatível com migração 0007</span></footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.2 · compatível com migração 0007</span></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
