@@ -427,14 +427,39 @@ function qtdAerea(i){
   if(i.aereo==null) return 0;
   return Math.max(0,Math.min(i.qtd,Number(i.aereo)||0)); }
 function pesoPor(itens,rig){ return itens.reduce((s,i)=>{
+  if(!i.cod) return s;                   /* linha avulsa não tem peso de catálogo */
   if(i.aereo==null) return s;            /* linha não classificada fica fora dos dois memoriais */
   const it=item(i.cod), a=qtdAerea(i);
   return s + it.peso*(rig==="aereo" ? a : i.qtd-a);},0); }
 function valorItens(itens,dias){ return itens.reduce((s,i)=>s+item(i.cod).diaria*i.qtd*(dias||1),0); }
 
 /* ---------------- memoriais ---------------- */
-function calcSolo(os){
-  const p=os.solo, pEq=pesoPor(os.itens,"solo"), pAe=pesoPor(os.itens,"aereo");
+/* ---- ambientes da OS ----
+   O memorial da sala principal mora nos campos originais da OS; as salas de
+   B.U. moram em os.mem, indexadas pelo id do ambiente. Assim uma OS antiga,
+   de sala única, continua sendo lida sem conversão nenhuma. */
+const ambsOS = o => (o.ambientes && o.ambientes.length) ? o.ambientes
+                  : [{id:PLENARIA, nome:"Plenária", principal:true}];
+function memAmb(o, id){
+  if(!id || id===PLENARIA || (ambsOS(o)[0]||{}).id===id){
+    if(!o.ancoragens) o.ancoragens=[];
+    return {solo:o.solo, aereo:o.aereo, ancoragens:o.ancoragens};
+  }
+  o.mem = o.mem || {};
+  if(!o.mem[id] || !o.mem[id].solo) o.mem[id] = {
+    solo:{area:0,adm:500,admPont:600,publicoKgm2:250,torres:true,apoios:4,feito:false},
+    aereo:{pontos:0,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:false},
+    ancoragens:[]};
+  if(!o.mem[id].ancoragens) o.mem[id].ancoragens=[];
+  return o.mem[id];
+}
+/* as linhas de uma sala; sem ambiente, a linha é da principal */
+const itensAmb = (o,id) => o.itens.filter(i=>(i.amb||PLENARIA)===id ||
+  (id===(ambsOS(o)[0]||{}).id && !ambsOS(o).some(a=>a.id===(i.amb||PLENARIA))));
+
+function calcSolo(os, ambId){
+  const m=memAmb(os, ambId), itens=ambId?itensAmb(os,ambId):os.itens;
+  const p=m.solo, pEq=pesoPor(itens,"solo"), pAe=pesoPor(itens,"aereo");
   const transf = p.torres ? pAe : 0;
   const total = pEq + transf;
   const area = Math.max(1,Number(p.area)||1);
@@ -443,7 +468,8 @@ function calcSolo(os){
   const dTot = dEq + dPub;
   const util = dTot/(Number(p.adm)||1);
   let maior={peso:0,nome:"—"};
-  for(const i of os.itens){const it=item(i.cod); if(it.rig==="solo"&&it.peso>maior.peso) maior={peso:it.peso,nome:it.nome};}
+  for(const i of itens){ if(!i.cod) continue; const it=item(i.cod);
+    if(qtdAerea(i)<i.qtd && it.peso>maior.peso) maior={peso:it.peso,nome:it.nome}; }
   const pont = maior.peso/(Math.max(1,Number(p.apoios)||1));
   const utilP = pont/(Number(p.admPont)||1);
   const ok = util<=1 && utilP<=1;
@@ -464,7 +490,11 @@ function calcAereo(os){
   return {bruto,efetivo,proj,n,porPonto,util,cr,fs,flecha,ok,apoiadoSolo:os.solo.torres};
 }
 function etapasOk(os){
-  return {escopo:os.itens.length>0, solo:!!os.solo.feito, aereo:!!os.aereo.feito, descritivo:(os.descritivo||"").trim().length>40};
+  /* com várias salas, um memorial só fecha quando TODAS fecham */
+  const ambs=ambsOS(os);
+  const todos=k=>ambs.every(a=>!!memAmb(os,a.id)[k].feito);
+  return {escopo:os.itens.length>0, solo:todos("solo"), aereo:todos("aereo"),
+          descritivo:(os.descritivo||"").trim().length>40};
 }
 const prontoParaOSC = os => { const e=etapasOk(os);
   return e.escopo&&e.solo&&e.aereo&&e.descritivo && (typeof pendentes!=="function" || pendentes(os).length===0); };
@@ -684,7 +714,7 @@ function vOSV(){
       <h2 style="font-size:19px;margin-top:6px">${esc(o.evento)}</h2>
       <div class="flex" style="margin-top:5px"><span class="tag">${o.codigo||""}</span><span class="muted">${esc(c.nome)} · ${esc(o.local)}</span><span class="pill ${STCOR[o.status]||""}"><span class="dot"></span>${esc(o.status)}</span></div></div>
     <div class="flex">${can("editar_memorial")?`<button class="btn pri" data-act="go" data-view="producao" data-id="${o.id}">Abrir na produção</button>`:""}
-      ${osc?`<button class="btn" data-act="osc" data-id="${osc.id}">Ver ordem de carga ${osc.id}</button>`:""}</div></div>
+      ${osc?`<button class="btn" data-act="osc" data-id="${osc.id}">Ver ordem de carga ${osc.codigo||""}</button>`:""}</div></div>
 
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
     <div class="card"><header><h3>Dados do evento</h3></header><div class="res" style="border:0;border-radius:0">
@@ -721,21 +751,35 @@ function vOSV(){
         : `<div class="verdict warn"><div><b>Sem gerador no escopo</b>Consumo de ${kwFmt(t.w)} ≈ ${dec(dem,1)} kVA com folga — confirmar se a energia do local atende.</div></div>`;})()}</div>
   </div>
 
-  ${porCategoria(o.itens).map(([c,its])=>`
+  ${ambsOS(o).map(amb=>{
+    const its0=itensAmb(o,amb.id); if(!its0.length && ambsOS(o).length>1) return "";
+    const ta=somaTecnica(its0);
+    return `${ambsOS(o).length>1?`<div class="ambhead" style="margin-top:16px"><b>${esc(amb.nome)}</b>
+      <span>${its0.length} linha(s) · ${ta.pecas} peças · ${ta.cases} cases · ${kg(ta.peso)} kgf</span></div>`:""}
+    ${porCategoria(its0).map(([c,its])=>`
   <div class="card" style="margin-top:14px"><header><h3>${esc(c)}</h3>
     <span class="hint">${(()=>{const t=somaTecnica(its);return its.length+" linhas · "+t.pecas+" peças · "+t.cases+" cases · "+kg(t.peso)+" kgf";})()}</span></header>
-  <div class="tblwrap"><table><thead><tr><th>Código</th><th>Item</th><th>Aplicação</th><th class="r">Qtd</th><th>Aplicação</th><th class="r">Cases</th><th class="r">Peso total</th><th class="r">Consumo</th><th class="r">Disponível na janela</th></tr></thead><tbody>
-  ${its.map(i=>{const it=item(i.cod);const disp=disponivel(i.cod,o.montagem,o.desmontagem)+ (oscDaOS(o.id)? (oscDaOS(o.id).itens.find(x=>x.cod===i.cod)||{qtd:0}).qtd :0);
+  <div class="tblwrap"><table><thead><tr><th>Código</th><th>Item</th><th class="r">Qtd</th><th>Aplicação</th><th class="r">Cases</th><th class="r">Peso total</th><th class="r">Consumo</th><th class="r">Disponível na janela</th><th>Observação</th></tr></thead><tbody>
+  ${its.map(i=>{
+    if(!i.cod) return `<tr style="background:var(--surface2)">
+      <td><span class="pill">avulso</span></td><td>${esc(i.nome)}</td>
+      <td class="r num">${i.qtd}</td><td><span class="muted" style="font-size:11px">fora do estoque</span></td>
+      <td class="r muted">—</td><td class="r muted">—</td><td class="r muted">—</td><td class="r muted">—</td>
+      <td class="muted" style="font-size:11.5px">${esc(i.obs||"—")}</td></tr>`;
+    const it=item(i.cod);
+    const disp=disponivel(i.cod,o.montagem,o.desmontagem)+ (oscDaOS(o.id)? (oscDaOS(o.id).itens.find(x=>x.cod===i.cod)||{qtd:0}).qtd :0);
     const falta=disp<i.qtd;
     return `<tr><td><span class="tag">${i.cod}</span></td><td>${esc(it.nome)}</td>
     <td class="r num">${i.qtd}</td>
-    <td>${(()=>{const a=qtdAerea(i); return a===i.qtd?`<span class="pill acc">todo no grid</span>`
+    <td>${(()=>{const a=qtdAerea(i); return indefinida(i)?`<span class="pill warn">a definir</span>`
+      : a===i.qtd?`<span class="pill acc">todo no grid</span>`
       : a===0?`<span class="pill">todo no solo</span>`
       : `<span class="pill acc">${a} no grid</span> <span class="pill">${i.qtd-a} no solo</span>`;})()}</td>
     <td class="r num muted">${cases(i.cod,i.qtd)}</td><td class="r num">${kg(it.peso*i.qtd)} kgf</td>
     <td class="r num muted">${it.watts?kwFmt(it.watts*i.qtd):"—"}</td>
-    <td class="r num" style="color:${falta?"var(--crit)":"var(--ink2)"};font-weight:${falta?600:400}">${disp}</td></tr>`;}).join("")}
-  </tbody></table></div></div>`).join("")}`;
+    <td class="r num" style="color:${falta?"var(--crit)":"var(--ink2)"};font-weight:${falta?600:400}">${disp}</td>
+    <td class="muted" style="font-size:11.5px">${esc(i.obs||"—")}</td></tr>`;}).join("")}
+  </tbody></table></div></div>`).join("")}`;}).join("")}`;
 }
 </script>
 <script>
@@ -971,7 +1015,8 @@ function vOSC(){
   if(c.status==="Em separação") acao=`<button class="btn pri" data-act="confirmarCarga" data-id="${c.id}" ${pode?"":"disabled"}>Confirmar carga · baixa em ${dt(c.carga)}</button>`;
   if(c.status==="Carregada") acao=`<button class="btn pri" data-act="registrarRetorno" data-id="${c.id}" ${pode?"":"disabled"}>Registrar descarga · entrada em ${dt(c.descarga)}</button>`;
   if(c.status==="Retornada") acao=`<span class="pill ok"><span class="dot"></span>Ciclo encerrado</span>`;
-  const semSaldo=c.itens.filter(i=>{const it=item(i.cod);return it.total-it.manut-reservado(i.cod,c.carga,c.descarga,c.id)<i.qtd;});
+  const semSaldo=c.itens.filter(i=>{ if(!i.cod) return false; const it=item(i.cod);
+    return it.total-it.manut-reservado(i.cod,c.carga,c.descarga,c.id)<i.qtd;});
   return `<div class="between" style="margin-bottom:14px">
     <div><button class="btn sm ghost" data-act="go" data-view="cargas">← Ordens de carga</button>
       <h2 style="font-size:19px;margin-top:6px">${esc(o?o.evento:c.evento||c.id)}</h2>
@@ -998,13 +1043,19 @@ function vOSC(){
   </div>
 
   <div class="card" style="margin-top:14px"><header><h3>Romaneio de carga</h3><span class="hint">${(()=>{const t=somaTecnica(c.itens);return t.pecas+" peças · "+t.cases+" cases · "+kg(t.peso)+" kgf · "+kwFmt(t.w);})()}</span></header>
-  <div class="tblwrap"><table><thead><tr><th>Código</th><th>Item</th><th class="r">Qtd</th><th class="r">Cases</th><th class="r">Peso (kgf)</th><th class="r">Consumo</th><th class="r">Disponível na janela</th><th>Situação</th></tr></thead><tbody>
-  ${c.itens.map(i=>{const it=item(i.cod);const disp=it.total-it.manut-reservado(i.cod,c.carga,c.descarga,c.id);const ok=disp>=i.qtd;
-    return `<tr><td><span class="tag">${i.cod}</span></td><td>${esc(it.nome)}</td><td class="r num" style="font-weight:600">${i.qtd}</td>
+  <div class="tblwrap"><table><thead><tr><th>Código</th><th>Item</th>${(c.ambientes||[]).length>1?`<th>Sala</th>`:""}<th class="r">Qtd</th><th class="r">Cases</th><th class="r">Peso (kgf)</th><th class="r">Consumo</th><th class="r">Disponível na janela</th><th>Situação</th><th>Observação</th></tr></thead><tbody>
+  ${c.itens.map(i=>{
+    const sala=(c.ambientes||[]).length>1?`<td class="muted" style="font-size:11.5px">${esc(nomeAmb(c.ambientes,i.amb))}</td>`:"";
+    if(!i.cod) return `<tr style="background:var(--surface2)"><td><span class="pill">avulso</span></td><td>${esc(i.nome)}</td>${sala}
+      <td class="r num" style="font-weight:600">${i.qtd}</td><td class="r muted">—</td><td class="r muted">—</td><td class="r muted">—</td><td class="r muted">—</td>
+      <td><span class="pill">não sai do galpão</span></td><td class="muted" style="font-size:11.5px">${esc(i.obs||"—")}</td></tr>`;
+    const it=item(i.cod);const disp=it.total-it.manut-reservado(i.cod,c.carga,c.descarga,c.id);const ok=disp>=i.qtd;
+    return `<tr><td><span class="tag">${i.cod}</span></td><td>${esc(it.nome)}</td>${sala}<td class="r num" style="font-weight:600">${i.qtd}</td>
     <td class="r num">${cases(i.cod,i.qtd)}</td>
     <td class="r num muted">${kg(it.peso*i.qtd)}</td><td class="r num muted">${it.watts?kwFmt(it.watts*i.qtd):"—"}</td>
     <td class="r num" style="color:${ok?"var(--ink2)":"var(--crit)"}">${disp}</td>
-    <td><span class="pill ${c.status==="Carregada"?"ok":ok?"":"crit"}">${c.status==="Carregada"?"em campo":ok?"reservado":"sem saldo"}</span></td></tr>`;}).join("")}
+    <td><span class="pill ${c.status==="Carregada"?"ok":ok?"":"crit"}">${c.status==="Carregada"?"em campo":ok?"reservado":"sem saldo"}</span></td>
+    <td class="muted" style="font-size:11.5px">${esc(i.obs||"—")}</td></tr>`;}).join("")}
   </tbody></table></div></div>`;
 }
 
@@ -1711,8 +1762,10 @@ const PRODUTORES = () => USERS.filter(u=>u.role==="producao" || u.role==="gerenc
   .sort((a,b)=> (a.role==="producao"?0:1) - (b.role==="producao"?0:1));
 function porCategoria(itens){
   const m={}; CATEGORIAS.forEach(c=>m[c]=[]);
-  itens.forEach(i=>{ const c=item(i.cod).cat; (m[c]=m[c]||[]).push(i); });
-  return CATEGORIAS.map(c=>[c,m[c]]).filter(x=>x[1].length);
+  /* a linha avulsa traz a própria categoria, já que não tem item de catálogo */
+  itens.forEach(i=>{ const c = i.cod ? item(i.cod).cat : (i.cat||"Extras"); (m[c]=m[c]||[]).push(i); });
+  return [...CATEGORIAS, ...Object.keys(m).filter(c=>!CATEGORIAS.includes(c))]
+    .map(c=>[c,m[c]||[]]).filter(x=>x[1].length);
 }
 const TEMPS={quente:"Quente",morno:"Morno",frio:"Frio"};
 const neg = id => S.negocios.find(n=>n.id===id);
@@ -1726,7 +1779,8 @@ const vazioBrief = () => ({
   luz:{tem:false,porte:"Cênica",movings:0,wash:0,pares:0,obs:""},
   cenografia:{tem:false,porte:"Identidade simples",paineis:0,testeiras:0,backdrops:0,forracao:0,obs:""},
   internet:{tem:false,porte:"Wi-Fi para a equipe",link:0,roteador:0,aps:0,switches:0,cabo:0,obs:""},
-  extras:{climatizacao:false,gerador:false,mobiliario:false,tenda:false,obs:""}
+  extras:{climatizacao:false,gerador:false,mobiliario:false,tenda:false,obs:""},
+  ambientes:[]   /* salas além da plenária: B.U., credenciamento, camarim… */
 });
 
 /* ---- portes: uma ideia central por bloco, traduzida em números ---- */
@@ -1778,6 +1832,27 @@ function inferirPortes(n){
   if(!b.internet) b.internet={tem:false,porte:"Wi-Fi para a equipe",obs:""};
   if(b.internet.aps===undefined) aplicarPorte(b,"internet",b.internet.porte||"Wi-Fi para a equipe");
 }
+/* ================= AMBIENTES =================
+   Um evento corporativo raramente cabe numa sala só: tem a plenária e as
+   salas de B.U., cada uma com a própria área, o próprio piso e o próprio
+   grid. A plenária continua sendo a sala do briefing — é dela que o
+   vendedor fala na ligação — e as demais entram nesta lista.
+   O id fixo da plenária deixa as linhas antigas apontando para o lugar certo. */
+const PLENARIA = "plenaria";
+const vazioAmbiente = nome => ({id:uid(), nome:nome||"", area:0, peDireito:0,
+  cargaPiso:500, pontos:0, energia:0, obs:""});
+
+function ambientes(n){
+  const b=n.brief||vazioBrief(), s=b.sala||{};
+  return [{id:PLENARIA, nome:s.nome||"Plenária", area:s.area||0, peDireito:s.peDireito||0,
+           cargaPiso:s.cargaPiso||500, pontos:s.pontos||0, energia:s.energia||0, obs:s.obs||"", principal:true},
+          ...(b.ambientes||[])];
+}
+const ambiente  = (n,id) => ambientes(n).find(a=>a.id===id) || ambientes(n)[0];
+const nomeAmb   = (lista,id) => (lista.find(a=>a.id===id)||lista[0]||{nome:"—"}).nome;
+/* linha sem ambiente é da plenária: é o caso de quem só tem uma sala */
+const ambDaLinha = l => l.amb || PLENARIA;
+
 const vazioVT = () => ({feita:false,data:"",hora:"",quem:[],resumo:"",fotos:[],
   checklist:[{t:"Medida do pé-direito conferida",ok:false},{t:"Pontos de ancoragem localizados",ok:false},
     {t:"Quadro de energia e carga disponível",ok:false},{t:"Acesso, doca e elevador de carga",ok:false},
@@ -1806,6 +1881,7 @@ function ensureCRM(){
     if(!n.fech) n.fech=vazioFech();
     if(!n.produtores) n.produtores = [];
     if(!n.brief) n.brief=vazioBrief(); if(!n.vt) n.vt=vazioVT(); if(!n.tresd) n.tresd=vazio3D(); if(!n.briefNotas) n.briefNotas=[];
+    if(!n.brief.ambientes) n.brief.ambientes=[];
     if(!n.brief.sala.ancoragem||!n.brief.led.porte) inferirPortes(n); });
 }
 
@@ -1935,6 +2011,13 @@ function vCRM(){
   }).join("")}</div>`;
 }
 </script>
+<style>
+.amb{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r2);padding:8px 10px;background:var(--surface2)}
+.amb label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--ink3);font-family:var(--disp);font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.amb label input{width:78px;text-align:right}
+.amb>input{font-weight:600;min-width:120px}
+.ambtag{font-family:var(--disp);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);background:var(--surface2);border:1px solid var(--line2);border-radius:20px;padding:1px 8px;white-space:nowrap}
+</style>
 <script>
 /* ================= FICHA DO NEGÓCIO ================= */
 const podeEditarCRM = aba => S.role==="gerencia" || (S.role==="producao" && (aba==="vt"||aba==="tresd"));
@@ -1968,6 +2051,30 @@ const sel2=(l,path,v,pares)=>`<div class="field"><label for="f_${path.replace(".
   <select id="f_${path.replace(".","_")}" data-${path.includes(".")?"negb":"neg"}="${path}">${pares.map(o=>`<option value="${esc(o[0])}" ${o[0]===v?"selected":""}>${esc(o[1])}</option>`).join("")}</select></div>`;
 const chk=(l,path,v)=>`<label class="flex" style="gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" ${v?"checked":""} data-${path.includes(".")?"negb":"neg"}="${path}" style="width:auto"> ${l}</label>`;
 const ro = aba => podeEditarCRM(aba)?"":`<div class="verdict warn" style="margin-bottom:12px"><div><b>Somente leitura</b>Este perfil acompanha esta etapa, mas quem edita é a gerência.</div></div>`;
+
+/* ---- salas além da plenária ---- */
+function ambientesHTML(n,ed){
+  const extras=(n.brief.ambientes||[]);
+  const linha=(a,ix)=>`<div class="amb">
+    <input value="${esc(a.nome)}" data-amb="${a.id}" data-f="nome" placeholder="Ex.: B.U. Vendas" ${ed?"":"disabled"} style="flex:1;min-width:120px">
+    <label>área m²<input type="number" step="10" value="${a.area||0}" data-amb="${a.id}" data-f="area" ${ed?"":"disabled"}></label>
+    <label>pé-direito<input type="number" step="0.5" value="${a.peDireito||0}" data-amb="${a.id}" data-f="peDireito" ${ed?"":"disabled"}></label>
+    <label>piso kgf/m²<input type="number" step="50" value="${a.cargaPiso||500}" data-amb="${a.id}" data-f="cargaPiso" ${ed?"":"disabled"}></label>
+    <label>pontos<input type="number" step="1" value="${a.pontos||0}" data-amb="${a.id}" data-f="pontos" ${ed?"":"disabled"}></label>
+    ${ed?`<button class="btn sm ghost" data-act="rmAmbiente" data-id="${n.id}" data-a="${a.id}" title="Remover">×</button>`:""}
+  </div>`;
+  return `<div class="bsec"><header><h4>Outras salas do evento</h4>
+      <span class="muted" style="margin-left:auto;font-size:11px">plenária, B.U., credenciamento…</span></header><div class="in">
+    <p style="margin:0 0 9px;font-size:12px;color:var(--ink2);line-height:1.5">A plenária é a sala de cima. Aqui entram as salas de B.U. e o resto do evento —
+      cada uma com a própria área, o próprio piso e os próprios pontos. O orçamento e a OS ficam separados por sala, e cada uma ganha o seu memorial.</p>
+    ${extras.length?`<div style="display:grid;gap:7px;margin-bottom:10px">${extras.map(linha).join("")}</div>`
+      :`<div class="empty" style="padding:11px;font-size:12px;margin-bottom:10px">Só a plenária por enquanto. Se o evento tiver salas de B.U., cadastre aqui.</div>`}
+    ${ed?`<form class="addform" autocomplete="off" style="margin:0"><div class="rowf">
+      <div class="field w"><label for="ambNome">Nova sala</label><input id="ambNome" placeholder="Ex.: B.U. Marketing"></div>
+      <button class="btn go" type="submit" data-act="addAmbiente" data-id="${n.id}">Incluir sala</button>
+    </div><p class="hint">Enter inclui e deixa o cursor pronto para a próxima.</p></form>`:""}
+  </div></div>`;
+}
 
 /* ---- 1. Qualificação ---- */
 function abaQual(n){
@@ -2046,6 +2153,8 @@ function abaBrief(n){
         <div class="field"><label for="f_sala_obs">Observações do local</label>
           <textarea id="f_sala_obs" rows="2" style="font-family:var(--sans)" data-negb="sala.obs" placeholder="Acesso difícil, restrição de horário, piso de madeira…">${esc(b.sala.obs)}</textarea></div>
       </div></div>
+
+      ${ambientesHTML(n,ed)}
 
       ${bloco("led","Painel de LED","Que painel o evento pede",b.led.tem)}
       ${bloco("palco","Palco","Que palco o evento pede",b.palco.tem)}
@@ -2469,13 +2578,24 @@ function gerarOSVdeNegocio(negId){
     "Montagem "+dtl(n.montagem)+" às "+n.montagemHora+" · Evento "+dtl(n.evIni)+" às "+n.evIniHora+" · Desmontagem "+dtl(n.desmontagem)+" às "+n.desmontagemHora+".","",
     "9. RESPONSABILIDADE TÉCNICA","ART de execução a ser emitida pelo engenheiro responsável junto ao CREA antes do início da montagem."
   ].join("\n");
+  const ambs=ambientes(n), pubKg=n.tipoEvento==="Social"?250:300;
+  /* os itens de fora do estoque viram linha avulsa na OS: o produtor precisa
+     enxergar a sublocação e o serviço que foram vendidos, sem preço */
+  const avulsos=externos.map(l=>({id:uid(),cod:null,nome:l.nome,cat:l.cat,qtd:Number(l.qtd)||1,
+    amb:ambDaLinha(l), aereo:null, obs:[l.fornecedor?"Fornecedor: "+l.fornecedor:"",l.obs||""].filter(Boolean).join(" · ")}));
   S.os.push({id,codigo,cliente:n.cliente,evento:n.titulo,local:n.local+(n.sala?" · "+n.sala:""),cidade:n.cidade,
     publico:n.publico||0,area:b.sala.area||200,
     montagem:n.montagem,evIni:n.evIni||n.montagem,evFim:n.evFim||n.evIni||n.montagem,desmontagem:n.desmontagem,
     valor,produtores:[...n.produtores],produtor:usr(n.produtores[0]).nome,status:"Aguardando produção",criada:HOJE,negId:n.id,
-    itens:e.map(i=>({...i,aereo:item(i.cod).rig==="aereo"?i.qtd:0})),
-    solo:{area:b.sala.area||200,adm:b.sala.cargaPiso||500,admPont:600,publicoKgm2:n.tipoEvento==="Social"?250:300,torres,apoios:4,feito:false},
+    ambientes:ambs.map(a=>({id:a.id,nome:a.nome,principal:!!a.principal})),
+    itens:[...e.map(i=>({...i,id:uid(),aereo:item(i.cod).rig==="aereo"?i.qtd:0})), ...avulsos],
+    solo:{area:b.sala.area||200,adm:b.sala.cargaPiso||500,admPont:600,publicoKgm2:pubKg,torres,apoios:4,feito:false},
     aereo:{pontos:b.sala.pontos||8,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:b.estrutura.vao||10,feito:false},
+    /* cada sala de B.U. começa com os números que o briefing anotou para ela */
+    mem:Object.fromEntries(ambs.filter(a=>!a.principal).map(a=>[a.id,{
+      solo:{area:a.area||100,adm:a.cargaPiso||500,admPont:600,publicoKgm2:pubKg,torres:!(a.pontos>0),apoios:4,feito:false},
+      aereo:{pontos:a.pontos||0,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:false},
+      ancoragens:null}])),
     descritivo:desc,etapaAtual:"escopo"});
   n.osId=id; n.etapa="finalizacao"; n.valor=valor;
   /* a OS nova precisa das estruturas de produção e de logística prontas */
@@ -2494,7 +2614,7 @@ NAV.forEach(g=>g.items.forEach(i=>{ if(i.id==="crm"){ i.t="Pipeline"; i.roles=["
 
 function acaoCRM(a, id, t){
   t = t || {dataset:{}};
-  const CRM=["lead","aprovarFech","reabrirFech","setAnc","negocio","crmAba","avancar","novoNegocio","gerarOSVdeNegocio","addNota","usarSugerido","st3d","addFotos","verFoto","rmFoto","salvarLegenda","salvarCliente","editarCliente","fecharCliForm"];
+  const CRM=["lead","aprovarFech","reabrirFech","setAnc","negocio","crmAba","avancar","novoNegocio","gerarOSVdeNegocio","addNota","usarSugerido","st3d","addFotos","verFoto","rmFoto","salvarLegenda","salvarCliente","editarCliente","fecharCliForm","addAmbiente","rmAmbiente"];
   if(!CRM.includes(a)) return;
   switch(a){
     case "lead": {if(S.role!=="gerencia") break; const n=neg(id), u=t.dataset.u;
@@ -2536,6 +2656,25 @@ function acaoCRM(a, id, t){
          resto das estruturas que as abas esperam encontrar prontas */
       ensureCRM(); ensureOrc();
       S.crmAba="qualificacao"; save(); go("crm",n.id); toast("Negócio "+n.codigo+" criado. Comece pela qualificação."); break;}
+    case "addAmbiente": {
+      if(!podeEditarCRM("briefing")) break;
+      const el=document.getElementById("ambNome"); const nome=(el?el.value:"").trim();
+      if(!nome) return toast("Dê um nome à sala — B.U. Vendas, Credenciamento, o que for.");
+      const n=neg(id); n.brief.ambientes=n.brief.ambientes||[];
+      if(ambientes(n).some(a=>a.nome.toLowerCase()===nome.toLowerCase()))
+        return toast("Já existe uma sala com esse nome neste evento.");
+      n.brief.ambientes.push(Object.assign(vazioAmbiente(nome),{cargaPiso:n.brief.sala.cargaPiso||500}));
+      save(); render(); foco("ambNome"); toast(nome+" entrou no evento."); break;}
+    case "rmAmbiente": {
+      if(!podeEditarCRM("briefing")) break;
+      const n=neg(id), aid=t.dataset.a, alvo=(n.brief.ambientes||[]).find(a=>a.id===aid);
+      if(!alvo) break;
+      const usadas=(n.orc?n.orc.linhas:[]).filter(l=>ambDaLinha(l)===aid).length;
+      /* o que estava naquela sala volta para a plenária em vez de sumir do orçamento */
+      (n.orc?n.orc.linhas:[]).forEach(l=>{ if(ambDaLinha(l)===aid) l.amb=PLENARIA; });
+      n.brief.ambientes=n.brief.ambientes.filter(a=>a.id!==aid);
+      save(); render();
+      toast(usadas?alvo.nome+" removida — "+usadas+" linha(s) voltaram para a plenária.":alvo.nome+" removida."); break;}
     case "editarCliente": if(can("criar_negocio")){ S.cliEdit=id; render(); foco("clNome"); } break;
     case "fecharCliForm": S.cliEdit=null; render(); break;
     case "salvarCliente": {
@@ -2575,7 +2714,17 @@ document.addEventListener("input", ev=>{
   if(el.dataset && el.dataset.crmq!==undefined){ S.crmQ=el.value; const p=el.selectionStart; render();
     const f=document.getElementById("crmQ"); if(f){ f.focus(); f.setSelectionRange(p,p); } }
   if(el.id==="vtInput"&&el.files) lerFotos(S.sel, el.files);
+  if(el.dataset && el.dataset.amb!==undefined) bindAmbiente(el);
 });
+/* edição direta dos campos de cada sala, sem redesenhar a tela a cada tecla */
+function bindAmbiente(el){
+  if(!podeEditarCRM("briefing")) return;
+  const n=neg(S.sel); if(!n) return;
+  const a=(n.brief.ambientes||[]).find(x=>x.id===el.dataset.amb); if(!a) return;
+  const f=el.dataset.f;
+  a[f] = f==="nome" ? el.value : (Number(el.value)||0);
+  save();
+}
 document.addEventListener("change", ev=>{
   const el=ev.target, n=neg(S.sel);
   if(el.type==="checkbox" && el.dataset && (el.dataset.neg!==undefined||el.dataset.negb!==undefined)) bindNeg(el);
@@ -2608,6 +2757,9 @@ document.addEventListener("change", ev=>{
 .totrow span{font-size:12px;color:var(--ink2)}
 .totrow b{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600}
 .totrow.big b{font-size:17px}
+.orctbl tr.amb td{background:var(--accentSoft);color:var(--ink);font-family:var(--disp);font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:7px 11px;border-top:1px solid var(--line)}
+.orctbl tr.cat td{padding-left:16px}
+.ambsel{margin-top:4px;font-size:10.5px;padding:2px 6px;height:auto;width:auto;max-width:170px;color:var(--ink2)}
 </style>
 <script>
 /* ================= ORÇAMENTO ================= */
@@ -2663,22 +2815,30 @@ function orcTotais(n){
   return {porCat,subEstoque:sub.estoque,subExterno:sub.externo,subtotal,descV,total:subtotal-descV};
 }
 const linhasEstoque = n => (n.orc?n.orc.linhas:[]).filter(l=>l.tipo==="estoque");
-const escopoDaOS = n => linhasEstoque(n).map(l=>({cod:l.cod,qtd:Number(l.qtd)||0})).filter(i=>i.qtd>0);
+/* o escopo leva a sala e a observação junto — é o que o produtor precisa ver */
+const escopoDaOS = n => linhasEstoque(n).map(l=>({cod:l.cod,qtd:Number(l.qtd)||0,
+  amb:ambDaLinha(l), obs:l.obs||""})).filter(i=>i.qtd>0);
 
 /* ---- tela ---- */
 function abaNeg(n){
   if(!can("ver_valores")) return `<div class="verdict warn"><div><b>Sem acesso</b>O orçamento é visível apenas para a gerência.</div></div>`;
   const ed=S.role==="gerencia", o=n.orc, t=orcTotais(n);
   const dias=Math.max(1,diffDays(n.montagem||HOJE,n.desmontagem||HOJE));
-  const ordem=[...CATORC];
-  const grupos=ordem.map(c=>[c,o.linhas.filter(l=>l.cat===c)]).filter(x=>x[1].length);
+  const ambs=ambientes(n);
+  /* uma sala só: segue agrupando por categoria, como sempre foi.
+     mais de uma: sala primeiro, categoria dentro. */
+  const porAmb = ambs.map(a=>[a, o.linhas.filter(l=>ambDaLinha(l)===a.id)]).filter(x=>x[1].length);
+  const soltas = o.linhas.filter(l=>!ambs.some(a=>a.id===ambDaLinha(l)));
+  if(soltas.length) porAmb.push([{id:PLENARIA,nome:ambs[0].nome},soltas]);
+  const blocos = porAmb.map(([a,ls])=>[a, CATORC.map(c=>[c, ls.filter(l=>l.cat===c)]).filter(x=>x[1].length),
+    ls.reduce((t,l)=>t+(Number(l.qtd)||0)*(l.modo==="diaria"?(Number(l.dias)||1):1)*(Number(l.unit)||0),0)]);
   const inp=(ix,campo,v,cls,tipo)=>`<input class="${cls}" type="${tipo||"number"}" value="${esc(String(v))}" data-orc="${ix}" data-f="${campo}" ${ed?"":"disabled"} step="${campo==="unit"?"10":"1"}" min="0">`;
   return `${ro("orcamento")}
   <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:14px;align-items:start">
     <div class="card">
       <div class="orcbar">
         ${ed?`<div class="modes">
-          ${[["estoque","Item do estoque"],["kit","Kit"],["externo","Fora do estoque"]].map(m=>`<button class="${(S.orcModo||"estoque")===m[0]?"on":""}" data-act="orcModo" data-m="${m[0]}">${m[1]}</button>`).join("")}
+          ${[["estoque","Item do estoque"],["externo","Fora do estoque"]].map(m=>`<button class="${(S.orcModo||"estoque")==="externo"&&m[0]==="externo"||((S.orcModo||"estoque")!=="externo"&&m[0]==="estoque")?"on":""}" data-act="orcModo" data-m="${m[0]}">${m[1]}</button>`).join("")}
         </div>
         <button class="btn sm ghost" data-act="puxarBrief" data-id="${n.id}">Puxar escopo do briefing</button>`:""}
         <div style="flex:1"></div>
@@ -2688,7 +2848,8 @@ function abaNeg(n){
       ${ed?`<div style="padding:12px">${formAdicao(n,dias)}</div>`:""}
       ${o.linhas.length?`<div class="tblwrap"><table class="orctbl"><thead><tr>
         <th>Item</th><th class="r">Qtd</th><th class="r">Diárias</th><th class="r">Valor unit.</th><th class="r">Subtotal</th><th>Observação</th><th></th></tr></thead><tbody>
-        ${grupos.map(([c,ls])=>`<tr class="cat"><td colspan="7">${esc(c)} · ${brl(t.porCat[c]||0)}</td></tr>`+
+        ${blocos.map(([amb,grupos,totAmb])=>(ambs.length>1?`<tr class="amb"><td colspan="7">${esc(amb.nome)} · ${brl(totAmb)}</td></tr>`:"")+
+          grupos.map(([c,ls])=>`<tr class="cat"><td colspan="7">${esc(c)}</td></tr>`+
           ls.map(l=>{ const ix=o.linhas.indexOf(l);
             const v=(Number(l.qtd)||0)*(l.modo==="diaria"?(Number(l.dias)||1):1)*(Number(l.unit)||0);
             const disp=l.tipo==="estoque"&&n.montagem&&n.desmontagem?disponivel(l.cod,n.montagem,n.desmontagem):null;
@@ -2696,13 +2857,14 @@ function abaNeg(n){
             return `<tr class="${l.tipo==="externo"?"ext":""}">
               <td><b style="font-weight:500;font-size:12.5px">${esc(l.nome)}</b><br>
                 ${l.tipo==="estoque"?`<span class="tag">${l.cod}</span>${falta?`<span class="pill crit" style="margin-left:5px">só ${disp} na janela</span>`:disp!==null?`<span class="muted" style="font-size:10.5px;margin-left:5px">${disp} disponíveis</span>`:""}`
-                  :`<span class="pill">fora do estoque</span>${l.fornecedor?`<span class="muted" style="font-size:10.5px;margin-left:5px">${esc(l.fornecedor)}</span>`:""}`}</td>
+                  :`<span class="pill">fora do estoque</span>${l.fornecedor?`<span class="muted" style="font-size:10.5px;margin-left:5px">${esc(l.fornecedor)}</span>`:""}`}
+                ${ambs.length>1&&ed?`<select class="ambsel" data-orc="${ix}" data-f="amb">${ambs.map(a=>`<option value="${a.id}" ${a.id===ambDaLinha(l)?"selected":""}>${esc(a.nome)}</option>`).join("")}</select>`:""}</td>
               <td class="r">${inp(ix,"qtd",l.qtd,"qi")}</td>
               <td class="r">${l.modo==="diaria"?inp(ix,"dias",l.dias,"di"):`<span class="muted" style="font-size:11px">fechado</span>`}</td>
               <td class="r">${inp(ix,"unit",l.unit,"vi")}</td>
               <td class="r num" id="sub${ix}" style="font-weight:600;white-space:nowrap">${brl(v)}</td>
               <td>${inp(ix,"obs",l.obs||"","oi","text")}</td>
-              <td class="r">${ed?`<button class="btn sm ghost" data-act="rmLinha" data-id="${n.id}" data-ix="${ix}">×</button>`:""}</td></tr>`;}).join("")).join("")}
+              <td class="r">${ed?`<button class="btn sm ghost" data-act="rmLinha" data-id="${n.id}" data-ix="${ix}">×</button>`:""}</td></tr>`;}).join("")).join("")).join("")}
       </tbody></table></div>`
       :`<div class="empty">Orçamento vazio. Traga o escopo do briefing ou adicione os itens à mão.</div>`}
     </div>
@@ -2739,33 +2901,35 @@ function abaNeg(n){
   </div>`;
 }
 
+/* seletor de sala, repetido nos dois formulários e nas duas OS */
+function selAmb(id,ambs,sel){
+  if(ambs.length<2) return "";
+  return `<div class="field"><label for="${id}">Sala</label><select id="${id}">${
+    ambs.map(a=>`<option value="${a.id}" ${a.id===sel?"selected":""}>${esc(a.nome)}</option>`).join("")}</select></div>`;
+}
 function formAdicao(n,dias){
-  const modo=S.orcModo||"estoque";
+  const modo=(S.orcModo||"estoque")==="externo"?"externo":"estoque";
   const porCat={}; S.cat.forEach(c=>{(porCat[c.cat]=porCat[c.cat]||[]).push(c);});
+  const kits=(S.kits||[]).slice().sort((a,b)=>a.nome<b.nome?-1:1);
+  const ambs=ambientes(n);
   if(modo==="estoque") return `<form class="addform" autocomplete="off">
     <div class="rowf">
       <div class="field w"><label for="aeItem">Item do estoque</label><select id="aeItem">
+        ${kits.length?`<optgroup label="Kits">${kits.map(k=>`<option value="KIT:${k.cod}">${esc(k.nome)} — ${k.itens.length} itens</option>`).join("")}</optgroup>`:""}
         ${CATEGORIAS.filter(c=>porCat[c]).map(c=>`<optgroup label="${esc(c)}">${porCat[c].map(i=>`<option value="${i.cod}">${esc(i.cod)} · ${esc(i.nome)} — ${brl(i.diaria)}/diária</option>`).join("")}</optgroup>`).join("")}
       </select></div>
+      ${selAmb("aeAmb",ambs)}
       <div class="field s"><label for="aeQtd">Qtd</label><input id="aeQtd" type="number" value="1" min="1"></div>
       <div class="field s"><label for="aeDias">Diárias</label><input id="aeDias" type="number" value="${dias}" min="1"></div>
       <div class="field w"><label for="aeObs">Observação</label><input id="aeObs" placeholder="Ex.: 4 unidades de reserva"></div>
       <button class="btn pri go" type="submit" data-act="salvarEstoque" data-id="${n.id}">Adicionar</button>
-    </div><p class="hint">Enter adiciona e devolve o foco para o item, para lançar um atrás do outro.</p></form>`;
-  if(modo==="kit") return `<form class="addform" autocomplete="off">
-    <div class="rowf">
-      <div class="field w"><label for="ikKit">Kit</label><select id="ikKit">
-        ${CATEGORIAS.filter(c=>(S.kits||[]).some(k=>k.cat===c)).map(c=>`<optgroup label="${esc(c)}">${S.kits.filter(k=>k.cat===c).map(k=>`<option value="${k.cod}">${esc(k.nome)} — ${k.itens.length} itens</option>`).join("")}</optgroup>`).join("")}
-      </select></div>
-      <div class="field s"><label for="ikMult">Quantos</label><input id="ikMult" type="number" value="1" min="1"></div>
-      <div class="field s"><label for="ikDias">Diárias</label><input id="ikDias" type="number" value="${dias}" min="1"></div>
-      <button class="btn pri go" type="submit" data-act="inserirKit" data-id="${n.id}">Abrir kit</button>
-    </div><p class="hint">O kit entra aberto, linha por linha — é assim que o estoque separa e a disponibilidade é conferida.</p></form>`;
+    </div><p class="hint">Enter adiciona e devolve o foco para o item. Um kit entra aberto, linha por linha — é assim que o estoque separa e a disponibilidade é conferida.</p></form>`;
   return `<form class="addform" autocomplete="off">
     <div class="rowf">
       <div class="field w"><label for="axNome">Descrição</label><input id="axNome" placeholder="Ex.: Sublocação de 40 módulos de LED P2.6"></div>
       <div class="field"><label for="axCat">Categoria</label><select id="axCat">${CATORC.map(c=>`<option ${c==="Serviços"?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
       <div class="field"><label for="axForn">Fornecedor</label><input id="axForn" placeholder="Ex.: Ledway"></div>
+      ${selAmb("axAmb",ambs)}
     </div>
     <div class="rowf">
       <div class="field"><label for="axModo">Cobrança</label><select id="axModo"><option value="diaria">Por diária</option><option value="fechado">Valor fechado</option></select></div>
@@ -2813,13 +2977,27 @@ document.addEventListener("click", ev=>{
     case "puxarBrief": puxarBriefing(n); sincOrc(n); save(); render(); break;
     case "rmLinha": n.orc.linhas.splice(Number(t.dataset.ix),1); sincOrc(n); save(); render(); break;
     case "salvarEstoque": {
-      const cod=document.getElementById("aeItem").value, it=item(cod);
+      const esc0=document.getElementById("aeItem").value;
       const qtd=Math.max(1,Number(document.getElementById("aeQtd").value)||1);
-      const ex=n.orc.linhas.find(l=>l.tipo==="estoque"&&l.cod===cod);
+      const dias=Math.max(1,Number(document.getElementById("aeDias").value)||1);
+      const obs=document.getElementById("aeObs").value;
+      const amb=(document.getElementById("aeAmb")||{}).value||PLENARIA;
+      /* o kit entra aberto: o estoque separa peça a peça e a disponibilidade é conferida item a item */
+      if(esc0.startsWith("KIT:")){
+        const k=kitById(esc0.slice(4)); if(!k) break;
+        k.itens.forEach(x=>{ const it=item(x.cod);
+          const ex=n.orc.linhas.find(l=>l.tipo==="estoque"&&l.cod===x.cod&&ambDaLinha(l)===amb);
+          if(ex) ex.qtd+=x.qtd*qtd;
+          else n.orc.linhas.push({id:novaLinhaId(),tipo:"estoque",cod:x.cod,nome:it.nome,cat:it.cat,amb,
+            qtd:x.qtd*qtd,dias,unit:it.diaria,modo:"diaria",obs:obs||k.nome}); });
+        sincOrc(n); save(); render(); focarAdicao();
+        toast(k.nome+" aberto em "+k.itens.length+" linhas."); break;
+      }
+      const it=item(esc0);
+      const ex=n.orc.linhas.find(l=>l.tipo==="estoque"&&l.cod===esc0&&ambDaLinha(l)===amb);
       if(ex){ ex.qtd+=qtd; }
-      else n.orc.linhas.push({id:novaLinhaId(),tipo:"estoque",cod,nome:it.nome,cat:it.cat,qtd,
-        dias:Math.max(1,Number(document.getElementById("aeDias").value)||1),unit:it.diaria,modo:"diaria",
-        obs:document.getElementById("aeObs").value});
+      else n.orc.linhas.push({id:novaLinhaId(),tipo:"estoque",cod:esc0,nome:it.nome,cat:it.cat,amb,qtd,
+        dias,unit:it.diaria,modo:"diaria",obs});
       sincOrc(n); save(); render(); focarAdicao(); toast(it.nome+" adicionado ao orçamento."); break;}
     case "salvarExterno": {
       const nome=document.getElementById("axNome").value.trim();
@@ -2829,8 +3007,17 @@ document.addEventListener("click", ev=>{
         dias:Math.max(1,Number(document.getElementById("axDias").value)||1),
         unit:Number(document.getElementById("axUnit").value)||0,
         modo:document.getElementById("axModo").value,
+        amb:(document.getElementById("axAmb")||{}).value||PLENARIA,
         fornecedor:document.getElementById("axForn").value,obs:document.getElementById("axObs").value});
       sincOrc(n); save(); render(); focarAdicao(); toast("Item externo incluído."); break;}
+  }
+});
+document.addEventListener("change", ev=>{
+  const el=ev.target;
+  if(S.role==="gerencia" && el.dataset && el.dataset.orc!==undefined && el.dataset.f==="amb"){
+    const n=neg(S.sel); if(!n||!n.orc) return;
+    const l=n.orc.linhas[Number(el.dataset.orc)]; if(!l) return;
+    l.amb=el.value; sincOrc(n); save(); render();
   }
 });
 document.addEventListener("input", ev=>{
@@ -2839,6 +3026,7 @@ document.addEventListener("input", ev=>{
   if(el.dataset && el.dataset.orc!==undefined){
     const l=n.orc.linhas[Number(el.dataset.orc)]; if(!l) return;
     const f=el.dataset.f;
+    if(f==="amb"){ l.amb=el.value; sincOrc(n); save(); render(); return; }
     l[f] = f==="obs" ? el.value : (Number(el.value)||0);
     sincOrc(n); save(); repintarOrc(n,Number(el.dataset.orc));
   }
@@ -2887,7 +3075,8 @@ const kitById = cod => (S.kits||[]).find(k=>k.cod===cod);
 const cases = (cod,qtd) => { const it=item(cod); const pc=Number(it.porCase)||1; return Math.ceil(qtd/pc); };
 function somaTecnica(itens){
   let peso=0,w=0,cs=0,pecas=0;
-  itens.forEach(i=>{ const it=item(i.cod);
+  itens.forEach(i=>{ if(!i.cod) return;   /* linha avulsa não pesa nem ocupa case */
+    const it=item(i.cod);
     peso+=(it.peso||0)*i.qtd; w+=(it.watts||0)*i.qtd; cs+=cases(i.cod,i.qtd); pecas+=i.qtd; });
   return {peso,w,cases:cs,pecas,kva:w/1000/0.8};
 }
@@ -3085,6 +3274,20 @@ Object.assign(window.VEXTRA||(window.VEXTRA={}),{estoque:vEstoqueNovo});
 .mem .l .k small{display:block;color:var(--ink3);font-size:10.5px;font-family:var(--mono)}
 .mem .l .v{margin-left:auto;font-family:var(--mono);font-weight:600;font-size:13px;white-space:nowrap}
 .mem .l .v u{text-decoration:none;color:var(--ink3);font-weight:400;font-size:11px;margin-left:3px}
+.ambbar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.ambbar button{flex:1;min-width:150px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;cursor:pointer;color:var(--ink2)}
+.ambbar button b{display:block;font-family:var(--disp);font-size:12.5px;font-weight:600;color:var(--ink)}
+.ambbar button span{display:block;font-size:10.5px;color:var(--ink3);margin-top:1px}
+.ambbar button.on{border-color:var(--ink);box-shadow:var(--shadowUp)}
+.ambbar button.done b::after{content:" ✓";color:var(--ok)}
+.ambhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 2px 9px;padding-top:4px;border-top:1px solid var(--line2)}
+.ambhead b{font-family:var(--disp);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.ambhead span{font-size:11px;color:var(--ink3)}
+.ambhead span.s{margin-left:auto;font-family:var(--mono)}
+.modes{display:inline-flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
+.modes button{background:var(--surface);border:0;border-right:1px solid var(--line);padding:4px 10px;cursor:pointer;font-family:var(--disp);font-size:11px;font-weight:600;color:var(--ink3)}
+.modes button:last-child{border-right:0}
+.modes button.on{background:var(--accent);color:var(--onAccent)}
 </style>
 <script>
 /* ================= OS DO PRODUTOR ================= */
@@ -3093,33 +3296,61 @@ function ensureProd(){
     if(!o.itens) o.itens=[];
     if(!o.solo)  o.solo ={area:0,adm:500,admPont:1500,publicoKgm2:250,apoios:4,torres:false,feito:false};
     if(!o.aereo) o.aereo={pontos:0,wllPonto:0,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:false};
-    o.itens.forEach(i=>{ if(i.aereo===undefined) i.aereo = item(i.cod).rig==="aereo" ? i.qtd : 0; });
+    if(!o.ambientes || !o.ambientes.length) o.ambientes=[{id:PLENARIA,nome:"Plenária",principal:true}];
+    o.mem = o.mem || {};
+    o.itens.forEach(i=>{
+      if(!i.id) i.id=uid();
+      if(!i.amb) i.amb=o.ambientes[0].id;
+      /* linha avulsa não tem peso nem vai para memorial nenhum */
+      if(!i.cod){ i.aereo=null; return; }
+      if(i.aereo===undefined) i.aereo = item(i.cod).rig==="aereo" ? i.qtd : 0;
+    });
     if(!o.ancoragens){
       o.ancoragens = (o.aereo.pontos>0)
-        ? [{id:"A"+Math.random().toString(36).slice(2,7),nome:"Pontos da estrutura do local",qtd:o.aereo.pontos,wll:o.aereo.wllPonto}]
+        ? [{id:uid(),nome:"Pontos da estrutura do local",qtd:o.aereo.pontos,wll:o.aereo.wllPonto}]
         : [];
     }
+    o.ambientes.forEach(a=>{ const m=memAmb(o,a.id);
+      if(m.ancoragens===null || !m.ancoragens) m.ancoragens = (m.aereo.pontos>0)
+        ? [{id:uid(),nome:"Pontos da estrutura do local",qtd:m.aereo.pontos,wll:m.aereo.wllPonto}] : [];
+    });
   });
 }
-const indefinida = i => i.aereo===null || i.aereo===undefined;
+/* linha de catálogo sem aéreo/solo marcado; a avulsa nunca é pendência */
+const indefinida = i => !!i.cod && (i.aereo===null || i.aereo===undefined);
 const pendentes = o => o.itens.filter(indefinida);
-const nPontos = o => (o.ancoragens||[]).reduce((s,a)=>s+(Number(a.qtd)||0),0);
+const nPontos = (o,ambId) => (memAmb(o,ambId).ancoragens||[]).reduce((s,a)=>s+(Number(a.qtd)||0),0);
 
 /* memorial aéreo lê a tabela de pontos que o produtor montou */
-function calcAereo(o){
-  const p=o.aereo, anc=o.ancoragens||[];
-  const bruto=pesoPor(o.itens,"aereo");
-  const efetivo=o.solo.torres?0:bruto;
+function calcAereo(o, ambId){
+  const m=memAmb(o,ambId), itens=ambId?itensAmb(o,ambId):o.itens;
+  const p=m.aereo, anc=m.ancoragens||[];
+  const bruto=pesoPor(itens,"aereo");
+  const efetivo=m.solo.torres?0:bruto;
   const proj=efetivo*(Number(p.fd)||1.2)*(Number(p.fdes)||1.25);
-  const n=nPontos(o);
+  const n=nPontos(o,ambId);
   const porPonto = n? proj/n : 0;
   const grupos=anc.map(a=>({...a,carga:porPonto,util:porPonto/(Number(a.wll)||1),cap:(Number(a.qtd)||0)*(Number(a.wll)||0)}));
   const util = grupos.length? Math.max(...grupos.map(g=>g.util)) : Infinity;
   const cap = grupos.reduce((s,g)=>s+g.cap,0);
   const cr=(Number(p.wllAcess)||0)*7, fs = porPonto>0 ? cr/porPonto : Infinity;
   const flecha=(Number(p.vao)||0)*1000/200;
-  const ok = o.solo.torres ? true : (n>0 && util<=1 && fs>=(Number(p.fsMin)||5));
-  return {bruto,efetivo,proj,n,porPonto,util,cr,fs,flecha,ok,apoiadoSolo:o.solo.torres,grupos,cap};
+  const ok = m.solo.torres ? true : (n>0 && util<=1 && fs>=(Number(p.fsMin)||5));
+  return {bruto,efetivo,proj,n,porPonto,util,cr,fs,flecha,ok,apoiadoSolo:m.solo.torres,grupos,cap};
+}
+
+/* ---- sala ativa da OS ----
+   Pontos, memorial de solo e memorial aéreo são de uma sala por vez. */
+function ambAtiva(o){
+  const as=ambsOS(o);
+  return as.find(a=>a.id===S.ambSel) || as[0];
+}
+function barraAmb(o){
+  const as=ambsOS(o); if(as.length<2) return "";
+  const at=ambAtiva(o);
+  return `<div class="ambbar">${as.map(a=>{ const m=memAmb(o,a.id), feito=m.solo.feito&&m.aereo.feito;
+    return `<button class="${a.id===at.id?"on":""} ${feito?"done":""}" data-act="ambSel" data-a="${a.id}">
+      <b>${esc(a.nome)}</b><span>${feito?"memoriais fechados":m.solo.feito?"falta o aéreo":m.aereo.feito?"falta o solo":"memoriais abertos"}</span></button>`;}).join("")}</div>`;
 }
 
 /* ---- abas da produção ---- */
@@ -3128,14 +3359,15 @@ function vProdDet(){
   const e=etapasOk(o), aba=S.aba||"escopo", osc=oscDaOS(o.id), c=cli(o.cliente);
   const ed=can("editar_memorial");
   const pend=pendentes(o).length;
+  const as=ambsOS(o), pontosOk=as.every(x=>{const m=memAmb(o,x.id); return nPontos(o,x.id)>0||m.solo.torres;});
   const steps=[["escopo","Escopo","o que vai para o evento",e.escopo&&!pend],
-    ["pontos","Pontos e apoios","base dos dois memoriais",nPontos(o)>0||o.solo.torres],
-    ["solo","Memorial de solo","kgf/m² sobre o piso",e.solo],
-    ["aereo","Memorial aéreo","carga por ponto",e.aereo],
+    ["pontos","Pontos e apoios","base dos dois memoriais",pontosOk],
+    ["solo","Memorial de solo",as.length>1?as.length+" salas · kgf/m²":"kgf/m² sobre o piso",e.solo],
+    ["aereo","Memorial aéreo",as.length>1?as.length+" salas · carga por ponto":"carga por ponto",e.aereo],
     ["descritivo","Descritivo técnico","texto do projeto",e.descritivo],
     ["logistica","Logística","veículos e equipe",(o.logistica&&o.logistica.viagens.length>0)]];
-  const abas={escopo:()=>abaEscopo(o,ed),pontos:()=>abaPontos(o,ed),solo:()=>abaSolo(o,!ed),
-    aereo:()=>abaAereo(o,!ed),descritivo:()=>abaDesc(o,!ed),logistica:()=>abaLogistica(o,ed)};
+  const abas={escopo:()=>abaEscopo(o,ed),pontos:()=>barraAmb(o)+abaPontos(o,ed),solo:()=>barraAmb(o)+abaSolo(o,!ed),
+    aereo:()=>barraAmb(o)+abaAereo(o,!ed),descritivo:()=>abaDesc(o,!ed),logistica:()=>abaLogistica(o,ed)};
   /* vindo de outra tela a aba pode não existir aqui; cai no escopo em vez de quebrar */
   const body=(abas[aba]||abas.escopo)();
   return `<div class="between" style="margin-bottom:12px">
@@ -3155,19 +3387,40 @@ function vProdDet(){
 function abaEscopo(o,ed){
   const pend=pendentes(o), ps=pesoPor(o.itens,"solo"), pa=pesoPor(o.itens,"aereo"), t=somaTecnica(o.itens);
   const porCat={}; S.cat.forEach(c=>{(porCat[c.cat]=porCat[c.cat]||[]).push(c);});
+  const kits=(S.kits||[]).slice().sort((a,b)=>a.nome<b.nome?-1:1);
+  const as=ambsOS(o), A=ambAtiva(o);
+  const selA=(id,sel)=>as.length<2?"":`<div class="field"><label for="${id}">Sala</label><select id="${id}">${
+    as.map(a=>`<option value="${a.id}" ${a.id===(sel||A.id)?"selected":""}>${esc(a.nome)}</option>`).join("")}</select></div>`;
+  const modo=S.osModo==="avulso"?"avulso":"estoque";
   return `
   ${ed?`<div style="margin-bottom:14px"><form class="addform" autocomplete="off">
-    <div class="top"><h4>Incluir equipamento na OS</h4><div style="flex:1"></div>
-      <span class="hint">A produção ajusta o escopo que veio do comercial — quantidades, itens que faltaram, itens que saíram.</span></div>
-    <div class="rowf">
+    <div class="top"><h4>Incluir na OS</h4>
+      <div class="modes" style="margin-left:12px">${[["estoque","Equipamento"],["avulso","Linha avulsa"]].map(x=>
+        `<button type="button" class="${modo===x[0]?"on":""}" data-act="osModo" data-m="${x[0]}">${x[1]}</button>`).join("")}</div>
+      <div style="flex:1"></div>
+      <span class="hint">${modo==="estoque"?"A produção ajusta o escopo que veio do comercial — quantidades, itens que faltaram, itens que saíram."
+        :"Serve para o que não sai do galpão: sublocação, serviço de terceiro — ou só um recado para o barracão."}</span></div>
+    ${modo==="estoque"?`<div class="rowf">
       <div class="field w"><label for="peItem">Item</label><select id="peItem">
+        ${kits.length?`<optgroup label="Kits">${kits.map(k=>`<option value="KIT:${k.cod}">${esc(k.nome)} — ${k.itens.length} itens</option>`).join("")}</optgroup>`:""}
         ${CATEGORIAS.filter(c=>porCat[c]).map(c=>`<optgroup label="${esc(c)}">${porCat[c].map(x=>`<option value="${x.cod}">${esc(x.cod)} · ${esc(x.nome)}</option>`).join("")}</optgroup>`).join("")}
       </select></div>
+      ${selA("peAmb")}
       <div class="field s"><label for="peQtd">Qtd</label><input id="peQtd" type="number" value="1" min="1"></div>
       <div class="field s"><label for="peApl">Aplicação</label><select id="peApl">
         <option value="">Definir depois</option><option value="aereo">Aéreo</option><option value="solo">Solo</option></select></div>
+      <div class="field w"><label for="peObs">Observação</label><input id="peObs" placeholder="Ex.: 2 de reserva, chega direto do fornecedor"></div>
       <button class="btn pri go" type="submit" data-act="addItemOS" data-id="${o.id}">Incluir</button>
-    </div><p class="hint">Enter inclui e devolve o foco para o campo do item.</p></form></div>`:""}
+    </div><p class="hint">Enter inclui e devolve o foco para o campo do item. Um kit entra aberto, peça por peça.</p>`
+    :`<div class="rowf">
+      <div class="field w"><label for="pxNome">O que é</label><input id="pxNome" placeholder="Ex.: Sublocação de 40 módulos P2.6 — ou um recado para o barracão"></div>
+      <div class="field"><label for="pxCat">Categoria</label><select id="pxCat">${[...CATEGORIAS,"Serviços","Logística"].map(c=>`<option ${c==="Extras"?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
+      ${selA("pxAmb")}
+      <div class="field s"><label for="pxQtd">Qtd</label><input id="pxQtd" type="number" value="1" min="1"></div>
+      <div class="field w"><label for="pxObs">Observação</label><input id="pxObs" placeholder="Prazo, quem entrega, o que conferir…"></div>
+      <button class="btn pri go" type="submit" data-act="addAvulso" data-id="${o.id}">Incluir</button>
+    </div><p class="hint">Linha avulsa não tem peso nem entra em memorial — ela existe para aparecer na OS e na ordem de carga.</p>`}
+    </form></div>`:""}
 
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:14px">
     <div class="kpi"><div class="v">${t.pecas}</div><div class="k">peças no escopo</div><div class="d muted">${t.cases} cases</div></div>
@@ -3180,37 +3433,47 @@ function abaEscopo(o,ed){
   ${pend.length?`<div class="verdict crit" style="margin-bottom:14px"><div><b>Falta dizer onde vai</b>
     ${pend.slice(0,4).map(i=>esc(item(i.cod).nome)).join(", ")}${pend.length>4?" e mais "+(pend.length-4):""}. Marque Aéreo ou Solo em cada linha — enquanto estiver em branco, o peso não entra em memorial nenhum.</div></div>`:""}
 
-  ${porCategoria(o.itens).map(([cat,its])=>{const tc=somaTecnica(its);
+  ${as.map(amb=>{
+    const its0=itensAmb(o,amb.id); if(!its0.length && as.length>1) return "";
+    const ta=somaTecnica(its0.filter(i=>i.cod));
+    return `${as.length>1?`<div class="ambhead"><b>${esc(amb.nome)}</b>
+      <span>${its0.length} linha(s) · ${ta.pecas} peças · ${ta.cases} cases · ${kg(ta.peso)} kgf</span>
+      <span class="s">suspenso ${kg(pesoPor(its0,"aereo"))} · apoiado ${kg(pesoPor(its0,"solo"))} kgf</span></div>`:""}
+    ${porCategoria(its0).map(([cat,its])=>{const tc=somaTecnica(its.filter(i=>i.cod));
     return `<div class="card" style="margin-bottom:14px"><header><h3>${esc(cat)}</h3>
       <span class="hint">${its.length} linhas · ${tc.pecas} peças · ${tc.cases} cases · ${kg(tc.peso)} kgf${tc.w?" · "+kwFmt(tc.w):""}</span></header>
-    <div class="tblwrap"><table><thead><tr><th>Código</th><th>Item</th><th class="r" style="width:86px">Qtd</th>
-      <th style="width:148px">Aplicação</th><th class="r" style="width:88px">No grid</th><th class="r">Peso</th><th class="r">Consumo</th><th></th></tr></thead><tbody>
-    ${its.map(i=>{const ix=o.itens.indexOf(i), it=item(i.cod), a=qtdAerea(i), ind=indefinida(i);
-      return `<tr style="${ind?"background:var(--critSoft)":""}">
-      <td><span class="tag">${i.cod}</span></td><td>${esc(it.nome)}</td>
+    <div class="tblwrap"><table><thead><tr><th>Código</th><th>Item</th>${as.length>1?`<th style="width:130px">Sala</th>`:""}<th class="r" style="width:86px">Qtd</th>
+      <th style="width:148px">Aplicação</th><th class="r" style="width:88px">No grid</th><th class="r">Peso</th><th class="r">Consumo</th><th style="width:180px">Observação</th><th></th></tr></thead><tbody>
+    ${its.map(i=>{const ix=o.itens.indexOf(i), avulso=!i.cod, it=avulso?null:item(i.cod), a=qtdAerea(i), ind=indefinida(i);
+      return `<tr style="${ind?"background:var(--critSoft)":avulso?"background:var(--surface2)":""}">
+      <td>${avulso?`<span class="pill">avulso</span>`:`<span class="tag">${i.cod}</span>`}</td>
+      <td>${esc(avulso?i.nome:it.nome)}</td>
+      ${as.length>1?`<td>${ed?`<select data-osamb="${ix}" class="ambsel" style="margin:0">${as.map(x=>`<option value="${x.id}" ${x.id===(i.amb||as[0].id)?"selected":""}>${esc(x.nome)}</option>`).join("")}</select>`:`<span class="muted" style="font-size:11.5px">${esc(nomeAmb(as,i.amb))}</span>`}</td>`:""}
       <td class="r">${ed?`<input type="number" min="1" value="${i.qtd}" data-osq="${ix}" style="width:70px;text-align:right;padding:4px 7px;font-size:12px">`:`<span class="num">${i.qtd}</span>`}</td>
-      <td><span class="apl">
+      <td>${avulso?`<span class="muted" style="font-size:11px">fora do estoque</span>`:`<span class="apl">
         <button data-act="aplOS" data-id="${o.id}" data-ix="${ix}" data-v="aereo" class="${!ind&&a===i.qtd?"on":""}" ${ed?"":"disabled"}>Aéreo</button>
         <button data-act="aplOS" data-id="${o.id}" data-ix="${ix}" data-v="solo" class="${!ind&&a===0?"on":""}" ${ed?"":"disabled"}>Solo</button>
-        <button data-act="aplOS" data-id="${o.id}" data-ix="${ix}" data-v="" class="${ind?"on":""}" ${ed?"":"disabled"}>—</button></span></td>
-      <td class="r">${ind?`<span class="muted" style="font-size:11px">—</span>`
+        <button data-act="aplOS" data-id="${o.id}" data-ix="${ix}" data-v="" class="${ind?"on":""}" ${ed?"":"disabled"}>—</button></span>`}</td>
+      <td class="r">${avulso||ind?`<span class="muted" style="font-size:11px">—</span>`
         :ed?`<input type="number" min="0" max="${i.qtd}" value="${a}" data-rig="${ix}" style="width:72px;text-align:right;padding:4px 7px;font-size:12px">`
         :`<span class="num">${a}</span>`}</td>
-      <td class="r num ${ind?"muted":""}">${kg(it.peso*i.qtd)} kgf</td>
-      <td class="r num muted">${it.watts?kwFmt(it.watts*i.qtd):"—"}</td>
+      <td class="r num ${ind||avulso?"muted":""}">${avulso?"—":kg(it.peso*i.qtd)+" kgf"}</td>
+      <td class="r num muted">${!avulso&&it.watts?kwFmt(it.watts*i.qtd):"—"}</td>
+      <td>${ed?`<input value="${esc(i.obs||"")}" data-osobs="${ix}" placeholder="—" style="width:100%;padding:4px 7px;font-size:11.5px">`:`<span class="muted" style="font-size:11.5px">${esc(i.obs||"—")}</span>`}</td>
       <td class="r">${ed?`<button class="btn sm ghost" data-act="rmItemOS" data-id="${o.id}" data-ix="${ix}">×</button>`:""}</td></tr>`;}).join("")}
-    </tbody></table></div></div>`;}).join("")}
+    </tbody></table></div></div>`;}).join("")}`;}).join("")}
 
   <p class="muted" style="font-size:11.5px;margin:0 2px;line-height:1.6">Uma mesma peça pode ir suspensa num evento e apoiada no outro, por isso a aplicação é definida aqui e não no cadastro. Quando a linha for aérea e só parte das unidades subir ao grid, ajuste o campo <b>No grid</b> — o restante entra como carga de piso.</p>`;
 }
 
 /* ---- 2. Pontos e apoios ---- */
 function abaPontos(o,ed){
-  const anc=o.ancoragens||[], n=nPontos(o), cap=anc.reduce((s,a)=>s+(Number(a.qtd)||0)*(Number(a.wll)||0),0);
-  const pa=pesoPor(o.itens,"aereo"), ps=pesoPor(o.itens,"solo"), p=o.solo;
+  const A=ambAtiva(o), m=memAmb(o,A.id), itens=itensAmb(o,A.id);
+  const anc=m.ancoragens||[], n=nPontos(o,A.id), cap=anc.reduce((s,a)=>s+(Number(a.qtd)||0)*(Number(a.wll)||0),0);
+  const pa=pesoPor(itens,"aereo"), ps=pesoPor(itens,"solo"), p=m.solo;
   const f=(k,l,v,st,sf)=>`<div class="field"><label for="solo_${k}">${l}</label><input id="solo_${k}" type="number" data-calc="solo" data-k="${k}" value="${v}" step="${st||1}" ${ed?"":"disabled"}>${sf?`<span class="muted" style="font-size:10.5px">${sf}</span>`:""}</div>`;
   return `<div class="grid" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;align-items:start">
-    <div class="card"><header><h3>Pontos de ancoragem</h3>
+    <div class="card"><header><h3>Pontos de ancoragem${ambsOS(o).length>1?" · "+esc(A.nome):""}</h3>
       <span class="hint">${n} ponto(s) · capacidade somada ${kg(cap)} kgf</span></header>
       ${ed?`<div class="pad" style="border-bottom:1px solid var(--line2)"><form class="addform" autocomplete="off" style="border:0;background:transparent;padding:0">
         <div class="rowf">
@@ -3256,9 +3519,10 @@ function abaPontos(o,ed){
 <script>
 /* ---- 3. Memorial de solo, gerado ---- */
 function abaSolo(o,ro){
-  const p=o.solo, r=calcSolo(o), pend=pendentes(o).length;
+  const A=ambAtiva(o), m=memAmb(o,A.id);
+  const p=m.solo, r=calcSolo(o,A.id), pend=itensAmb(o,A.id).filter(indefinida).length;
   return `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,330px);gap:14px;align-items:start">
-    <div class="card"><header><h3>Memorial de cálculo · solo</h3>
+    <div class="card"><header><h3>Memorial de cálculo · solo${ambsOS(o).length>1?" · "+esc(A.nome):""}</h3>
       <span class="hint">gerado do escopo e dos apoios · ART pelo eng. responsável (CREA)</span></header>
       <div class="mem" style="border:0;border-radius:0" id="soloRes">${soloRes(r,p)}</div></div>
     <div class="grid" style="gap:12px">
@@ -3276,11 +3540,12 @@ function abaSolo(o,ro){
 }
 /* ---- 4. Memorial aéreo, gerado ---- */
 function abaAereo(o,ro){
-  const p=o.aereo, r=calcAereo(o), pend=pendentes(o).length;
+  const A=ambAtiva(o), m=memAmb(o,A.id);
+  const p=m.aereo, r=calcAereo(o,A.id), pend=itensAmb(o,A.id).filter(indefinida).length;
   const f=(k,l,v,st,sf)=>`<div class="field"><label for="ae_${k}">${l}</label><input id="ae_${k}" type="number" data-calc="aereo" data-k="${k}" value="${v}" step="${st||1}" ${ro?"disabled":""}>${sf?`<span class="muted" style="font-size:10.5px">${sf}</span>`:""}</div>`;
   return `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,330px);gap:14px;align-items:start">
     <div class="grid" style="gap:12px">
-      <div class="card"><header><h3>Memorial de cálculo · aéreo</h3>
+      <div class="card"><header><h3>Memorial de cálculo · aéreo${ambsOS(o).length>1?" · "+esc(A.nome):""}</h3>
         <span class="hint">${r.apoiadoSolo?"grid em torre de solo":r.n+" pontos cadastrados"}</span></header>
         <div class="mem" style="border:0;border-radius:0" id="aeRes">${aeRes(r,p)}</div></div>
       ${!r.apoiadoSolo&&r.grupos.length?`<div class="card"><header><h3>Verificação ponto a ponto</h3></header>
@@ -3343,29 +3608,55 @@ function aeVer(r,p){
 document.addEventListener("click", ev=>{
   const t=ev.target.closest("[data-act]"); if(!t) return;
   const a=t.dataset.act, id=t.dataset.id;
-  if(!["addItemOS","rmItemOS","aplOS","addAnc","rmAnc"].includes(a)) return;
+  if(!["addItemOS","rmItemOS","aplOS","addAnc","rmAnc","ambSel","addAvulso","osModo"].includes(a)) return;
+  if(a==="ambSel"){ S.ambSel=t.dataset.a; save(); render(); return; }
+  if(a==="osModo"){ S.osModo=t.dataset.m; save(); render(); foco(t.dataset.m==="avulso"?"pxNome":"peItem"); return; }
   if(!can("editar_memorial")) return;
   const o=osById(id); if(!o) return;
+  const A=ambAtiva(o), M=memAmb(o,A.id);
+  /* mexeu no escopo, os memoriais daquela sala reabrem */
+  const reabrir=ambId=>{ const mm=memAmb(o,ambId||A.id); mm.solo.feito=false; mm.aereo.feito=false; };
   switch(a){
     case "addItemOS": {
       const cod=document.getElementById("peItem").value, q=Math.max(1,Number(document.getElementById("peQtd").value)||1);
       const apl=document.getElementById("peApl").value, it=item(cod);
-      const ex=o.itens.find(i=>i.cod===cod);
-      if(ex){ ex.qtd+=q; if(apl==="aereo") ex.aereo=ex.qtd; if(apl==="solo") ex.aereo=0; }
-      else o.itens.push({cod,qtd:q,aereo: apl==="aereo"?q : apl==="solo"?0 : null});
-      o.solo.feito=false; o.aereo.feito=false; save(); render(); foco("peItem"); toast(it.nome+" incluído na OS."); break;}
-    case "rmItemOS": o.itens.splice(Number(t.dataset.ix),1); o.solo.feito=false; o.aereo.feito=false; save(); render(); break;
+      const amb=(document.getElementById("peAmb")||{}).value||A.id;
+      const obs=(document.getElementById("peObs")||{}).value||"";
+      if(cod.startsWith("KIT:")){
+        const k=kitById(cod.slice(4)); if(!k) break;
+        k.itens.forEach(x=>{ const ex=o.itens.find(i=>i.cod===x.cod && (i.amb||A.id)===amb);
+          if(ex) ex.qtd+=x.qtd*q;
+          else o.itens.push({id:uid(),cod:x.cod,qtd:x.qtd*q,amb,obs:obs||k.nome,
+            aereo: apl==="aereo"?x.qtd*q : apl==="solo"?0 : null}); });
+        reabrir(amb); save(); render(); foco("peItem");
+        toast(k.nome+" aberto em "+k.itens.length+" linhas."); break;
+      }
+      const ex=o.itens.find(i=>i.cod===cod && (i.amb||A.id)===amb);
+      if(ex){ ex.qtd+=q; if(apl==="aereo") ex.aereo=ex.qtd; if(apl==="solo") ex.aereo=0; if(obs) ex.obs=obs; }
+      else o.itens.push({id:uid(),cod,qtd:q,amb,obs,aereo: apl==="aereo"?q : apl==="solo"?0 : null});
+      reabrir(amb); save(); render(); foco("peItem"); toast(it.nome+" incluído na OS."); break;}
+    case "addAvulso": {
+      const nome=(document.getElementById("pxNome")||{}).value.trim();
+      if(!nome) return toast("Escreva o que é a linha avulsa.");
+      const amb=(document.getElementById("pxAmb")||{}).value||A.id;
+      o.itens.push({id:uid(),cod:null,nome,cat:(document.getElementById("pxCat")||{}).value||"Extras",
+        qtd:Math.max(1,Number((document.getElementById("pxQtd")||{}).value)||1),amb,aereo:null,
+        obs:(document.getElementById("pxObs")||{}).value||""});
+      save(); render(); foco("pxNome"); toast("Linha avulsa incluída."); break;}
+    case "rmItemOS": {const i=o.itens[Number(t.dataset.ix)];
+      o.itens.splice(Number(t.dataset.ix),1); if(i) reabrir(i.amb); save(); render(); break;}
     case "aplOS": {const i=o.itens[Number(t.dataset.ix)], v=t.dataset.v;
+      if(!i||!i.cod) break;
       i.aereo = v==="aereo"? i.qtd : v==="solo"? 0 : null;
-      o.solo.feito=false; o.aereo.feito=false; save(); render(); break;}
+      reabrir(i.amb); save(); render(); break;}
     case "addAnc": {
       const nome=document.getElementById("anNome").value.trim()||"Pontos do local";
       const qtd=Math.max(1,Number(document.getElementById("anQtd").value)||1);
       const wll=Math.max(0,Number(document.getElementById("anWll").value)||0);
-      o.ancoragens=o.ancoragens||[];
-      o.ancoragens.push({id:uid(),nome,qtd,wll});
-      o.aereo.feito=false; save(); render(); foco("anNome"); toast(qtd+" ponto(s) de "+kg(wll)+" kgf cadastrados."); break;}
-    case "rmAnc": o.ancoragens.splice(Number(t.dataset.ix),1); o.aereo.feito=false; save(); render(); break;
+      M.ancoragens=M.ancoragens||[];
+      M.ancoragens.push({id:uid(),nome,qtd,wll});
+      M.aereo.feito=false; save(); render(); foco("anNome"); toast(qtd+" ponto(s) de "+kg(wll)+" kgf cadastrados."); break;}
+    case "rmAnc": M.ancoragens.splice(Number(t.dataset.ix),1); M.aereo.feito=false; save(); render(); break;
   }
 });
 document.addEventListener("input", ev=>{
@@ -3375,14 +3666,29 @@ document.addEventListener("input", ev=>{
     const i=o.itens[Number(el.dataset.osq)]; if(!i) return;
     i.qtd=Math.max(1,Number(el.value)||1);
     if(i.aereo!=null) i.aereo=Math.min(i.aereo,i.qtd);
-    o.solo.feito=false; o.aereo.feito=false; save();
+    const m=memAmb(o,i.amb); m.solo.feito=false; m.aereo.feito=false; save();
+  }
+  if(el.dataset && el.dataset.osobs!==undefined){
+    const i=o.itens[Number(el.dataset.osobs)]; if(!i) return;
+    i.obs=el.value; save();
   }
   if(el.dataset && el.dataset.anc!==undefined){
-    const a=o.ancoragens[Number(el.dataset.anc)]; if(!a) return;
+    const M=memAmb(o,ambAtiva(o).id);
+    const a=M.ancoragens[Number(el.dataset.anc)]; if(!a) return;
     const f=el.dataset.f;
     a[f] = f==="nome" ? el.value : Math.max(0,Number(el.value)||0);
-    o.aereo.feito=false; save();
+    M.aereo.feito=false; save();
   }
+});
+document.addEventListener("change", ev=>{
+  const el=ev.target; if(!can("editar_memorial")) return;
+  if(!el.dataset || el.dataset.osamb===undefined) return;
+  const o=osById(S.sel); if(!o) return;
+  const i=o.itens[Number(el.dataset.osamb)]; if(!i) return;
+  const antes=i.amb; i.amb=el.value;
+  /* a linha mudou de sala: os dois memoriais envolvidos reabrem */
+  [antes,i.amb].forEach(x=>{ const m=memAmb(o,x); m.solo.feito=false; m.aereo.feito=false; });
+  save(); render();
 });
 document.addEventListener("change", ev=>{
   const el=ev.target;
@@ -3627,7 +3933,7 @@ function mRetorno(c){
   modal("Registrar descarga · "+c.id, `
     <p style="margin:0;font-size:12.5px;color:var(--ink2)">Conferência de retorno em <b class="mono">${dtl(c.descarga)}</b>. Informe as avarias — as peças avariadas entram em manutenção e não voltam ao saldo disponível.</p>
     <div class="tblwrap" style="border:1px solid var(--line);border-radius:var(--r2)"><table style="min-width:420px"><thead><tr><th>Item</th><th class="r">Enviado</th><th class="r" style="width:110px">Avarias</th></tr></thead><tbody>
-    ${c.itens.map(i=>`<tr><td>${esc(item(i.cod).nome)}<br><span class="tag">${i.cod}</span></td><td class="r num">${i.qtd}</td>
+    ${c.itens.filter(i=>i.cod).map(i=>`<tr><td>${esc(item(i.cod).nome)}<br><span class="tag">${i.cod}</span></td><td class="r num">${i.qtd}</td>
       <td class="r"><input type="number" min="0" max="${i.qtd}" value="0" data-av="${i.cod}" style="width:82px;text-align:right"></td></tr>`).join("")}
     </tbody></table></div>`,
     `<button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="confirmarRetorno" data-id="${c.id}">Dar entrada no estoque</button>`);
@@ -3646,6 +3952,20 @@ function mMov(m){
 }
 
 /* ---------------- ações ---------------- */
+/* O galpão separa por item, não por sala: o mesmo moving pedido na plenária e
+   numa B.U. sai como uma pilha só, com a divisão anotada na linha. A linha
+   avulsa viaja junto — não mexe em saldo, mas carrega o recado do produtor.
+   A mesma regra está em gerar_ordem_carga, no banco. */
+function romaneioDaOS(o){
+  const as=ambsOS(o), por={}, avulsos=[];
+  o.itens.forEach(i=>{
+    if(!i.cod) return avulsos.push({...i, obs:[nomeAmb(as,i.amb), i.obs].filter(Boolean).join(" · ")});
+    const e=por[i.cod] || (por[i.cod]={cod:i.cod,qtd:0,partes:[]});
+    e.qtd+=i.qtd; e.partes.push(nomeAmb(as,i.amb)+" "+i.qtd);
+  });
+  return [...Object.values(por).map(e=>({cod:e.cod,qtd:e.qtd,
+    obs:e.partes.length>1?e.partes.join(" · "):""})), ...avulsos];
+}
 function gerarOSC(osId){
   const o=osById(osId); if(!o) return;
   if(!prontoParaOSC(o)) return toast("Conclua os dois memoriais e o descritivo antes de gerar a carga.");
@@ -3656,7 +3976,9 @@ function gerarOSC(osId){
     veiculo:(o.logistica&&o.logistica.viagens.length)?o.logistica.viagens.map(v=>veic(v.cod).nome+" · "+veic(v.cod).placa).join(" + "):"A definir na roteirização",
     equipe:(o.logistica&&o.logistica.viagens.length)?o.logistica.viagens.reduce((s,v)=>s+v.equipe.length,0)+" pessoas em "+o.logistica.viagens.length+" veículo(s)":"A escalar",
     conferente:PERFIS.estoque.nome,
-    itens:o.itens.map(i=>({...i})),obs:"Gerada automaticamente a partir de "+o.id+" pela produção."});
+    ambientes:(o.ambientes||[]).map(a=>({...a})),
+    itens:romaneioDaOS(o),
+    obs:"Gerada automaticamente a partir de "+(o.codigo||o.id)+" pela produção."});
   o.status="Liberada"; o.etapaAtual="pronto";
   fluxo(osId, "Ordem de carga "+id+" emitida a partir de "+o.id+". Carga em "+dtl(o.montagem)+", descarga em "+dtl(o.desmontagem)+".",
     ["gerencia","estoque","producao"], "cargas", id, false);
@@ -3664,16 +3986,17 @@ function gerarOSC(osId){
 }
 function confirmarCarga(id){
   const c=oscById(id); if(!c) return;
-  const falta=c.itens.filter(i=>{const it=item(i.cod);return it.total-it.manut-reservado(i.cod,c.carga,c.descarga,c.id)<i.qtd;});
+  const falta=c.itens.filter(i=>{ if(!i.cod) return false; const it=item(i.cod);
+    return it.total-it.manut-reservado(i.cod,c.carga,c.descarga,c.id)<i.qtd;});
   if(falta.length) return toast("Sem saldo para "+item(falta[0].cod).nome+" nesta janela.");
   c.status="Carregada";
   S.seq.mov++;
   const o=c.osId?osById(c.osId):null;
   S.movs.push({id:"M-"+S.seq.mov,data:c.carga,tipo:"SAÍDA",oscId:c.id,ref:o?o.evento:c.evento||c.id,
-    linhas:c.itens.map(i=>[i.cod,i.qtd]),user:PERFIS[S.role].nome});
-  fluxo(c.osId, "Carga confirmada em "+dtl(c.carga)+": "+c.itens.reduce((s,i)=>s+i.qtd,0)+" peças baixadas do estoque pela ordem "+c.id+".",
+    linhas:c.itens.filter(i=>i.cod).map(i=>[i.cod,i.qtd]),user:PERFIS[S.role].nome});
+  fluxo(c.osId, "Carga confirmada em "+dtl(c.carga)+": "+c.itens.filter(i=>i.cod).reduce((s,i)=>s+i.qtd,0)+" peças baixadas do estoque pela ordem "+(c.codigo||c.id)+".",
     ["gerencia","producao","estoque"], "cargas", c.id, false);
-  save(); render(); toast("Baixa lançada em "+dtl(c.carga)+" · "+c.itens.reduce((s,i)=>s+i.qtd,0)+" peças saíram do galpão.");
+  save(); render(); toast("Baixa lançada em "+dtl(c.carga)+" · "+c.itens.filter(i=>i.cod).reduce((s,i)=>s+i.qtd,0)+" peças saíram do galpão.");
 }
 function confirmarRetorno(id){
   const c=oscById(id); if(!c) return;
@@ -3684,7 +4007,7 @@ function confirmarRetorno(id){
   S.seq.mov++;
   const o=c.osId?osById(c.osId):null;
   S.movs.push({id:"M-"+S.seq.mov,data:c.descarga,tipo:"ENTRADA",oscId:c.id,ref:o?o.evento:c.evento||c.id,
-    linhas:c.itens.map(i=>[i.cod,i.qtd-((av.find(a=>a[0]===i.cod)||[0,0])[1])]),user:PERFIS[S.role].nome, avarias:av.length?av:undefined});
+    linhas:c.itens.filter(i=>i.cod).map(i=>[i.cod,i.qtd-((av.find(a=>a[0]===i.cod)||[0,0])[1])]),user:PERFIS[S.role].nome, avarias:av.length?av:undefined});
   if(o) o.status="Encerrada";
   fluxo(c.osId, "Descarga registrada em "+dtl(c.descarga)+" pela ordem "+c.id+"."+(av.length?" "+av.reduce((s,a)=>s+a[1],0)+" peça(s) seguiram para manutenção.":" Retorno sem avarias."),
     ["gerencia","producao","estoque"], "movimentos", null, av.length>0);
@@ -3712,25 +4035,30 @@ function salvarOSV(){
 }
 
 /* ---------------- recálculo ao vivo ---------------- */
+/* com várias salas, a mensagem diz quantas ainda faltam em vez de dar por encerrado */
+function faltaMemorial(o,k){
+  const as=ambsOS(o); if(as.length<2) return "";
+  const faltam=as.filter(a=>!memAmb(o,a.id)[k].feito);
+  if(!faltam.length) return (k==="solo"?"Memorial de solo":"Memorial aéreo")+" fechado nas "+as.length+" salas.";
+  return "Falta "+(k==="solo"?"o memorial de solo":"o memorial aéreo")+" de "+faltam.map(a=>a.nome).join(", ")+".";
+}
 function liveCalc(el){
   const o=osById(S.sel); if(!o) return;
+  const A=ambAtiva(o), m=memAmb(o,A.id);
   const grupo=el.dataset.calc, k=el.dataset.k;
   const val = el.type==="checkbox" ? el.checked : Number(el.value);
-  o[grupo][k]=val;
-  o[grupo].feito=false;
-  if(grupo==="solo"&&k==="area") o.area=val;
-  if(grupo==="solo"){ const r=calcSolo(o); $("#soloRes").innerHTML=soloRes(r,o.solo); $("#soloVer").innerHTML=soloVer(r); }
-  else { const r=calcAereo(o); $("#aeRes").innerHTML=aeRes(r,o.aereo); $("#aeVer").innerHTML=aeVer(r,o.aereo); }
+  m[grupo][k]=val;
+  m[grupo].feito=false;
+  if(grupo==="solo"&&k==="area"&&A.id===ambsOS(o)[0].id) o.area=val;
+  if(grupo==="solo"){ const r=calcSolo(o,A.id); $("#soloRes").innerHTML=soloRes(r,m.solo); $("#soloVer").innerHTML=soloVer(r); }
+  else { const r=calcAereo(o,A.id); $("#aeRes").innerHTML=aeRes(r,m.aereo); $("#aeVer").innerHTML=aeVer(r,m.aereo); }
   if(el.type==="checkbox"){ save(); render(); return; }
   save();
 }
 
 /* ---------------- eventos ---------------- */
-document.addEventListener("click", ev=>{
-  const t=ev.target.closest("[data-act]");
-  if(!t){ return; }
-  if(t.dataset.act==="fecharModal" && ev.target.closest("[data-stop]") && ev.target.closest("[data-act]")!==t) return;
-  const a=t.dataset.act, id=t.dataset.id;
+function acaoPrincipal(a, id, t){
+  t = t || {dataset:{}};
   switch(a){
     case "go": go(t.dataset.view, id||null); break;
     case "menu": $("#side").classList.toggle("open"); $("#scrim").classList.toggle("on"); break;
@@ -3747,21 +4075,27 @@ document.addEventListener("click", ev=>{
       pintarPick(); foco("fItem"); break;}
     case "rmItem": tmpItens.splice(Number(t.dataset.ix),1); pintarPick(); break;
     case "salvarOSV": salvarOSV(); break;
-    case "fecharSolo": {const o=osById(id); const r=calcSolo(o);
-      if(pendentes(o).length) return toast(pendentes(o).length+" linha(s) do escopo ainda sem aplicação definida.");
+    case "fecharSolo": {const o=osById(id); const A=ambAtiva(o), m=memAmb(o,A.id);
+      const r=calcSolo(o,A.id), pend=itensAmb(o,A.id).filter(indefinida);
+      const sufixo=ambsOS(o).length>1?" · "+A.nome:"";
+      if(pend.length) return toast(pend.length+" linha(s) do escopo ainda sem aplicação definida"+(sufixo?" em "+A.nome:"")+".");
       if(!r.ok) return toast("Memorial reprovado — ajuste os apoios antes de concluir.");
-      o.solo.feito=true; if(o.status==="Aguardando produção") o.status="Em produção";
-      fluxo(o.id,"Memorial de cálculo de solo concluído: "+dec(r.dTot,1)+" kgf/m² sobre limite de "+dec(o.solo.adm,0)+" kgf/m² ("+(r.util*100).toFixed(0)+"%).",["gerencia","producao"],"producao",o.id,false);
-      save(); render(); toast("Memorial de solo concluído."); break;}
-    case "fecharAereo": {const o=osById(id); const r=calcAereo(o);
-      if(pendentes(o).length) return toast(pendentes(o).length+" linha(s) do escopo ainda sem aplicação definida.");
+      m.solo.feito=true; if(o.status==="Aguardando produção") o.status="Em produção";
+      fluxo(o.id,"Memorial de cálculo de solo concluído"+sufixo+": "+dec(r.dTot,1)+" kgf/m² sobre limite de "+dec(m.solo.adm,0)+" kgf/m² ("+(r.util*100).toFixed(0)+"%).",["gerencia","producao"],"producao",o.id,false);
+      save(); render();
+      toast(faltaMemorial(o,"solo")||"Memorial de solo concluído"+sufixo+"."); break;}
+    case "fecharAereo": {const o=osById(id); const A=ambAtiva(o), m=memAmb(o,A.id);
+      const r=calcAereo(o,A.id), pend=itensAmb(o,A.id).filter(indefinida);
+      const sufixo=ambsOS(o).length>1?" · "+A.nome:"";
+      if(pend.length) return toast(pend.length+" linha(s) do escopo ainda sem aplicação definida"+(sufixo?" em "+A.nome:"")+".");
       if(!r.apoiadoSolo && !r.n) return toast("Cadastre os pontos de ancoragem antes de concluir o memorial aéreo.");
       if(!r.ok && !r.apoiadoSolo) return toast("Rigging reprovado — ajuste pontos, WLL ou acessórios.");
-      o.aereo.feito=true; if(o.status==="Aguardando produção") o.status="Em produção";
-      fluxo(o.id, r.apoiadoSolo?"Memorial aéreo concluído: grid apoiado em torres de solo, sem içamento em pontos do local."
-        :"Memorial aéreo concluído: "+dec(r.porPonto,0)+" kgf por ponto em "+r.n+" pontos ("+(r.util*100).toFixed(0)+"% do WLL) · FS "+dec(r.fs,1)+":1.",
+      m.aereo.feito=true; if(o.status==="Aguardando produção") o.status="Em produção";
+      fluxo(o.id, (r.apoiadoSolo?"Memorial aéreo concluído"+sufixo+": grid apoiado em torres de solo, sem içamento em pontos do local."
+        :"Memorial aéreo concluído"+sufixo+": "+dec(r.porPonto,0)+" kgf por ponto em "+r.n+" pontos ("+(r.util*100).toFixed(0)+"% do WLL) · FS "+dec(r.fs,1)+":1."),
         ["gerencia","producao"],"producao",o.id,false);
-      save(); render(); toast("Memorial aéreo concluído."); break;}
+      save(); render();
+      toast(faltaMemorial(o,"aereo")||"Memorial aéreo concluído"+sufixo+"."); break;}
     case "modelo": {const o=osById(id); $("#descTxt").value=MODELO(o); break;}
     case "salvarDesc": {const o=osById(id); o.descritivo=$("#descTxt").value;
       if(o.status==="Aguardando produção") o.status="Em produção"; save(); render();
@@ -3775,6 +4109,12 @@ document.addEventListener("click", ev=>{
     case "confirmarRetorno": confirmarRetorno(id); break;
     case "verMov": mMov(S.movs.find(m=>m.id===id)); break;
   }
+}
+document.addEventListener("click", ev=>{
+  const t=ev.target.closest("[data-act]");
+  if(!t){ return; }
+  if(t.dataset.act==="fecharModal" && ev.target.closest("[data-stop]") && ev.target.closest("[data-act]")!==t) return;
+  acaoPrincipal(t.dataset.act, t.dataset.id, t);
 });
 document.addEventListener("input", ev=>{
   const el=ev.target;
@@ -3917,6 +4257,13 @@ function mapNegocio(n){
       cargaPiso:num(s.carga_piso),energia:num(s.energia_kva),pontos:s.pontos||0,acesso:s.acesso||"",
       elevador:!!s.elevador,obs:s.observacao||""}); }
   (n.briefing_blocos||[]).forEach(x=>{ if(b[x.bloco]){ b[x.bloco].tem=x.incluso; b[x.bloco].porte=x.porte||b[x.bloco].porte; b[x.bloco].obs=x.observacao||""; }});
+  /* a plenária é o ambiente principal e já está em b.sala; aqui vêm as demais */
+  const ambs=(n.negocio_ambientes||[]).slice().sort((x,y)=>x.ordem-y.ordem);
+  const princ=ambs.find(x=>x.principal);
+  if(princ) b.sala.nome = princ.nome || b.sala.nome;
+  b.ambientes = ambs.filter(x=>!x.principal).map(x=>({id:x.id, nome:x.nome, area:num(x.area_m2),
+    peDireito:num(x.pe_direito), cargaPiso:num(x.carga_piso), energia:num(x.energia_kva),
+    pontos:x.pontos||0, obs:x.observacao||""}));
   const vt=vazioVT();
   if(n.visitas_tecnicas){ const v=n.visitas_tecnicas;
     Object.assign(vt,{feita:v.realizada,data:v.data||"",hora:v.hora||"",resumo:v.resumo||""}); }
@@ -3938,8 +4285,11 @@ function mapNegocio(n){
   if(n.orcamentos){ const o=n.orcamentos;
     Object.assign(orc,{desconto:num(o.desconto),condicoes:o.condicoes||"",validade:o.validade||"",
       obsGeral:o.observacao||"",probabilidade:o.probabilidade,previsao:o.previsao||"",concorrentes:o.concorrentes||""}); }
+  const idPlen = princ ? princ.id : null;
   orc.linhas=(n.orcamento_linhas||[]).sort((a,c)=>a.ordem-c.ordem).map(l=>({id:l.id,tipo:l.tipo,cod:l.item_cod,
     nome:l.descricao,cat:l.categoria,qtd:num(l.quantidade),dias:l.diarias,unit:num(l.valor_unitario),
+    /* no banco a plenária tem uuid; no app ela é PLENARIA */
+    amb:(!l.ambiente_id||l.ambiente_id===idPlen)?PLENARIA:l.ambiente_id,
     modo:l.cobranca,fornecedor:l.fornecedor||"",obs:l.observacao||""}));
   return {id:n.id, codigo:n.codigo, titulo:n.titulo, cliente:n.cliente_id, etapa:n.etapa,
     temp:n.temperatura, recorrente:n.recorrente, eventosAnteriores:n.eventos_anteriores,
@@ -3957,7 +4307,22 @@ function mapNegocio(n){
          concorrentes:orc.concorrentes,probabilidade:orc.probabilidade,previsao:orc.previsao}};
 }
 function mapOS(o){
-  const m=o.os_memorial||{};
+  /* o memorial agora é um por ambiente; a plenária vira o da OS e as demais entram em .mem */
+  const memos=[].concat(o.os_memorial||[]);
+  const ambs=(o.os_ambientes||[]).slice().sort((a,b)=>a.ordem-b.ordem);
+  const idPlen=(ambs.find(a=>a.principal)||ambs[0]||{}).id;
+  const memDe=id=>memos.find(x=>x.ambiente_id===id)||{};
+  const ancDe=id=>(o.os_ancoragens||[]).filter(x=>x.ambiente_id===id)
+    .map(a=>({id:a.id,nome:a.nome,qtd:a.quantidade,wll:num(a.wll_kgf)}));
+  const soloDe=x=>({area:num(x.area_apoio),adm:num(x.carga_admissivel),admPont:num(x.carga_pontual_admissivel),
+    publicoKgm2:num(x.sobrecarga_publico),apoios:x.apoios_por_equipamento||4,
+    torres:!!x.torre_solo,feito:!!x.solo_concluido});
+  const aereoDe=x=>({pontos:0,wllPonto:0,fd:num(x.fator_dinamico)||1.2,fdes:num(x.fator_desbalanceamento)||1.25,
+    wllAcess:num(x.wll_acessorio)||2000,fsMin:num(x.fs_minimo)||5,vao:num(x.vao_livre)||10,
+    feito:!!x.aereo_concluido});
+  /* no app a plenária tem id fixo; as B.U. ficam com o uuid do banco */
+  const appId=id=>id===idPlen?PLENARIA:id;
+  const m=memDe(idPlen);
   return {id:o.id, codigo:o.codigo, negId:o.negocio_id, cliente:o.cliente_id, evento:o.evento,
     local:o.local_nome||"", cidade:o.cidade||"", publico:o.publico||0, area:num(o.area_m2),
     montagem:o.montagem, evIni:o.evento_inicio||o.montagem, evFim:o.evento_fim||o.evento_inicio||o.montagem,
@@ -3966,8 +4331,13 @@ function mapOS(o){
     produtores:(o.os_produtores||[]).sort((a,b)=>(b.responsavel?1:0)-(a.responsavel?1:0)).map(p=>p.perfil_id),
     produtor:"",
     itens:(o.os_itens||[]).map(i=>({id:i.id,cod:i.item_cod,qtd:i.quantidade,
+      nome:i.descricao||"", cat:i.categoria||"", amb:appId(i.ambiente_id),
       aereo:i.quantidade_aerea===null?null:i.quantidade_aerea, obs:i.observacao||""})),
-    ancoragens:(o.os_ancoragens||[]).map(a=>({id:a.id,nome:a.nome,qtd:a.quantidade,wll:num(a.wll_kgf)})),
+    ambientes:(ambs.length?ambs:[{id:idPlen,nome:"Plenária",principal:true}])
+      .map(a=>({id:appId(a.id),nome:a.nome,principal:!!a.principal})),
+    ancoragens:ancDe(idPlen),
+    mem:Object.fromEntries(ambs.filter(a=>!a.principal).map(a=>[a.id,{
+      solo:soloDe(memDe(a.id)), aereo:aereoDe(memDe(a.id)), ancoragens:ancDe(a.id)}])),
     solo:{area:num(m.area_apoio),adm:num(m.carga_admissivel),admPont:num(m.carga_pontual_admissivel),
           publicoKgm2:num(m.sobrecarga_publico),apoios:m.apoios_por_equipamento||4,
           torres:!!m.torre_solo,feito:!!m.solo_concluido},
@@ -3983,7 +4353,7 @@ function mapOS(o){
 const mapCarga = c => ({id:c.id, codigo:c.codigo, osId:c.os_id, evento:c.evento_avulso||"",
   status:c.status, carga:c.data_carga, horaCarga:c.hora_carga||"", descarga:c.data_descarga,
   veiculo:c.veiculo||"", equipe:c.equipe||"", conferente:"", obs:c.observacao||"",
-  itens:(c.osc_itens||[]).map(i=>({cod:i.item_cod,qtd:i.quantidade}))});
+  itens:(c.osc_itens||[]).map(i=>({cod:i.item_cod,nome:i.descricao||"",qtd:i.quantidade,obs:i.observacao||""}))});
 const mapMov = m => ({id:m.id, codigo:m.codigo, data:m.data, tipo:m.tipo==="SAIDA"?"SAÍDA":"ENTRADA",
   oscId:m.ordem_carga_id, ref:m.referencia||"", quem:m.usuario_id, user:"",
   linhas:(m.movimento_linhas||[]).map(l=>[l.item_cod,l.quantidade]),
@@ -4000,7 +4370,7 @@ async function carregarTudo(){
          canais, msgs, posts, notas, comps, notifs] = await Promise.all([
     q("perfis"), q("clientes"), q("v_itens"),
     q("kits","*, kit_itens(item_cod, quantidade)"), q("frota"),
-    q("negocios", `*, negocio_sala(*), briefing_blocos(*), briefing_notas(*),
+    q("negocios", `*, negocio_sala(*), negocio_ambientes(*), briefing_blocos(*), briefing_notas(*),
         visitas_tecnicas(*), vt_participantes(perfil_id), vt_checklist(*), vt_fotos(*),
         projetos_3d(*), orcamentos(*), orcamento_linhas(*),
         fechamentos(*), fechamento_participantes(perfil_id), fechamento_pauta(*)`),
@@ -4008,14 +4378,14 @@ async function carregarTudo(){
       if(r.error||!r.data.length) return r;
       const ids=r.data.map(x=>x.id);
       const det = await sb.from("ordens_venda").select(
-        `id, os_produtores(perfil_id,responsavel), os_itens(*), os_ancoragens(*), os_memorial(*),
+        `id, os_produtores(perfil_id,responsavel), os_ambientes(*), os_itens(*), os_ancoragens(*), os_memorial(*),
          os_logistica(observacao), os_viagens(*, viagem_equipe(*))`).in("id",ids);
       if(det.error) return det;
       const byId={}; det.data.forEach(d=>byId[d.id]=d);
       r.data.forEach(o=>Object.assign(o, byId[o.id]||{}));
       return r;
     }),
-    q("ordens_carga","*, osc_itens(item_cod, quantidade)"),
+    q("ordens_carga","*, osc_itens(item_cod, descricao, quantidade, observacao)"),
     q("movimentos","*, movimento_linhas(item_cod, quantidade, avaria)"),
     q("canais","*, canal_membros(perfil_id, lido_em)"), q("mensagens"),
     q("posts","*, post_curtidas(perfil_id), post_comentarios(*)"),
@@ -4185,7 +4555,25 @@ async function syncNegocios(){
       valor:n.valor||0,os_id:nz(n.osId)});
     if(r.error) throw r.error;
 
-    if(!a || !igual(n.brief.sala,a.brief.sala)){
+    if(!a || !igual(n.brief.sala,a.brief.sala) || !igual(n.brief.ambientes,a.brief.ambientes)){
+      r=await sb.from("negocio_ambientes").upsert({negocio_id:n.id,nome:n.brief.sala.nome||"Plenária",
+        principal:true,area_m2:n.brief.sala.area,pe_direito:n.brief.sala.peDireito,
+        carga_piso:n.brief.sala.cargaPiso,energia_kva:n.brief.sala.energia,
+        pontos:n.brief.sala.pontos,observacao:nz(n.brief.sala.obs),ordem:0},
+        {onConflict:"negocio_id,nome"});
+      if(r.error) throw r.error;
+      const extras=(n.brief.ambientes||[]);
+      if(extras.length){
+        r=await sb.from("negocio_ambientes").upsert(extras.map((x,i)=>({id:x.id,negocio_id:n.id,nome:x.nome||("Sala "+(i+2)),
+          principal:false,area_m2:x.area||0,pe_direito:x.peDireito||0,carga_piso:x.cargaPiso||500,
+          energia_kva:x.energia||0,pontos:x.pontos||0,observacao:nz(x.obs),ordem:i+1})));
+        if(r.error) throw r.error;
+      }
+      /* sala apagada no app sai do banco também */
+      const vivos=extras.map(x=>x.id);
+      r=await sb.from("negocio_ambientes").delete().eq("negocio_id",n.id).eq("principal",false)
+        .not("id","in","("+(vivos.length?vivos.map(v=>'"'+v+'"').join(","):'"00000000-0000-0000-0000-000000000000"')+")");
+      if(r.error) throw r.error;
       r=await sb.from("negocio_sala").upsert({negocio_id:n.id,area_m2:n.brief.sala.area,
         pe_direito:n.brief.sala.peDireito,ancoragem:n.brief.sala.ancoragem,carga_piso:n.brief.sala.cargaPiso,
         energia_kva:n.brief.sala.energia,pontos:n.brief.sala.pontos,acesso:nz(n.brief.sala.acesso),
@@ -4241,7 +4629,13 @@ async function syncOrcamento(n){
   if(r.error) throw r.error;
   r=await sb.from("orcamento_linhas").delete().eq("negocio_id",n.id); if(r.error) throw r.error;
   if(n.orc.linhas.length){
+    /* a plenária é PLENARIA no app e uuid no banco; a tradução é aqui */
+    const pl=await sb.from("negocio_ambientes").select("id").eq("negocio_id",n.id).eq("principal",true);
+    if(pl.error) throw pl.error;
+    const idPlen=(pl.data&&pl.data[0])?pl.data[0].id:null;
+    const amb=l=>{ const a=ambDaLinha(l); return a===PLENARIA?idPlen:a; };
     r=await sb.from("orcamento_linhas").insert(n.orc.linhas.map((l,i)=>({negocio_id:n.id,tipo:l.tipo,
+      ambiente_id:amb(l),
       item_cod:l.tipo==="estoque"?l.cod:null,descricao:l.nome,categoria:l.cat,quantidade:l.qtd,
       diarias:Math.max(1,l.dias||1),valor_unitario:l.unit||0,cobranca:l.modo||"diaria",
       fornecedor:nz(l.fornecedor),observacao:nz(l.obs),ordem:i})));
@@ -4279,26 +4673,47 @@ async function syncOS(){
       if(o.produtores.length){ r=await sb.from("os_produtores").insert(
         o.produtores.map((p,i)=>({os_id:o.id,perfil_id:p,responsavel:i===0}))); if(r.error) throw r.error; }
     }
+    /* as salas primeiro: elas são a chave de tudo o que vem depois */
+    const as=ambsOS(o);
+    r=await sb.from("os_ambientes").upsert(as.map((x,i)=>({os_id:o.id,nome:x.nome,
+      principal:i===0,ordem:i})), {onConflict:"os_id,nome"});
+    if(r.error) throw r.error;
+    const reg=await sb.from("os_ambientes").select("id,nome,principal,ordem").eq("os_id",o.id);
+    if(reg.error) throw reg.error;
+    const vivos=as.map(x=>x.nome);
+    r=await sb.from("os_ambientes").delete().eq("os_id",o.id).not("nome","in",
+      "("+vivos.map(v=>'"'+String(v).replace(/"/g,'')+'"').join(",")+")");
+    if(r.error) throw r.error;
+    /* do id do app para o id do banco, pela ordem */
+    const noBanco={}; as.forEach((x,i)=>{
+      const achado=(reg.data||[]).find(y=>y.nome===x.nome) || (reg.data||[])[i];
+      if(achado) noBanco[x.id]=achado.id; });
+
     if(!a || !igual(o.itens,a.itens)){
       r=await sb.from("os_itens").delete().eq("os_id",o.id); if(r.error) throw r.error;
-      if(o.itens.length){ r=await sb.from("os_itens").insert(o.itens.map(i=>({os_id:o.id,item_cod:i.cod,
+      if(o.itens.length){ r=await sb.from("os_itens").insert(o.itens.map(i=>({os_id:o.id,
+        ambiente_id:noBanco[i.amb||as[0].id]||noBanco[as[0].id],
+        item_cod:i.cod||null, descricao:i.cod?null:(i.nome||"Linha avulsa"), categoria:i.cod?null:nz(i.cat),
         quantidade:i.qtd,quantidade_aerea:i.aereo==null?null:i.aereo,observacao:nz(i.obs)})));
         if(r.error) throw r.error; }
     }
-    if(!a || !igual(o.ancoragens,a.ancoragens)){
-      r=await sb.from("os_ancoragens").delete().eq("os_id",o.id); if(r.error) throw r.error;
-      if((o.ancoragens||[]).length){ r=await sb.from("os_ancoragens").insert(
-        o.ancoragens.map(x=>({os_id:o.id,nome:x.nome,quantidade:x.qtd,wll_kgf:x.wll})));
-        if(r.error) throw r.error; }
+    /* memorial e ancoragens de cada sala */
+    r=await sb.from("os_ancoragens").delete().eq("os_id",o.id); if(r.error) throw r.error;
+    const linhasAnc=[], memoriais=[];
+    for(const x of as){
+      const bid=noBanco[x.id]; if(!bid) continue;
+      const m=memAmb(o,x.id);
+      (m.ancoragens||[]).forEach(p=>linhasAnc.push({os_id:o.id,ambiente_id:bid,
+        nome:p.nome,quantidade:p.qtd,wll_kgf:p.wll}));
+      memoriais.push({ambiente_id:bid,os_id:o.id,area_apoio:m.solo.area,carga_admissivel:m.solo.adm,
+        carga_pontual_admissivel:m.solo.admPont,sobrecarga_publico:m.solo.publicoKgm2,
+        apoios_por_equipamento:m.solo.apoios,torre_solo:!!m.solo.torres,solo_concluido:!!m.solo.feito,
+        fator_dinamico:m.aereo.fd,fator_desbalanceamento:m.aereo.fdes,wll_acessorio:m.aereo.wllAcess,
+        fs_minimo:m.aereo.fsMin,vao_livre:m.aereo.vao,aereo_concluido:!!m.aereo.feito});
     }
-    if(!a || !igual(o.solo,a.solo) || !igual(o.aereo,a.aereo)){
-      r=await sb.from("os_memorial").upsert({os_id:o.id,area_apoio:o.solo.area,carga_admissivel:o.solo.adm,
-        carga_pontual_admissivel:o.solo.admPont,sobrecarga_publico:o.solo.publicoKgm2,
-        apoios_por_equipamento:o.solo.apoios,torre_solo:!!o.solo.torres,solo_concluido:!!o.solo.feito,
-        fator_dinamico:o.aereo.fd,fator_desbalanceamento:o.aereo.fdes,wll_acessorio:o.aereo.wllAcess,
-        fs_minimo:o.aereo.fsMin,vao_livre:o.aereo.vao,aereo_concluido:!!o.aereo.feito});
-      if(r.error) throw r.error;
-    }
+    if(linhasAnc.length){ r=await sb.from("os_ancoragens").insert(linhasAnc); if(r.error) throw r.error; }
+    if(memoriais.length){ r=await sb.from("os_memorial").upsert(memoriais,{onConflict:"ambiente_id"});
+      if(r.error) throw r.error; }
     if(!a || !igual(o.logistica,a.logistica)) await syncLogistica(o);
   }
 }
@@ -4328,7 +4743,8 @@ async function syncCargas(){
     if(!a || !igual(c.itens,a.itens)){
       r=await sb.from("osc_itens").delete().eq("ordem_carga_id",c.id); if(r.error) throw r.error;
       if(c.itens.length){ r=await sb.from("osc_itens").insert(c.itens.map(i=>({ordem_carga_id:c.id,
-        item_cod:i.cod,quantidade:i.qtd}))); if(r.error) throw r.error; }
+        item_cod:i.cod||null, descricao:i.cod?null:(i.nome||"Linha avulsa"),
+        quantidade:i.qtd, observacao:nz(i.obs)}))); if(r.error) throw r.error; }
     }
   }
 }
