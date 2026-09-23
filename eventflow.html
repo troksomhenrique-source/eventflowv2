@@ -1574,7 +1574,8 @@ function vNotas(){
 .tabs{display:flex;gap:2px;background:var(--surface2);border:1px solid var(--line);border-radius:var(--r2);padding:2px}
 .tabs button{background:none;border:0;padding:5px 12px;border-radius:4px;cursor:pointer;font-family:var(--disp);font-size:12px;font-weight:600;color:var(--ink2)}
 .tabs button.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadowUp)}
-@media (max-width:700px){.cal .cell{min-height:64px;padding:5px}.cal .ev,.cal .more{display:none}.cal .dots{display:flex;gap:3px;flex-wrap:wrap}}
+.agenda-layout>div>.between{flex-wrap:wrap;gap:8px}
+@media (max-width:700px){.agenda-layout{grid-template-columns:1fr!important}.cal .cell{min-height:64px;padding:5px}.cal .ev,.cal .more{display:none}.cal .dots{display:flex;gap:3px;flex-wrap:wrap}}
 </style>
 <script>
 /* ================= AGENDA ================= */
@@ -1591,7 +1592,7 @@ function vAgendaCal(){
   const sel=S.agendaDia||HOJE;
   const lista=compromissosDo(sel);
   return `${agendaHead()}
-  <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:14px;align-items:start">
+  <div class="grid agenda-layout" style="grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:14px;align-items:start">
     <div>
       <div class="between" style="margin-bottom:10px">
         <div class="flex" style="gap:6px"><button class="btn sm" data-act="mes" data-n="-1">←</button>
@@ -6545,6 +6546,64 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-wa]'
  }}catch(err){WC.error=wcError(err);wcStatus(WC.error,true);toast(WC.error);}
 });
 </script>
+<style>
+.integracao-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,.7fr);gap:18px}.integracao-passos{padding-left:22px;line-height:1.7}.integracao-passos li{margin:10px 0}.integracao-link{display:flex;gap:8px;align-items:center}.integracao-link input{min-width:0;flex:1;font-family:var(--mono);font-size:11px}.integracao-info{padding:13px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;font-size:12px;line-height:1.6}.integracao-status{min-height:24px;margin-top:12px;font-size:12px}.integracao-status.erro{color:var(--crit)}.miro-shell{height:calc(100dvh - 195px);min-height:480px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}.miro-shell iframe{display:block;width:100%;height:100%;border:0}.miro-empty{padding:65px 24px;text-align:center;max-width:700px;margin:auto}.miro-empty .miro-icon{display:grid;place-items:center;width:70px;height:70px;border-radius:18px;background:#fff1a8;color:#292824;font-size:32px;margin:0 auto 18px}.miro-empty p{color:var(--ink2);line-height:1.7}.miro-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.miro-head .grow{flex:1}.miro-head h2{margin:0 0 4px}.miro-foot{font-size:12px;line-height:1.5;color:var(--ink3);margin-top:10px}
+@media(max-width:700px){.integracao-grid{grid-template-columns:1fr}.integracao-link{flex-wrap:wrap}.integracao-link input{flex-basis:100%}.miro-shell{height:65dvh;min-height:380px}.miro-empty{padding:35px 18px}.agenda-integracao-head{align-items:flex-start!important;gap:10px;flex-wrap:wrap}}
+</style>
+<script>
+/* Integrações: assinatura de calendário e quadro Miro. Nenhum segredo de servidor no HTML. */
+const GAGENDA={status:null,busy:false,message:'',error:false};
+const MIRO={config:null,loaded:false,busy:false,error:'',loadingBoard:false};
+const integracaoErro=e=>['PGRST202','42P01','42703'].includes(e?.code)?'Aplique a atualização 0010 no Supabase para ativar esta área.':e?.message||'Não foi possível concluir. Tente novamente.';
+async function integracaoRpc(name,args){const r=await sb.rpc(name,args);if(r.error)throw r.error;return r.data;}
+const agendaHeadIntegracoes=agendaHead;
+agendaHead=function(){return `<div class="between agenda-integracao-head">${agendaHeadIntegracoes()}<button class="btn" data-integ="googleAbrir" style="margin-bottom:12px">Google Agenda ↗</button></div>`;};
+const navOperacao= NAV.find(g=>g.g==='Operação');if(navOperacao){const ag=navOperacao.items.find(x=>x.id==='agenda');if(ag)ag.t='Agenda';navOperacao.items.push({id:'organograma',t:'Organograma',roles:['gerencia','producao','estoque'],ic:'users'});}
+TITLES.organograma=['Organograma','Estrutura da equipe · quadro Miro'];
+window.VEXTRA.organograma=()=>vOrganograma();
+Object.assign(ADMIN_TABLES,{agenda_assinaturas:'Integração · Google Agenda',organograma_miro:'Organograma · Miro'});
+function googleFeedURL(){const token=GAGENDA.status?.token;if(!/^[0-9a-f]{64}$/.test(token||''))return '';return SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/agenda-feed?token='+encodeURIComponent(token);}
+function googleAgendaModal(){const s=GAGENDA.status,active=!!s?.ativa,url=googleFeedURL(),role=S.role;
+ modal('Conectar ao Google Agenda',`<div class="integracao-grid"><div><p>Veja seus compromissos do EventFlow também no Google Agenda. As alterações continuam sendo feitas no ERP.</p>
+ <div class="field"><label for="gaEscopo">O que aparece no Google</label><select id="gaEscopo" ${GAGENDA.busy?'disabled':''}><option value="meus" ${s?.escopo!=='equipe'?'selected':''}>Meus compromissos e operações</option>${role==='gerencia'?`<option value="equipe" ${s?.escopo==='equipe'?'selected':''}>Agenda de toda a equipe</option>`:''}</select></div>
+ <p class="hint">Compromissos criados por você ou atribuídos a você, etapas das suas OS e cargas relacionadas. Para estoque, inclui a agenda de cargas do setor. Período: últimos 90 dias e próximos 2 anos.</p>
+ <button class="btn pri" data-integ="googleAtivar" ${GAGENDA.busy?'disabled':''}>${GAGENDA.busy?'Aguarde…':active?'Aplicar seleção':'Gerar link privado'}</button>
+ ${active?`<div style="margin-top:20px"><span class="pill ok">Link ativo</span><ol class="integracao-passos"><li>Copie o link privado abaixo.<div class="integracao-link"><input id="gaLink" value="${esc(url)}" readonly aria-label="Link privado da agenda"><button class="btn sm" data-integ="googleCopiar">Copiar link</button></div></li><li>Abra o Google Agenda no computador e escolha <b>Outras agendas → + → Do URL</b>.<br><a class="btn sm" href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noopener noreferrer">Abrir Google Agenda ↗</a></li><li>Cole o link e clique em <b>Adicionar agenda</b>. Ela também aparecerá no aplicativo do celular.</li></ol></div>`:''}
+ </div><div><div class="integracao-info"><b>Como as atualizações funcionam</b><p>O Google consulta o link periodicamente. A atualização pode demorar e não é controlada pelo EventFlow. Editar no Google não altera o ERP.</p><p>OS e cargas usam janelas de referência de 1 hora, iguais aos horários operacionais exibidos na agenda. Confira a ordem para a programação completa.</p><b>Seu link é privado</b><p>Quem tiver esse link poderá consultar os eventos exportados. Não compartilhe em grupos nem publique no GitHub.</p></div>
+ ${active?`<p class="hint" style="margin-top:15px">Última consulta ao link: ${s.ultima_consulta?esc(new Date(s.ultima_consulta).toLocaleString('pt-BR')):'nenhuma registrada'}. Uma consulta não confirma a assinatura no Google.</p><div class="flex" style="flex-wrap:wrap"><button class="btn sm" data-integ="googleTestar" ${GAGENDA.busy?'disabled':''}>Testar conexão</button><button class="btn sm" data-integ="googleDownload" ${GAGENDA.busy?'disabled':''}>Baixar cópia .ics</button><button class="btn sm" data-integ="googleRenovar" ${GAGENDA.busy?'disabled':''}>Trocar link</button><button class="btn sm" data-integ="googleDesativar" ${GAGENDA.busy?'disabled':''}>Desativar link</button></div>`:''}
+ </div></div><div class="integracao-status ${GAGENDA.error?'erro':''}" id="gaMensagem" role="status">${esc(GAGENDA.message)}</div>`, '<button class="btn" data-act="fecharModal">Fechar</button>');
+}
+async function googleAgendaAbrir(){if(GAGENDA.busy)return;GAGENDA.busy=true;GAGENDA.message='';try{GAGENDA.status=await integracaoRpc('agenda_assinatura_status');}catch(e){GAGENDA.status=null;GAGENDA.message=integracaoErro(e);GAGENDA.error=true;}finally{GAGENDA.busy=false;googleAgendaModal();}}
+async function googleConfigurar(ativa=true,renovar=false){if(GAGENDA.busy)return;const scope=document.getElementById('gaEscopo')?.value||GAGENDA.status?.escopo||'meus';
+ if(GAGENDA.status?.ativa&&(renovar||scope!==GAGENDA.status.escopo)&&!confirm('O link anterior deixará de funcionar. Será necessário adicionar o novo link no Google Agenda. Continuar?'))return;
+ if(!ativa&&!confirm('Desativar o link impede novas consultas. Eventos já copiados pelo Google não são apagados automaticamente. Continuar?'))return;
+ GAGENDA.busy=true;GAGENDA.message='';GAGENDA.error=false;googleAgendaModal();try{if(ativa&&!await sincronizar())throw new Error('Salve as alterações pendentes antes de ativar a agenda.');GAGENDA.status=await integracaoRpc('agenda_assinatura_configurar',{p_escopo:scope,p_ativa:ativa,p_renovar:renovar});GAGENDA.message=ativa?'Link pronto. Adicione-o no Google seguindo os passos acima.':'Link desativado. Você pode remover a assinatura no Google Agenda.';}catch(e){GAGENDA.message=integracaoErro(e);GAGENDA.error=true;}finally{GAGENDA.busy=false;googleAgendaModal();}}
+async function googleCopiar(){const url=googleFeedURL();if(!url)return;try{await navigator.clipboard.writeText(url);toast('Link copiado. Cole em “Do URL” no Google Agenda.');}catch{const el=document.getElementById('gaLink');el?.focus();el?.select();toast('Selecione e copie o link com Ctrl+C.');}}
+async function googleVerificar(download=false){if(GAGENDA.busy||!googleFeedURL())return;GAGENDA.busy=true;GAGENDA.message='Consultando a agenda publicada…';GAGENDA.error=false;googleAgendaModal();try{
+ const r=await fetch(googleFeedURL(),{cache:'no-store',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(20000)});if(!r.ok){if(r.status===401||r.status===403)throw new Error('Publique agenda-feed com a verificação de JWT desativada somente nessa função. O link privado faz o controle de acesso.');if(r.status===404)throw new Error('Função agenda-feed ausente ou link desativado. Confira a publicação no Supabase e gere um link válido.');throw new Error('O servidor não conseguiu consultar a agenda. Confira a migração 0010 e a função agenda-feed.');}
+ const text=await r.text();if(!text.startsWith('BEGIN:VCALENDAR'))throw new Error('A resposta do servidor não é um calendário válido.');const count=(text.match(/BEGIN:VEVENT/g)||[]).length;
+ if(download){const blob=new Blob([text],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='eventflow-agenda.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
+ GAGENDA.message=download?`Cópia baixada com ${count} evento(s). Importar este arquivo não cria atualização automática; para isso, use o link.`:`Conexão funcionando: ${count} evento(s) disponíveis. Agora adicione o link no Google Agenda.`;
+ }catch(e){GAGENDA.message=e.name==='TimeoutError'?'A consulta demorou demais. Confira a função no Supabase e tente novamente.':integracaoErro(e);GAGENDA.error=true;}finally{GAGENDA.busy=false;googleAgendaModal();}}
+function miroBoardId(link){const u=new URL(link.trim());if(u.protocol!=='https:'||u.hostname!=='miro.com'||u.username||u.password||u.port)throw new Error('Use o link HTTPS do quadro em miro.com/app/board/…');const m=u.pathname.match(/^\/app\/(?:board|live-embed)\/([^/]+)\/?$/);const id=m?decodeURIComponent(m[1]):'';if(!/^[A-Za-z0-9_=-]{5,128}$/.test(id))throw new Error('Link de quadro inválido. Copie a URL completa do seu quadro no Miro.');return id;}
+function miroURL(embed=false){const c=MIRO.config;if(!c||!/^[A-Za-z0-9_=-]{5,128}$/.test(c.board_id))return '';const url=new URL('https://miro.com/app/'+(embed?'live-embed/':'board/')+encodeURIComponent(c.board_id)+'/');if(embed){url.searchParams.set('autoplay','true');url.searchParams.set('usePostAuth','true');if(c.somente_leitura)url.searchParams.set('embedMode','view_only_without_ui');}return url.href;}
+async function miroCarregar(){if(MIRO.busy)return;MIRO.busy=true;MIRO.error='';try{const r=await sb.from('organograma_miro').select('*').maybeSingle();if(r.error)throw r.error;MIRO.config=r.data||null;MIRO.loaded=true;}catch(e){MIRO.error=integracaoErro(e);}finally{MIRO.busy=false;if(S.view==='organograma')render();}}
+function vOrganograma(){if(!MIRO.loaded&&!MIRO.busy&&!MIRO.error)queueMicrotask(miroCarregar);const c=MIRO.config;
+ if(MIRO.error)return `<div class="card pad"><p role="alert">${esc(MIRO.error)}</p><button class="btn" data-integ="miroAtualizar">Tentar novamente</button></div>`;
+ if(!MIRO.loaded)return '<div class="card pad">Carregando organograma…</div>';
+ if(!c)return `<div class="card"><div class="miro-empty"><div class="miro-icon">▦</div><h2>Organograma da equipe</h2><p>Organize áreas, lideranças e responsabilidades em um quadro do Miro, acessível aqui no EventFlow.</p>${S.role==='gerencia'?`<button class="btn pri" data-integ="miroConfigurar">Vincular quadro do Miro</button><p class="hint">Já tem um quadro? Cole o link para começar. O acesso continua sendo definido no Miro.</p>`:'<p>Peça à gerência para vincular o quadro do organograma.</p>'}</div></div>`;
+ return `<div class="miro-head"><div class="grow"><h2>${esc(c.titulo)}</h2><span class="hint">${c.somente_leitura?'Visualização dentro do EventFlow':'Visualização e edição conforme suas permissões no Miro'}</span></div><a class="btn" href="${esc(miroURL())}" target="_blank" rel="noopener noreferrer">Abrir no Miro ↗</a><button class="btn" data-integ="miroTelaCheia">Tela cheia</button>${S.role==='gerencia'?'<button class="btn" data-integ="miroConfigurar">Configurar</button>':''}</div><div class="miro-shell" id="miroShell"><iframe title="${esc(c.titulo)}" src="${esc(miroURL(true))}" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><p class="miro-foot">Se o quadro pedir acesso, entre na sua conta do Miro pelo botão “Abrir no Miro”. O acesso ao ERP não concede acesso ao quadro. Alterações feitas no quadro são salvas no Miro.</p>`;
+}
+function miroConfigModal(){if(S.role!=='gerencia')return;const c=MIRO.config;modal('Organograma · conectar Miro',`<form id="miroConfigForm"><div class="field"><label for="miroTitulo">Título no EventFlow</label><input id="miroTitulo" required minlength="2" maxlength="100" value="${esc(c?.titulo||'Organograma da equipe')}"></div><div class="field"><label for="miroLink">Link do quadro</label><input id="miroLink" type="url" required placeholder="https://miro.com/app/board/…/" value="${esc(c?miroURL():'')}"></div><label class="flex" style="gap:8px;margin:14px 0"><input id="miroLeitura" type="checkbox" style="width:auto" ${c?.somente_leitura?'checked':''}>Exibir somente para leitura dentro do ERP</label><div class="integracao-info">Cole a URL do quadro, não o código de incorporação. Compartilhe o quadro com as contas certas no Miro; não é necessário torná-lo público. Esta opção de leitura muda a exibição aqui, mas não altera as permissões no próprio Miro.</div><div id="miroMensagem" class="integracao-status erro" role="alert"></div><div class="flex"><button type="submit" class="btn pri">Salvar quadro</button>${c?'<button type="button" class="btn" data-integ="miroRemover">Desvincular</button>':''}</div></form>`,'<button class="btn" data-act="fecharModal">Cancelar</button>');}
+async function miroSalvar(form){const btn=form.querySelector('button[type=submit]');btn.disabled=true;try{const id=miroBoardId(document.getElementById('miroLink').value);await integracaoRpc('organograma_configurar',{p_titulo:document.getElementById('miroTitulo').value.trim(),p_board:id,p_somente_leitura:document.getElementById('miroLeitura').checked});fecharModal();await miroCarregar();toast('Quadro vinculado.');}catch(e){document.getElementById('miroMensagem').textContent=integracaoErro(e);}finally{btn.disabled=false;}}
+document.addEventListener('submit',ev=>{if(ev.target.id==='miroConfigForm'){ev.preventDefault();miroSalvar(ev.target);}});
+document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-integ]');if(!b)return;try{switch(b.dataset.integ){
+ case 'googleAbrir':await googleAgendaAbrir();break;case 'googleAtivar':await googleConfigurar();break;case 'googleCopiar':await googleCopiar();break;
+ case 'googleRenovar':await googleConfigurar(true,true);break;case 'googleDesativar':await googleConfigurar(false);break;case 'googleTestar':await googleVerificar();break;case 'googleDownload':await googleVerificar(true);break;
+ case 'miroConfigurar':miroConfigModal();break;case 'miroAtualizar':await miroCarregar();break;case 'miroTelaCheia':{const el=document.getElementById('miroShell');if(el?.requestFullscreen)await el.requestFullscreen();else toast('Use “Abrir no Miro” para visualizar em uma janela maior.');break;}
+ case 'miroRemover':if(S.role==='gerencia'&&confirm('Desvincular o organograma do EventFlow? O quadro original continuará no Miro.')){await integracaoRpc('organograma_configurar',{p_titulo:null,p_board:null,p_somente_leitura:false});fecharModal();await miroCarregar();}break;
+ }}catch(e){toast(integracaoErro(e));}});
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"></script>
 <script>
 /* =============================================================
@@ -6608,7 +6667,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Peça à gerência para criar seu usuário e definir o perfil."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.4 · migrações 0007 a 0009</span></footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.5 · migrações 0007 a 0010</span></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -7567,7 +7626,7 @@ function ouvirMudancas(){
     .subscribe();
 }
 let suave=null;
-function recarregarSuave(){ clearTimeout(suave); suave=setTimeout(()=>{ if(S.view!=="perfil" && S.view!=="chat" && !gravando && !temAlteracoes() && !document.querySelector("input:focus,textarea:focus,select:focus,#modalHost .modal")) recarregar(); }, 1200); }
+function recarregarSuave(){ clearTimeout(suave); suave=setTimeout(()=>{ if(S.view!=="perfil" && S.view!=="chat" && S.view!=="organograma" && !gravando && !temAlteracoes() && !document.querySelector("input:focus,textarea:focus,select:focus,#modalHost .modal")) recarregar(); }, 1200); }
 
 /* ações do cabeçalho e da tela de login */
 document.addEventListener("click", ev=>{
