@@ -6246,6 +6246,305 @@ function pintarTema(){
 
 /* O boot fica no módulo de dados: primeiro autentica, depois carrega, depois renderiza. */
 </script>
+<style>
+.conta-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.conta-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.conta-fields .wide{grid-column:1/-1}.foto-conta{width:112px;height:112px;border-radius:50%;object-fit:cover;background:var(--surface2);display:grid;place-items:center;font-size:36px;margin:0 auto 14px}
+.conta-info{font-size:12px;color:var(--ink2);line-height:1.5}.perfil-link{display:flex;align-items:center;gap:8px;border:0;background:none;color:inherit;text-align:left;cursor:pointer;padding:0;font:inherit}
+.audit-before,.audit-after{white-space:pre-wrap;word-break:break-word;max-width:400px;font-family:var(--mono);font-size:11px}
+.audit-filters{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.audit-filters .field{flex:1;min-width:135px}
+.conta-message{margin:12px 0;color:var(--ink2);font-size:13px}.conta-message[data-error="true"]{color:var(--crit)}
+@media(max-width:760px){.conta-grid{grid-template-columns:1fr}.conta-fields{grid-template-columns:1fr}.conta-fields .wide{grid-column:auto}}
+</style>
+<script>
+/* Administração somente para consulta; dados particulares em tabela própria. */
+const ONLINE={rows:[],loaded:false,busy:false,error:"",at:null};
+const AUD={rows:[],loaded:false,busy:false,error:"",more:false,filter:{tabela:"",acao:"",busca:"",de:"",ate:""}};
+const MP={data:null,draft:null,busy:false,loading:false,dirty:false,error:"",photoUrl:"",preview:"",photoBlob:null,photoBusy:false};
+const ADMIN_TABLES={perfis:"Pessoas",perfil_detalhes:"Dados de perfil",clientes:"Clientes",itens:"Equipamentos",kits:"Kits",kit_itens:"Itens de kit",frota:"Frota",negocios:"Negócios",negocio_sala:"Sala do briefing",negocio_ambientes:"Ambientes comerciais",briefing_blocos:"Briefing",briefing_notas:"Notas do briefing",visitas_tecnicas:"Visitas técnicas",vt_fotos:"Fotos da visita",orcamentos:"Orçamentos",orcamento_linhas:"Itens do orçamento",fechamentos:"Fechamentos",ordens_venda:"Ordens de serviço",os_ambientes:"Salas da OS",os_itens:"Itens da OS",os_memorial:"Memoriais",os_estruturas:"Estruturas",os_zonas:"Zonas de piso",os_ancoragens:"Ancoragens",os_escala:"Escala",os_veiculo_dias:"Veículos por dia",os_produtores:"Produtores",os_logistica:"Logística",ordens_carga:"Ordens de carga",osc_itens:"Itens da carga",movimentos:"Movimentos",movimento_linhas:"Itens movimentados",freelancers:"Freelancers",reembolsos:"Reembolsos",notas:"Notas",compromissos:"Agenda",mensagens:"Mensagens",posts:"Mural"};
+const AUD_ACTION={INSERT:"Inclusão",UPDATE:"Alteração",DELETE:"Exclusão"};
+const quandoConta=v=>v?new Date(v).toLocaleString("pt-BR"):"—";
+function erroConta(e){return ["PGRST202","PGRST205","42P01"].includes(e?.code)?"Esta área precisa da atualização 0008 no banco. Peça à gerência para aplicá-la.":mensagemErro(e||{});}
+const txtConta=e=>`<div class="verdict warn" role="alert"><div>${esc(e)}</div></div>`;
+const adminNav=NAV.find(g=>g.g==="Administração");
+if(adminNav){adminNav.items=adminNav.items.filter(i=>i.id!=="equipe");adminNav.items.push(
+ {id:"equipe",t:"Pessoas online",roles:["gerencia"],ic:"users"},
+ {id:"auditoria",t:"Histórico de alterações",roles:["gerencia"],ic:"doc"});}
+NAV.push({g:"Minha conta",items:[{id:"perfil",t:"Meu perfil",roles:["gerencia","producao","estoque"],ic:"badge"}]});
+Object.assign(TITLES,{equipe:["Pessoas online","Acompanhamento da equipe · somente gerência"],auditoria:["Histórico de alterações","Registros confirmados no banco"],perfil:["Meu perfil","Foto, dados pessoais e contato"]});
+Object.assign(window.VEXTRA||(window.VEXTRA={}),{equipe:()=>vPessoasOnline(),auditoria:()=>vAuditoria(),perfil:()=>vMeuPerfil()});
+const renderShellConta=renderShell;
+renderShell=function(){
+ renderShellConta();
+ const who=document.getElementById("who");if(!who)return;
+ const atual=who.innerHTML;
+ who.innerHTML=`<button class="perfil-link" data-act="go" data-view="perfil" aria-label="Abrir meu perfil">${atual}</button>`;
+ if(MP.photoUrl&&MP.data?.id===S.perfilId){const a=who.querySelector(".av");if(a){a.textContent="";const img=document.createElement("img");img.src=MP.photoUrl;img.alt="";img.style.cssText="width:100%;height:100%;object-fit:cover;border-radius:50%";img.onerror=()=>{a.textContent=me().ini;};a.appendChild(img);}}
+};
+let presencaSessao=null,presencaTimer=null,presencaPendente=false;
+async function atualizarPresenca(sair=false){
+ if(!S.perfilId||presencaPendente)return;
+ presencaSessao=presencaSessao||uid();presencaPendente=true;
+ try{const r=await sb.rpc("registrar_presenca",{p_sessao:presencaSessao,p_sair:sair});if(r.error)console.warn("Presença indisponível",r.error.code);}
+ catch(e){console.warn("Presença indisponível");}finally{presencaPendente=false;}
+}
+function iniciarConta(){
+ clearInterval(presencaTimer);atualizarPresenca();
+ presencaTimer=setInterval(()=>{atualizarPresenca();if(S.view==="equipe"&&S.role==="gerencia")carregarOnline();},30000);
+ carregarMeuPerfil(false);
+}
+async function encerrarPresenca(){clearInterval(presencaTimer);await atualizarPresenca(true);}
+async function carregarOnline(){
+ if(S.role!=="gerencia"||ONLINE.busy)return;
+ ONLINE.busy=true;ONLINE.error="";
+ try{const r=await sb.rpc("pessoas_online");if(r.error)throw r.error;ONLINE.rows=r.data||[];ONLINE.at=new Date().toISOString();}
+ catch(e){ONLINE.error=erroConta(e);ONLINE.rows=[];}
+ finally{ONLINE.busy=false;ONLINE.loaded=true;if(S.view==="equipe"&&S.role==="gerencia")render();}
+}
+function vPessoasOnline(){
+ if(S.role!=="gerencia")return txtConta("Esta área é exclusiva da gerência.");
+ if(!ONLINE.loaded&&!ONLINE.busy)queueMicrotask(carregarOnline);
+ return `<div class="card"><header><h3>${ONLINE.rows.length} pessoa(s) online</h3><button class="btn sm" data-act="onlineAtualizar" ${ONLINE.busy?"disabled":""}>Atualizar agora</button></header>
+ <div class="pad"><p class="conta-info">Conexão confirmada nos últimos 90 segundos. A lista atualiza a cada 30 segundos; ao fechar o navegador, a pessoa pode levar até 90 segundos para desaparecer. Isso indica conexão recente, não comprova atividade diante da tela.</p>${ONLINE.error?txtConta(ONLINE.error):""}</div>
+ <div class="tblwrap"><table><thead><tr><th>Nome</th><th>Cargo</th><th>Perfil</th><th>E-mail</th><th>Último sinal</th></tr></thead><tbody>
+ ${ONLINE.rows.map(p=>`<tr><td><span class="pill ok">Online</span> <b>${esc(p.nome)}</b></td><td>${esc(p.cargo||"Não informado")}</td><td>${esc(PERFIS[p.papel]?.label||p.papel)}</td><td>${esc(p.email||"—")}</td><td>${esc(quandoConta(p.visto_em))}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">${ONLINE.busy||!ONLINE.loaded?"Buscando pessoas online…":ONLINE.error?"Não foi possível consultar a presença.":"Nenhuma conexão recente encontrada."}</td></tr>`}
+ </tbody></table></div><div class="pad hint">${ONLINE.at?"Última consulta: "+esc(quandoConta(ONLINE.at)):""} · Painel somente de visualização.</div></div>`;
+}
+async function carregarAuditoria(mais=false){
+ if(S.role!=="gerencia"||AUD.busy)return;
+ AUD.busy=true;AUD.error="";
+ try{
+  const f=AUD.filter;let ate=null;
+  if(f.ate){const d=new Date(f.ate+"T00:00:00");d.setDate(d.getDate()+1);ate=d.toISOString();}
+  const r=await sb.rpc("listar_auditoria",{p_tabela:f.tabela||null,p_acao:f.acao||null,p_busca:f.busca||null,
+   p_antes:mais&&AUD.rows.length?AUD.rows.at(-1).id:null,p_de:f.de?new Date(f.de+"T00:00:00").toISOString():null,p_ate:ate});
+  if(r.error)throw r.error;
+  AUD.rows=mais?[...AUD.rows,...(r.data||[])]:r.data||[];AUD.more=(r.data||[]).length===100;
+ }catch(e){AUD.error=erroConta(e);}finally{AUD.busy=false;AUD.loaded=true;if(S.view==="auditoria"&&S.role==="gerencia")render();}
+}
+function vAuditoria(){
+ if(S.role!=="gerencia")return txtConta("Esta área é exclusiva da gerência.");
+ if(!AUD.loaded&&!AUD.busy)queueMicrotask(()=>carregarAuditoria());
+ const f=AUD.filter;
+ return `<div class="grid" style="gap:14px"><div class="card"><header><h3>Consultar registros</h3></header><div class="pad">
+ <form id="auditForm" class="audit-filters"><div class="field"><label for="auditBusca">Pessoa, registro ou descrição</label><input id="auditBusca" maxlength="120" value="${esc(f.busca)}" placeholder="Buscar no histórico"></div>
+ <div class="field"><label for="auditTabela">Área</label><select id="auditTabela"><option value="">Todas</option>${Object.entries(ADMIN_TABLES).map(([k,n])=>`<option value="${k}" ${k===f.tabela?"selected":""}>${esc(n)}</option>`).join("")}</select></div>
+ <div class="field"><label for="auditAcao">Ação</label><select id="auditAcao"><option value="">Todas</option>${Object.entries(AUD_ACTION).map(([k,n])=>`<option value="${k}" ${k===f.acao?"selected":""}>${n}</option>`).join("")}</select></div>
+ <div class="field"><label for="auditDe">De</label><input id="auditDe" type="date" value="${esc(f.de)}"></div><div class="field"><label for="auditAte">Até</label><input id="auditAte" type="date" value="${esc(f.ate)}"></div>
+ <button class="btn pri" type="submit" ${AUD.busy?"disabled":""}>${AUD.busy?"Consultando…":"Filtrar"}</button></form>
+ <p class="conta-info">Inclusões, alterações e exclusões confirmadas após a ativação da auditoria. Abra um registro para comparar os dados. Uma gravação da OS pode gerar várias linhas na mesma transação.</p>${AUD.error?txtConta(AUD.error):""}</div></div>
+ <div class="card"><div class="tblwrap"><table><thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Área / registro</th><th></th></tr></thead><tbody>
+ ${AUD.rows.map(r=>`<tr><td>${esc(quandoConta(r.ocorrido_em))}</td><td><b>${esc(r.autor_nome)}</b><br><span class="hint">${esc(PERFIS[r.autor_papel]?.label||r.autor_papel||"Operação do banco")}</span></td><td><span class="pill ${r.operacao==="DELETE"?"warn":""}">${AUD_ACTION[r.operacao]||esc(r.operacao)}</span></td><td>${esc(ADMIN_TABLES[r.tabela]||r.tabela)}<br><span class="hint">${esc(r.resumo||r.registro)}</span></td><td><button class="btn sm" data-act="auditDetalhe" data-id="${r.id}">Ver alterações</button></td></tr>`).join("")||`<tr><td colspan="5" class="empty">${AUD.busy||!AUD.loaded?"Carregando histórico…":"Nenhum registro encontrado para este filtro."}</td></tr>`}
+ </tbody></table></div><div class="pad flex"><span class="hint">${AUD.rows.length} registro(s) exibido(s)</span>${AUD.more?`<button class="btn" data-act="auditMais" ${AUD.busy?"disabled":""}>Carregar mais antigos</button>`:""}</div></div></div>`;
+}
+function detalheAuditoria(id){
+ if(S.role!=="gerencia")return;const r=AUD.rows.find(r=>String(r.id)===String(id));if(!r)return;
+ const a=r.antes||{},d=r.depois||{},keys=[...new Set([...Object.keys(a),...Object.keys(d)])].filter(k=>JSON.stringify(a[k])!==JSON.stringify(d[k]));
+ const val=v=>v===undefined?"—":v===null?"Vazio":typeof v==="object"?JSON.stringify(v,null,2):String(v);
+ modal("Detalhes da alteração",`<p class="conta-info"><b>${esc(r.autor_nome)}</b> · ${esc(quandoConta(r.ocorrido_em))}<br>${esc(ADMIN_TABLES[r.tabela]||r.tabela)} · ${AUD_ACTION[r.operacao]}<br>Registro: ${esc(r.registro)} · Transação: ${esc(r.transacao)}</p>
+ <div class="tblwrap"><table><thead><tr><th>Campo</th><th>Antes</th><th>Depois</th></tr></thead><tbody>${keys.map(k=>`<tr><td>${esc(k.replaceAll("_"," "))}</td><td><div class="audit-before">${esc(val(a[k]))}</div></td><td><div class="audit-after">${esc(val(d[k]))}</div></td></tr>`).join("")}</tbody></table></div>`,
+ `<button class="btn" data-act="fecharModal">Fechar</button>`);
+}
+const CAMPOS_CONTA=[['telefone','Telefone','tel',40],['whatsapp','WhatsApp','tel',40],['nascimento','Data de nascimento','date',null],['cep','CEP','text',12],['endereco','Endereço','text',200],['numero','Número','text',20],['complemento','Complemento','text',120],['bairro','Bairro','text',100],['cidade','Cidade','text',100],['estado','UF','text',2]];
+function limparPreview(){if(MP.preview)URL.revokeObjectURL(MP.preview);MP.preview="";}
+async function carregarMeuPerfil(redesenhar=true){
+ if(MP.loading||!S.perfilId)return;MP.loading=true;MP.error="";
+ try{
+  const r=await sb.rpc("meu_perfil_completo");if(r.error)throw r.error;if(!r.data?.id)throw new Error("Não foi possível consultar seu perfil.");
+  MP.data=r.data;if(!MP.dirty)MP.draft={...r.data};
+  MP.photoUrl="";
+  if(r.data.avatar_path){const foto=await sb.storage.from("avatares").createSignedUrl(r.data.avatar_path,28800);if(foto.data)MP.photoUrl=foto.data.signedUrl;}
+ }catch(e){MP.error=erroConta(e);}finally{MP.loading=false;if(redesenhar&&S.view==="perfil")render();else if(MP.data)renderShell();}
+}
+function vMeuPerfil(){
+ if(!MP.data&&!MP.loading&&!MP.error)queueMicrotask(()=>carregarMeuPerfil());
+ if(!MP.data)return `<div class="card pad">${MP.error?txtConta(MP.error)+`<button class="btn" data-act="perfilRecarregar">Tentar novamente</button>`:"Carregando seu perfil…"}</div>`;
+ const d=MP.draft||MP.data,foto=MP.preview||(d.avatar_path?MP.photoUrl:"");
+ const field=(key,label,type="text",max=120,extra="")=>`<div class="field ${key==="endereco"?"wide":""}"><label for="mp_${key}">${label}</label><input id="mp_${key}" name="${key}" data-conta="${key}" type="${type}" value="${esc(d[key]||"")}" ${max?'maxlength="'+max+'"':''} ${extra}></div>`;
+ return `<form id="meuPerfilForm"><fieldset style="border:0;padding:0;min-width:0" ${MP.busy||MP.photoBusy?"disabled":""}><div class="conta-grid">
+ <div class="card pad" style="text-align:center">${foto?`<img class="foto-conta" src="${esc(foto)}" alt="Sua foto de perfil">`:`<div class="foto-conta" style="color:${esc(d.cor||'#1B1B1E')}">${esc(ini(d.nome))}</div>`}
+ <button class="btn" type="button" data-act="perfilEscolherFoto" style="justify-content:center">${MP.photoBusy?"Preparando foto…":"Trocar foto"}</button><input id="perfilFoto" type="file" accept="image/jpeg,image/png,image/webp" hidden aria-label="Selecionar foto do perfil">
+ ${(foto||MP.photoBlob)?`<button class="btn ghost" type="button" data-act="perfilRemoverFoto">Remover foto</button>`:""}
+ <p class="conta-info">JPG, PNG ou WebP, até 5 MB. A foto é atualizada ao salvar.</p>
+ <span class="pill">${esc(PERFIS[d.papel]?.label||d.papel)}</span><p class="conta-info">${esc(d.cargo||"Cargo não informado")}<br>O cargo e o acesso são definidos pela gerência.</p></div>
+ <div class="card"><header><h3>Seus dados</h3></header><div class="pad"><div class="conta-fields">
+ ${field('nome','Nome completo','text',120,'required minlength="2" autocomplete="name"')}
+ <div class="field"><label for="mp_email">E-mail de acesso</label><input id="mp_email" value="${esc(d.email||'')}" readonly><span class="hint">E-mail vinculado à conta de acesso.</span></div>
+ ${CAMPOS_CONTA.map(([k,l,t,m])=>field(k,l,t,m,k==='nascimento'?'max="'+new Date().toLocaleDateString('en-CA')+'"':'')).join('')}
+ <div class="field wide"><label for="mp_bio">Sobre você</label><textarea id="mp_bio" data-conta="bio" maxlength="500" rows="3" placeholder="Especialidades, funções e uma breve apresentação">${esc(d.bio||'')}</textarea></div>
+ ${field('cor','Cor das iniciais','color',null)}
+ </div><div class="conta-message" id="perfilMensagem" role="status" data-error="${!!MP.error}">${esc(MP.error||(MP.dirty?'Você tem alterações para salvar.':'Seus dados de contato e endereço ficam disponíveis somente para você e a gerência.'))}</div>
+ <div class="flex"><button type="submit" class="btn pri">${MP.busy?'Salvando…':'Salvar perfil'}</button><button type="button" class="btn" data-act="perfilCancelar">Descartar alterações</button></div></div></div>
+ </div></fieldset></form>`;
+}
+async function prepararFoto(file){
+ if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>5*1024*1024){MP.error="Escolha uma imagem JPG, PNG ou WebP de até 5 MB.";render();return;}
+ MP.photoBusy=true;MP.error="";render();
+ try{
+  const img=await createImageBitmap(file);const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
+  const ctx=canvas.getContext('2d'),side=Math.min(img.width,img.height);ctx.fillStyle='#fff';ctx.fillRect(0,0,512,512);
+  ctx.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,512,512);img.close();
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.86));if(!blob)throw new Error('Não foi possível preparar a foto.');
+  limparPreview();MP.photoBlob=blob;MP.preview=URL.createObjectURL(blob);MP.dirty=true;
+ }catch(e){MP.error="Não foi possível abrir esta imagem. Escolha outro arquivo.";}finally{MP.photoBusy=false;if(S.view==='perfil')render();}
+}
+async function salvarMeuPerfil(){
+ if(MP.busy||MP.photoBusy||!MP.draft)return false;
+ const form=document.getElementById('meuPerfilForm');if(form&&!form.reportValidity())return false;
+ MP.busy=true;MP.error="";render();let novoPath=null,confirmado=false;
+ try{
+  const d=MP.draft,payload={nome:(d.nome||'').trim(),cor:d.cor||'#1B1B1E',bio:d.bio||'',avatar_path:d.avatar_path||null};
+  CAMPOS_CONTA.forEach(([k])=>payload[k]=d[k]||null);
+  if(MP.photoBlob){novoPath=S.perfilId+'/'+uid()+'.jpg';const up=await sb.storage.from('avatares').upload(novoPath,MP.photoBlob,{contentType:'image/jpeg',upsert:false});if(up.error)throw up.error;payload.avatar_path=novoPath;}
+  const r=await sb.rpc('salvar_meu_perfil',{p_dados:payload});if(r.error)throw r.error;
+  confirmado=true;const antigo=MP.data.avatar_path;MP.data={...MP.data,...payload};MP.draft={...MP.data};MP.dirty=false;MP.photoBlob=null;limparPreview();
+  const eu=S.perfis.find(p=>p.id===S.perfilId);if(eu)Object.assign(eu,{nome:payload.nome,cor:payload.cor,ini:ini(payload.nome)});
+  if(antigo&&antigo!==payload.avatar_path){const rm=await sb.storage.from('avatares').remove([antigo]);if(rm.error)console.warn('Foto anterior não removida',rm.error.code);}
+  MP.photoUrl='';if(payload.avatar_path){const foto=await sb.storage.from('avatares').createSignedUrl(payload.avatar_path,28800);MP.photoUrl=foto.data?.signedUrl||'';}
+  toast('Perfil salvo.');return true;
+ }catch(e){
+  if(novoPath&&!confirmado)await sb.storage.from('avatares').remove([novoPath]).catch(()=>{});
+  MP.error=confirmado?'Perfil salvo, mas a foto não pôde ser atualizada na tela. Abra seu perfil novamente.':erroConta(e);return confirmado;
+ }finally{MP.busy=false;if(S.view==='perfil')render();else renderShell();}
+}
+document.addEventListener('input',ev=>{const k=ev.target.dataset?.conta;if(k&&MP.draft){MP.draft[k]=ev.target.value;MP.dirty=true;MP.error='';const el=document.getElementById('perfilMensagem');if(el){el.textContent='Você tem alterações para salvar.';el.dataset.error='false';}}});
+document.addEventListener('change',ev=>{if(ev.target.id==='perfilFoto')prepararFoto(ev.target.files[0]);});
+document.addEventListener('submit',ev=>{
+ if(ev.target.id==='meuPerfilForm'){ev.preventDefault();salvarMeuPerfil();}
+ if(ev.target.id==='auditForm'){ev.preventDefault();if(AUD.busy)return;
+  const g=id=>document.getElementById(id).value;const de=g('auditDe'),ate=g('auditAte');
+  if(de&&ate&&ate<de)return toast('A data final precisa ser igual ou posterior à inicial.');
+  AUD.filter={tabela:g('auditTabela'),acao:g('auditAcao'),busca:g('auditBusca').trim(),de,ate};carregarAuditoria();}
+});
+document.addEventListener('click',ev=>{
+ const t=ev.target.closest('[data-act]');if(!t)return;
+ if(t.dataset.act==='onlineAtualizar')carregarOnline();
+ if(t.dataset.act==='perfilEscolherFoto')document.getElementById('perfilFoto')?.click();
+ if(t.dataset.act==='auditMais')carregarAuditoria(true);
+ if(t.dataset.act==='auditDetalhe')detalheAuditoria(t.dataset.id);
+ if(t.dataset.act==='perfilRecarregar')carregarMeuPerfil();
+ if(t.dataset.act==='perfilCancelar'&&!MP.busy){MP.draft={...MP.data};MP.dirty=false;MP.error='';MP.photoBlob=null;limparPreview();render();}
+ if(t.dataset.act==='perfilRemoverFoto'&&!MP.busy){MP.draft.avatar_path=null;MP.photoBlob=null;limparPreview();MP.dirty=true;render();}
+});
+window.addEventListener('beforeunload',e=>{if(MP.dirty||MP.busy){e.preventDefault();e.returnValue='';}});
+</script>
+<style>
+.wa{--wa-green:#087f68;display:grid;grid-template-columns:310px minmax(0,1fr);height:calc(100dvh - 150px);min-height:480px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.wa-side{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--surface)}
+.wa-bar{display:flex;align-items:center;gap:8px;padding:15px;border-bottom:1px solid var(--line);background:var(--surface)}
+.wa-bar h3{margin:0;font-size:17px}.wa-bar .grow{flex:1;min-width:0}.wa-search{padding:10px}.wa-search input{width:100%}.wa-list{overflow:auto;flex:1}.wa-conv{border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);width:100%;display:flex;align-items:center;gap:10px;padding:15px;text-align:left;cursor:pointer}.wa-conv.on{background:#087f6818}.wa-avatar{border-radius:50%;width:42px;height:42px;display:grid;place-items:center;background:#087f6820;color:var(--wa-green);font-weight:800;flex-shrink:0}.wa-conv-text{min-width:0;flex:1}.wa-conv-text b,.wa-conv-text small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wa-conv-text small{margin-top:5px;color:var(--ink3)}.wa-count{background:var(--wa-green);color:white;border-radius:20px;padding:3px 7px;font-size:11px}.wa-main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.wa-body{flex:1;overflow:auto;padding:20px;background-image:radial-gradient(#89988d22 1px,transparent 1px);background-size:18px 18px}.wa-message{display:flex;margin:9px 0}.wa-message.mine{justify-content:flex-end}.wa-bubble{max-width:min(80%,620px);padding:10px 13px;border-radius:0 13px 13px;background:var(--surface);box-shadow:0 1px 2px #0001;overflow-wrap:anywhere}.mine .wa-bubble{border-radius:13px 0 13px 13px;background:color-mix(in srgb,var(--surface) 80%,#47c391 20%)}.wa-author{font-size:11px;font-weight:700;color:color-mix(in srgb,var(--ink) 65%,#087f68 35%);margin-bottom:5px}.wa-text{white-space:pre-wrap}.wa-meta{font-size:10px;text-align:right;color:var(--ink3);margin-top:6px}.wa-meta button{font-size:10px;border:0;background:none;color:inherit;cursor:pointer;padding:3px}.wa-quote{border-left:3px solid var(--wa-green);padding:7px;margin-bottom:7px;background:#8881;font-size:12px;white-space:pre-wrap}.wa-media{display:block;max-width:100%;max-height:260px;border-radius:8px}.wa-bubble audio{max-width:100%;width:270px}.wa-compose{padding:12px;border-top:1px solid var(--line);background:var(--surface)}.wa-compose-row{display:flex;align-items:end;gap:8px}.wa-compose textarea{flex:1;min-width:0;resize:vertical;max-height:150px;border-radius:12px;min-height:42px}.wa-icon{border:1px solid var(--line);border-radius:50%;width:38px;height:38px;background:var(--surface);color:var(--ink);display:inline-grid;place-items:center;cursor:pointer;flex-shrink:0}.wa-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.wa-send{background:var(--wa-green);color:#fff;border:0}.wa-status{font-size:12px;padding:7px 12px;min-height:28px;color:var(--ink3)}.wa-status.error{color:var(--danger,#b42318)}.wa-pending{padding:8px;margin-bottom:8px;background:#087f6811;border-radius:8px;font-size:12px}.wa-back{display:none}.wa-person{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--line)}.wa-person label{flex:1}.wa-person input[type=checkbox]{width:auto}.wa-people{max-height:340px;overflow:auto}.wa-modalerr{color:#b42318;min-height:24px;font-size:12px}.wa-center{margin:auto;text-align:center;padding:24px;color:var(--ink3)}
+.wa-call{position:fixed;z-index:2000;inset:20px;max-width:1050px;max-height:760px;margin:auto;border-radius:20px;background:#101c25;color:#fff;display:flex;flex-direction:column;box-shadow:0 20px 80px #0008;padding:20px;gap:15px}.wa-call[hidden]{display:none}.wa-call-head{display:flex;justify-content:space-between;gap:12px}.wa-videos{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;flex:1;min-height:0;overflow:auto}.wa-tile{background:#203441;border-radius:15px;position:relative;min-height:150px;overflow:hidden}.wa-tile video{width:100%;height:100%;max-height:400px;object-fit:contain}.wa-tile span{position:absolute;bottom:10px;left:10px;font-size:12px;background:#0009;border-radius:7px;padding:5px}.wa-call-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}.wa-call-actions button{background:#304653;color:white;border:0;border-radius:20px;padding:12px;cursor:pointer}.wa-call-actions .hangup{background:#b72e3d}.wa-incoming{position:fixed;z-index:1900;right:20px;bottom:20px;background:var(--surface);border:1px solid var(--line);box-shadow:0 8px 40px #0004;border-radius:16px;padding:20px;max-width:350px}.wa-incoming[hidden]{display:none}
+@media(max-width:760px){.wa{grid-template-columns:1fr;height:calc(100dvh - 145px);min-height:410px}.wa.has-chat .wa-side{display:none}.wa:not(.has-chat) .wa-main{display:none}.wa-back{display:inline-grid}.wa-bubble{max-width:92%}.wa-body{padding:10px}.wa-bar{padding:10px;flex-wrap:wrap}.wa-bar h3{font-size:14px}.wa-call{inset:8px;padding:12px}.wa-videos{grid-template-columns:1fr 1fr}.wa-tile{min-height:120px}.wa-compose-row{gap:5px}.wa-icon{width:34px;height:34px}}
+</style>
+<script>
+/* Chat é salvo por RPCs independentes da fila de gravação do ERP. */
+const WC={chats:[],messages:[],selected:null,loaded:false,loading:false,sending:false,error:'',q:'',search:'',searchInput:'',drafts:{},reply:null,file:null,fileUrl:null,pendingId:null,urls:{},more:false,rec:null,recStream:null,recTimer:null,recording:false,recSeconds:0,poll:null};
+const WIC={plus:'<path d="M8 2v12M2 8h12"/>',phone:'<path d="M3 2l3 3-2 2c1 2 3 4 5 5l2-2 3 3c-3 4-13-6-11-11z"/>',video:'<rect x="1" y="3" width="9" height="10" rx="2"/><path d="M10 6l5-3v10l-5-3"/>',file:'<path d="M5 9l5-5a3 3 0 014 4l-7 7a4 4 0 01-6-6l7-7"/>',mic:'<rect x="6" y="1" width="4" height="9" rx="2"/><path d="M3 7v1a5 5 0 0010 0V7M8 13v3M5 16h6"/>',send:'<path d="M1 1l14 7-14 7 3-7zM4 8h11"/>',back:'<path d="M11 2L5 8l6 6"/>',group:'<circle cx="6" cy="5" r="3"/><path d="M0 15v-2a6 6 0 0112 0v2M11 2a3 3 0 010 6M13 10a4 4 0 013 4"/>'};
+const wi=(name)=>`<svg viewBox="0 0 16 18" aria-hidden="true">${WIC[name]||WIC.plus}</svg>`;
+const wbtn=(action,label,icon,extra='')=>`<button type="button" class="wa-icon ${extra}" data-wa="${action}" title="${label}" aria-label="${label}">${wi(icon)}</button>`;
+const wcName=c=>c?.tipo==='dm'?usr(c.membros.find(x=>x.perfil_id!==S.perfilId)?.perfil_id).nome:c?.nome||'Conversa';
+const wcCurrent=()=>WC.chats.find(c=>c.id===WC.selected);
+const wcError=e=>['PGRST202','42P01','42703'].includes(e?.code)?'Aplique a atualização 0009 no banco para ativar o novo chat.':e?.message||'Falha de conexão. Tente novamente.';
+async function wrpc(name,args){const r=await sb.rpc(name,args);if(r.error)throw r.error;return r.data;}
+function wcStatus(text,error=false){const el=document.getElementById('waStatus');if(el){el.textContent=text;el.classList.toggle('error',error);}}
+function wcDraw(){if(S.view==='chat'){const media=[...document.querySelectorAll('[data-wa-media]')].map(el=>[el.dataset.waMedia,[...el.childNodes]]),scroll=document.getElementById('waBody')?.scrollTop;const active=document.activeElement,id=active?.id,start=active?.selectionStart,end=active?.selectionEnd;render();for(const [key,nodes] of media){const host=document.querySelector(`[data-wa-media="${key}"]`);if(host)host.append(...nodes);}if(scroll!==undefined&&document.getElementById('waBody'))document.getElementById('waBody').scrollTop=scroll;if(id&&['waText','waSearch','waMessageSearch'].includes(id)){const el=document.getElementById(id);el?.focus();if(typeof start==='number')el?.setSelectionRange(start,end);}}}
+async function wcList(draw=true){if(WC.loading)return;WC.loading=true;try{const before=JSON.stringify(WC.chats);WC.chats=await wrpc('chat_listar')||[];const changed=before!==JSON.stringify(WC.chats);WC.loaded=true;WC.error='';if(WC.selected&&!wcCurrent()){WC.selected=null;WC.messages=[];}if(draw)wcDraw();return changed;}catch(e){WC.error=wcError(e);if(draw)wcDraw();}finally{WC.loading=false;}}
+async function wcRead(older=false,background=false){const id=WC.selected;if(!id)return;try{
+ const rows=await wrpc('chat_mensagens',{p_canal:id,p_antes:older?WC.messages[0]?.criado_em:null,p_busca:WC.search||null,p_cursor:older?WC.messages[0]?.id:null});if(id!==WC.selected)return;
+ const sorted=(rows||[]).reverse(),changed=JSON.stringify(older?[]:WC.messages.slice(-100))!==JSON.stringify(sorted);
+ WC.more=rows.length===100;
+ if(older){const map=new Map([...sorted,...WC.messages].map(m=>[m.id,m]));WC.messages=[...map.values()].sort((a,b)=>a.criado_em.localeCompare(b.criado_em)||a.id.localeCompare(b.id));}
+ else if(!background||changed){WC.messages=sorted;}
+ WC.error='';if(!background||changed){const body=document.getElementById('waBody'),near=!body||body.scrollHeight-body.scrollTop-body.clientHeight<100;wcDraw();await wcMedia();if(!older&&near)wcBottom();}
+ if(!document.hidden&&S.view==='chat'&&!WC.search){const r=await sb.from('canal_membros').update({lido_em:new Date().toISOString()}).eq('canal_id',id).eq('perfil_id',S.perfilId);if(r.error)console.warn('Leitura não confirmada',r.error.code);}
+ }catch(e){WC.error=wcError(e);if(!background)wcDraw();else wcStatus(WC.error,true);}}
+function wcBottom(){const b=document.getElementById('waBody');if(b)b.scrollTop=b.scrollHeight;}
+async function wcOpen(id){if(id===WC.selected){await wcRead();return;}if(WC.file&&!confirm('O anexo ainda não foi enviado. Descartar e trocar de conversa?'))return;if(WC.recording)return toast('Pare a gravação antes de trocar de conversa.');WC.selected=id;WC.messages=[];WC.reply=null;WC.search='';WC.searchInput='';wcDiscardFile();wcDraw();await wcRead();}
+function wcTime(t){return new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+function wcBubble(m){const mine=m.autor_id===S.perfilId,c=wcCurrent(),reply=WC.messages.find(x=>x.id===m.resposta_id),a=m.apagado?null:m.anexo;
+ const read=mine&&c?.membros.filter(x=>x.perfil_id!==S.perfilId).every(x=>new Date(x.lido_em)>=new Date(m.criado_em));
+ return `<div class="wa-message ${mine?'mine':''}"><div class="wa-bubble"><div class="wa-author">${mine?'Você':esc(usr(m.autor_id).nome)}</div>
+ ${m.resposta_id?`<div class="wa-quote">${esc(reply?(reply.apagado?'Mensagem apagada':reply.texto||reply.anexo?.nome):'Resposta a uma mensagem anterior')}</div>`:''}
+ <div class="wa-text">${m.apagado?'<i>Mensagem apagada</i>':linkify(m.texto)}</div>
+ ${a?`<div data-wa-media="${m.id}"></div><button class="btn sm" data-wa="download" data-id="${m.id}">${esc(a.nome)} · ${(a.bytes/1024/1024).toFixed(1)} MB ↓</button>`:''}
+ <div class="wa-meta">${wcTime(m.criado_em)} ${m.editado_em&&!m.apagado?'· editada':''} ${mine?`<span title="${read?'Lida por todos':'Salva no servidor'}">${read?'✓✓':'✓'}</span>`:''}
+ ${!m.apagado?`<button data-wa="reply" data-id="${m.id}">Responder</button>${mine?`<button data-wa="edit" data-id="${m.id}">Editar</button><button data-wa="delete" data-id="${m.id}">Apagar</button>`:''}`:''}</div></div></div>`;
+}
+function vWhatsChat(){if(!WC.loaded&&!WC.loading&&!WC.error)queueMicrotask(()=>wcList());const c=wcCurrent();
+ const filtered=WC.chats.filter(c=>wcName(c).toLocaleLowerCase().includes(WC.q.toLocaleLowerCase())).sort((a,b)=>(b.ultima?.criado_em||b.criado_em).localeCompare(a.ultima?.criado_em||a.criado_em));
+ return `<div class="wa ${c?'has-chat':''}"><aside class="wa-side"><div class="wa-bar"><h3 class="grow">Conversas</h3>${wbtn('new','Nova conversa','plus')}${wbtn('group','Criar grupo','group')}</div>
+ <div class="wa-search"><input id="waSearch" aria-label="Buscar conversa" placeholder="Buscar conversa" value="${esc(WC.q)}"></div><div class="wa-list">${filtered.map(x=>`<button class="wa-conv ${x.id===c?.id?'on':''}" data-wa="open" data-id="${x.id}"><span class="wa-avatar">${esc(ini(wcName(x)))}</span><span class="wa-conv-text"><b>${esc(wcName(x))}</b><small>${esc(x.ultima?(x.ultima.apagado?'Mensagem apagada':x.ultima.texto||x.ultima.anexo?.nome||'Arquivo'):'Comece a conversa')}</small></span>${x.novas?`<span class="wa-count">${x.novas}</span>`:''}</button>`).join('')||`<div class="empty">${WC.error?esc(WC.error):WC.loaded?'Nenhuma conversa. Use + para começar.':'Carregando…'}</div>`}</div><button class="btn ghost" data-wa="refresh">Atualizar conversas</button></aside>
+ <section class="wa-main">${c?`<div class="wa-bar">${wbtn('back','Voltar às conversas','back','wa-back')}<span class="wa-avatar">${esc(ini(wcName(c)))}</span><div class="grow"><h3>${esc(wcName(c))}</h3><small>${c.tipo==='dm'?'Conversa individual':c.membros.length+' participantes'}</small></div>${wbtn('voice','Chamada de voz','phone')}${wbtn('video','Chamada de vídeo','video')}${c.tipo!=='dm'?wbtn('manage','Dados do grupo','group'):''}</div>
+ <form id="waSearchForm" class="wa-search" style="display:flex;gap:7px"><input id="waMessageSearch" aria-label="Buscar mensagens" maxlength="120" placeholder="Buscar nesta conversa" value="${esc(WC.searchInput)}"><button class="btn sm">Buscar</button></form>
+ <div class="wa-body" id="waBody">${WC.more?'<button class="btn sm" data-wa="older">Carregar anteriores</button>':''}${WC.messages.map(wcBubble).join('')||'<div class="wa-center">Nenhuma mensagem para exibir.</div>'}</div>
+ <div class="wa-compose">${WC.reply?`<div class="wa-pending">Respondendo: ${esc(WC.reply.texto||WC.reply.anexo?.nome||'Mensagem')} <button class="btn sm" data-wa="cancelReply">Cancelar</button></div>`:''}
+ ${WC.file?`<div class="wa-pending">${esc(WC.file.name)} · ${(WC.file.size/1024/1024).toFixed(1)} MB <button class="btn sm" data-wa="discardFile">Remover</button>${WC.file.type.startsWith('audio/')?`<audio controls src="${esc(WC.fileUrl)}" style="max-width:100%"></audio>`:''}</div>`:''}
+ ${WC.recording?`<div class="wa-pending" role="status">● Gravando <span id="waRecTime">${WC.recSeconds}s</span> · limite 5 min <button class="btn sm" data-wa="stopAudio">Parar e ouvir</button><button class="btn sm" data-wa="cancelAudio">Cancelar</button></div>`:''}
+ <div class="wa-compose-row">${wbtn('attach','Anexar arquivo','file')}<input hidden type="file" id="waFile"><textarea id="waText" maxlength="10000" rows="1" aria-label="Mensagem" placeholder="Escreva uma mensagem" ${WC.sending?'disabled':''}>${esc(WC.drafts[c.id]||'')}</textarea>${wbtn('record','Gravar áudio','mic')}${wbtn('send','Enviar mensagem','send','wa-send')}</div></div><div id="waStatus" class="wa-status ${WC.error?'error':''}" role="status">${esc(WC.error||(WC.sending?'Enviando…':'Enter envia · Shift+Enter quebra linha · anexos até 25 MB'))}</div>`:`<div class="wa-center"><h2>Chat da equipe</h2><p>Converse sobre seus eventos, compartilhe arquivos<br>e reúna a equipe por voz ou vídeo.</p><button class="btn pri" data-wa="new">Iniciar conversa</button></div>`}</section></div>`;
+}
+window.VEXTRA.chat=vWhatsChat;TITLES.chat=['Chat','Equipe conectada à operação'];
+function wcDiscardFile(){if(WC.fileUrl)URL.revokeObjectURL(WC.fileUrl);WC.file=null;WC.fileUrl=null;WC.pendingId=null;}
+function wcFile(file){if(!file)return;if(WC.sending||WC.recording)return toast('Aguarde o envio ou termine a gravação.');if(file.size>25*1024*1024||file.size===0)return toast('Escolha um arquivo de até 25 MB, não vazio.');wcDiscardFile();WC.file=file;WC.fileUrl=URL.createObjectURL(file);wcDraw();}
+async function wcMedia(){for(const m of WC.messages){const a=m.anexo;if(!a||m.apagado)continue;const el=document.querySelector('[data-wa-media="'+m.id+'"]');if(!el||el.childNodes.length)continue;try{
+ const url=await wcURL(a);if(!el.isConnected)continue;let media;if(a.tipo==='audio')media=document.createElement('audio');else if(a.tipo==='imagem'&&/^image\/(png|jpeg|webp|gif)$/.test(a.mime))media=document.createElement('img');else if(a.tipo==='video')media=document.createElement('video');if(media){media.className='wa-media';media.controls=true;media.preload='metadata';media.src=url;if(media.tagName==='IMG'){media.alt=a.nome;media.loading='lazy';}el.appendChild(media);}
+ }catch{el.textContent='Anexo indisponível. Tente atualizar.';}}}
+async function wcURL(a,download=false){const cached=WC.urls[a.path];if(!download&&cached?.until>Date.now())return cached.url;const r=await sb.storage.from('chat-arquivos').createSignedUrl(a.path,300,download?{download:a.nome}:undefined);if(r.error)throw r.error;if(!download)WC.urls[a.path]={url:r.data.signedUrl,until:Date.now()+240000};return r.data.signedUrl;}
+async function wcSend(){if(WC.sending||WC.recording||!WC.selected)return;const channel=WC.selected,text=(WC.drafts[channel]||'').trim(),file=WC.file,reply=WC.reply?.id;if(!text&&!file)return;WC.sending=true;WC.error='';WC.pendingId=WC.pendingId||uid();const id=WC.pendingId;wcDraw();let uploaded=null;
+ try{let attachment=null;if(file){const path=channel+'/'+S.perfilId+'/'+id+'/'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100);const up=await sb.storage.from('chat-arquivos').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});if(up.error&&String(up.error.statusCode)!=='409')throw up.error;uploaded=path;attachment={path,nome:file.name.slice(0,180),bytes:file.size,mime:file.type,tipo:file.type.startsWith('audio/')?'audio':file.type.startsWith('video/')?'video':/^image\/(png|jpeg|webp|gif)$/.test(file.type)?'imagem':'arquivo'};}
+ await wrpc('chat_enviar',{p_id:id,p_canal:channel,p_texto:text,p_anexo:attachment,p_resposta:reply||null});WC.drafts[channel]='';WC.reply=null;wcDiscardFile();await wcList(false);await wcRead();wcBottom();
+ }catch(e){if(e.code==='22000')WC.pendingId=null;WC.error=wcError(e);}finally{WC.sending=false;wcDraw();wcMedia();if(!WC.error)wcBottom();}}
+function wcPeople(group){modal(group?'Criar grupo':'Nova conversa',`<form id="waCreateForm"><input type="hidden" id="waGroupMode" value="${group?'1':'0'}">${group?'<div class="field"><label for="waGroupName">Nome do grupo</label><input id="waGroupName" required minlength="2" maxlength="80" placeholder="Ex.: Produção · Evento Roche"></div>':''}<p>Selecione ${group?'os participantes':'uma pessoa'}.</p><div class="wa-people">${USERS.filter(p=>p.id!==S.perfilId).map(p=>`<div class="wa-person"><input id="person_${p.id}" type="${group?'checkbox':'radio'}" name="waPerson" value="${p.id}"><label for="person_${p.id}"><b>${esc(p.nome)}</b><br><small>${esc(p.cargo||PERFIS[p.role]?.label||'')}</small></label></div>`).join('')}</div><div class="wa-modalerr" id="waModalError" role="alert"></div><button class="btn pri" type="submit">${group?'Criar grupo':'Conversar'}</button></form>`,'');}
+async function wcCreate(form){const button=form.querySelector('button');button.disabled=true;try{const group=document.getElementById('waGroupMode').value==='1',members=[...form.querySelectorAll('input[name=waPerson]:checked')].map(x=>x.value);if(!members.length)throw new Error('Selecione pelo menos uma pessoa.');const id=await wrpc('chat_criar',{p_nome:group?document.getElementById('waGroupName').value:null,p_membros:members,p_direta:!group});fecharModal();await wcList(false);await wcOpen(id);}catch(e){document.getElementById('waModalError').textContent=wcError(e);}finally{button.disabled=false;}}
+function wcManage(){const c=wcCurrent();if(!c||c.tipo==='dm')return;const admin=c.membros.some(m=>m.perfil_id===S.perfilId&&m.admin);modal('Dados do grupo',`<div class="field"><label for="waRename">Nome</label><input id="waRename" value="${esc(c.nome)}" maxlength="80" ${admin?'':'readonly'}></div>${admin?'<button class="btn sm" data-wa="rename">Salvar nome</button>':''}<div class="wa-people">${c.membros.map(m=>`<div class="wa-person"><span style="flex:1">${esc(usr(m.perfil_id).nome)} ${m.admin?'<small>· Admin</small>':''}</span>${admin?`<button class="btn sm" data-wa="member" data-id="${m.perfil_id}" data-op="${m.admin?'rebaixar':'promover'}">${m.admin?'Retirar admin':'Tornar admin'}</button>${m.perfil_id!==S.perfilId?`<button class="btn sm" data-wa="member" data-id="${m.perfil_id}" data-op="remover">Remover</button>`:''}`:''}</div>`).join('')}</div>${admin?`<div class="field"><label for="waAddPerson">Adicionar participante</label><select id="waAddPerson"><option value="">Selecione</option>${USERS.filter(p=>!c.membros.some(m=>m.perfil_id===p.id)).map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select><button class="btn sm" data-wa="addMember">Adicionar</button></div>`:''}<div id="waModalError" class="wa-modalerr" role="alert"></div><button class="btn" data-wa="leave">Sair do grupo</button>`,'<button class="btn" data-act="fecharModal">Fechar</button>');}
+async function wcManageDo(op,person=null,name=null){try{await wrpc('chat_gerenciar',{p_canal:WC.selected,p_acao:op,p_pessoa:person,p_nome:name});await wcList(false);if(op==='sair'){WC.selected=null;fecharModal();wcDraw();}else wcManage();}catch(e){document.getElementById('waModalError').textContent=wcError(e);}}
+async function wcRecord(){const recordingChannel=WC.selected;if(WC.recording||WC.sending)return;if(CALL.id)return toast('Encerre a chamada antes de gravar uma mensagem.');try{if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('Gravação de áudio requer HTTPS e um navegador compatível.');const stream=await navigator.mediaDevices.getUserMedia({audio:true});if(WC.selected!==recordingChannel||S.view!=='chat'){stream.getTracks().forEach(t=>t.stop());return;}const mime=['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus'].find(t=>MediaRecorder.isTypeSupported(t));WC.recStream=stream;const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined),chunks=[];WC.rec=rec;WC.recording=true;WC.recSeconds=0;WC.cancelRecording=false;rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};rec.onerror=()=>{WC.cancelRecording=true;wcStopAudio(true);toast('Não foi possível gravar o áudio.');};rec.onstop=()=>{stream.getTracks().forEach(t=>t.stop());clearInterval(WC.recTimer);WC.recording=false;WC.rec=null;WC.recStream=null;if(!WC.cancelRecording){const type=rec.mimeType||mime||'audio/webm',ext=type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm';wcFile(new File(chunks,'Audio-'+Date.now()+'.'+ext,{type}));}else wcDraw();};rec.start(1000);WC.recTimer=setInterval(()=>{WC.recSeconds++;const el=document.getElementById('waRecTime');if(el)el.textContent=WC.recSeconds+'s';if(WC.recSeconds>=300)wcStopAudio();},1000);wcDraw();}catch(e){WC.error=e.name==='NotAllowedError'?'Permita o microfone para gravar áudio.':wcError(e);wcDraw();}}
+function wcStopAudio(cancel=false){WC.cancelRecording=cancel;if(WC.rec?.state!=='inactive')WC.rec?.stop();}
+/* Chamadas WebRTC: malha de até seis participantes; sinalização autenticada no banco. */
+const CALL={id:null,stream:null,peers:new Map(),cursor:0,polling:false,incoming:null,config:null,video:false,busy:false};
+function callHosts(){if(!document.getElementById('waCall')){const h=document.createElement('div');h.innerHTML='<section id="waCall" class="wa-call" hidden aria-label="Chamada em andamento"><div class="wa-call-head"><b id="waCallTitle">Chamada</b><span id="waCallState" role="status">Conectando…</span></div><div id="waVideos" class="wa-videos"></div><div class="wa-call-actions"><button data-wa="mute" id="waMute">Silenciar microfone</button><button data-wa="camera" id="waCamera">Desligar câmera</button><button data-wa="playCall">Ouvir chamada</button><button class="hangup" data-wa="hangup">Encerrar</button></div></section><aside id="waIncoming" class="wa-incoming" hidden><b id="waIncomingTitle"></b><p>Chamada recebida</p><button class="btn pri" data-wa="accept">Atender</button> <button class="btn" data-wa="decline">Recusar</button></aside>';document.body.appendChild(h);}}
+async function callConfig(){const r=await sb.functions.invoke('chat-ice',{body:{}});if(r.error||!r.data?.iceServers?.length)throw new Error('Chamadas precisam da função chat-ice e do serviço TURN configurados. Consulte o guia de instalação.');return {iceServers:r.data.iceServers};}
+function callTile(id,name,stream,local=false){let tile=document.getElementById('call_'+id);if(!tile){tile=document.createElement('div');tile.id='call_'+id;tile.className='wa-tile';const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=local;tile.appendChild(v);const label=document.createElement('span');label.textContent=name;tile.appendChild(label);document.getElementById('waVideos').appendChild(tile);}const v=tile.querySelector('video');if(v.srcObject!==stream)v.srcObject=stream;v.play().catch(()=>{document.getElementById('waCallState').textContent='Toque em Ouvir chamada para ativar o som.';});}
+async function callStart(video,accept=false){const target=WC.selected,invitation=CALL.incoming;if(CALL.busy||CALL.id)return;if(WC.recording)return toast('Pare a gravação de áudio primeiro.');CALL.busy=true;let stream=null,id=null;try{if(!navigator.mediaDevices?.getUserMedia||!window.RTCPeerConnection)throw new Error('Chamadas exigem HTTPS e navegador com câmera/microfone.');CALL.config=await callConfig();stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:video?{width:{ideal:640},height:{ideal:360},facingMode:'user'}:false});if(accept){id=invitation.id;await wrpc('chat_chamada_acao',{p_id:id,p_acao:'entrar'});}else id=await wrpc('chat_ligar',{p_canal:target,p_video:video});CALL.id=id;CALL.video=video;CALL.stream=stream;CALL.cursor=0;callHosts();document.getElementById('waIncoming').hidden=true;document.getElementById('waCall').hidden=false;document.getElementById('waCallTitle').textContent=video?'Chamada de vídeo':'Chamada de voz';document.getElementById('waCamera').hidden=!video;document.getElementById('waMute').textContent='Silenciar microfone';document.getElementById('waCamera').textContent='Desligar câmera';document.getElementById('waCallState').textContent=accept?'Conectando…':'Chamando…';callTile(S.perfilId,'Você',stream,true);await callPoll();}catch(e){stream?.getTracks().forEach(t=>t.stop());toast(e.name==='NotAllowedError'?'Permita acesso ao microfone e à câmera para continuar.':wcError(e));}finally{CALL.busy=false;}}
+async function callSignal(to,data){await wrpc('chat_sinal',{p_id:CALL.id,p_para:to,p_dados:data});}
+function callPeer(id){if(CALL.peers.has(id))return CALL.peers.get(id);const pc=new RTCPeerConnection(CALL.config),entry={pc,ice:[],offered:false};CALL.peers.set(id,entry);CALL.stream.getTracks().forEach(t=>pc.addTrack(t,CALL.stream));pc.onicecandidate=e=>{if(e.candidate&&CALL.id)callSignal(id,{type:'ice',candidate:e.candidate.toJSON()}).catch(()=>{});};pc.ontrack=e=>callTile(id,usr(id).nome,e.streams[0]||new MediaStream([e.track]));pc.onconnectionstatechange=()=>{const el=document.getElementById('waCallState');if(el)el.textContent=pc.connectionState==='connected'?'Em chamada':pc.connectionState==='failed'?'Falha de conexão. Encerre e tente novamente.':'Conectando…';};return entry;}
+async function callPoll(){if(CALL.polling||!S.perfilId)return;CALL.polling=true;try{const data=await wrpc('chat_telefonia',{p_id:CALL.id,p_cursor:CALL.cursor});callHosts();if(!CALL.id){const invite=(data.chamadas||[]).find(c=>c.estado!=='encerrada'&&c.participantes.some(p=>p.perfil_id===S.perfilId&&p.estado==='convidado'));CALL.incoming=invite||null;document.getElementById('waIncoming').hidden=!invite;if(invite)document.getElementById('waIncomingTitle').textContent=usr(invite.autor_id).nome+' · '+(invite.video?'Vídeo':'Voz');return;}
+ const c=data.chamadas.find(x=>x.id===CALL.id);if(!c||c.estado==='encerrada'||!c.participantes.some(p=>p.perfil_id===S.perfilId&&p.estado==='entrou')){callCleanup();toast('Chamada encerrada.');return;}
+ const peers=c.participantes.filter(p=>p.perfil_id!==S.perfilId&&p.estado==='entrou').map(p=>p.perfil_id);
+ for(const [id,entry] of CALL.peers){if(!peers.includes(id)){entry.pc.close();CALL.peers.delete(id);document.getElementById('call_'+id)?.remove();}}
+ for(const id of peers){const e=callPeer(id);if(S.perfilId<id&&!e.offered){e.offered=true;await e.pc.setLocalDescription(await e.pc.createOffer());await callSignal(id,{type:'offer',sdp:e.pc.localDescription.sdp});}}
+ for(const s of data.sinais||[]){if(!peers.includes(s.de)){CALL.cursor=s.id;continue;}const e=callPeer(s.de),d=s.dados;if(d.type==='offer'){await e.pc.setRemoteDescription({type:'offer',sdp:d.sdp});for(const ice of e.ice)await e.pc.addIceCandidate(ice);e.ice=[];await e.pc.setLocalDescription(await e.pc.createAnswer());await callSignal(s.de,{type:'answer',sdp:e.pc.localDescription.sdp});}else if(d.type==='answer'){if(e.pc.signalingState==='have-local-offer')await e.pc.setRemoteDescription({type:'answer',sdp:d.sdp});for(const ice of e.ice)await e.pc.addIceCandidate(ice);e.ice=[];}else if(d.type==='ice'){if(e.pc.remoteDescription)await e.pc.addIceCandidate(d.candidate);else e.ice.push(d.candidate);}CALL.cursor=s.id;}
+ }catch(e){console.warn('Falha na sinalização da chamada',e.message);if(CALL.id)document.getElementById('waCallState').textContent='Conexão instável. Tentando novamente…';}finally{CALL.polling=false;}}
+function callCleanup(){CALL.peers.forEach(e=>e.pc.close());CALL.peers.clear();CALL.stream?.getTracks().forEach(t=>t.stop());CALL.stream=null;CALL.id=null;CALL.cursor=0;CALL.incoming=null;const el=document.getElementById('waCall');if(el)el.hidden=true;const videos=document.getElementById('waVideos');if(videos)videos.replaceChildren();}
+async function callEnd(){const id=CALL.id;callCleanup();if(id)try{await wrpc('chat_chamada_acao',{p_id:id,p_acao:'sair'});}catch{toast('Chamada encerrada neste dispositivo. A sessão remota expira automaticamente.');}}
+async function callDecline(){const id=CALL.incoming?.id;if(!id)return;try{await wrpc('chat_chamada_acao',{p_id:id,p_acao:'recusar'});CALL.incoming=null;document.getElementById('waIncoming').hidden=true;}catch(e){toast(wcError(e));}}
+function iniciarChatCompleto(){clearInterval(WC.poll);WC.poll=setInterval(async()=>{callPoll();if(S.view==='chat'&&!document.hidden&&!WC.sending){const changed=await wcList(false);if(changed){wcDraw();wcMedia();}await wcRead(false,true);}},2500);}
+const iniciarContaChat=iniciarConta;iniciarConta=function(){iniciarContaChat();iniciarChatCompleto();};
+window.addEventListener('beforeunload',e=>{if(CALL.id||WC.recording||WC.sending||WC.file||Object.values(WC.drafts).some(Boolean)){e.preventDefault();e.returnValue='';}});
+document.addEventListener('input',e=>{if(e.target.id==='waText')WC.drafts[WC.selected]=e.target.value;if(e.target.id==='waMessageSearch')WC.searchInput=e.target.value;if(e.target.id==='waSearch'){WC.q=e.target.value;wcDraw();wcMedia();}});
+document.addEventListener('change',e=>{if(e.target.id==='waFile')wcFile(e.target.files[0]);});
+document.addEventListener('keydown',e=>{if(e.target.id==='waText'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();wcSend();}});
+document.addEventListener('submit',e=>{if(e.target.id==='waCreateForm'){e.preventDefault();wcCreate(e.target);}if(e.target.id==='waSearchForm'){e.preventDefault();WC.search=document.getElementById('waMessageSearch').value;wcRead();}});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-wa]');if(!b)return;const action=b.dataset.wa,id=b.dataset.id;
+ try{switch(action){
+ case 'new':wcPeople(false);break;case 'group':wcPeople(true);break;case 'open':if(!WC.sending)await wcOpen(id);break;
+ case 'refresh':await wcList();await wcRead();break;case 'back':if(!WC.recording&&!WC.sending){WC.selected=null;wcDraw();}break;
+ case 'send':await wcSend();break;case 'attach':document.getElementById('waFile')?.click();break;case 'discardFile':if(!WC.sending){wcDiscardFile();wcDraw();}break;
+ case 'record':await wcRecord();break;case 'stopAudio':wcStopAudio();break;case 'cancelAudio':wcStopAudio(true);break;
+ case 'reply':WC.reply=WC.messages.find(m=>m.id===id);wcDraw();document.getElementById('waText')?.focus();break;case 'cancelReply':WC.reply=null;wcDraw();break;
+ case 'older':await wcRead(true);break;case 'download':{const m=WC.messages.find(m=>m.id===id);if(m?.anexo){const url=await wcURL(m.anexo,true);const a=document.createElement('a');a.href=url;a.rel='noopener';a.target='_blank';a.download=m.anexo.nome;a.click();}break;}
+ case 'edit':{const m=WC.messages.find(m=>m.id===id);const text=prompt('Editar mensagem',m.texto);if(text!==null){await wrpc('chat_editar',{p_id:id,p_texto:text,p_apagar:false});await wcRead();}break;}
+ case 'delete':if(confirm('Apagar esta mensagem da conversa? O registro de auditoria será preservado.')){await wrpc('chat_editar',{p_id:id,p_apagar:true});await wcRead();}break;
+ case 'manage':wcManage();break;case 'rename':await wcManageDo('nome',null,document.getElementById('waRename').value);break;
+ case 'member':await wcManageDo(b.dataset.op,id);break;case 'addMember':await wcManageDo('adicionar',document.getElementById('waAddPerson').value||null);break;
+ case 'leave':if(confirm('Sair deste grupo?'))await wcManageDo('sair');break;
+ case 'voice':await callStart(false);break;case 'video':await callStart(true);break;case 'accept':if(CALL.incoming)await callStart(CALL.incoming.video,true);break;case 'decline':await callDecline();break;case 'hangup':await callEnd();break;
+ case 'mute':{const tracks=CALL.stream?.getAudioTracks()||[];tracks.forEach(t=>t.enabled=!t.enabled);b.textContent=tracks[0]?.enabled?'Silenciar microfone':'Ativar microfone';break;}
+ case 'camera':{const tracks=CALL.stream?.getVideoTracks()||[];tracks.forEach(t=>t.enabled=!t.enabled);b.textContent=tracks[0]?.enabled?'Desligar câmera':'Ligar câmera';break;}
+ case 'playCall':document.querySelectorAll('#waVideos video').forEach(v=>v.play().catch(()=>{}));break;
+ }}catch(err){WC.error=wcError(err);wcStatus(WC.error,true);toast(WC.error);}
+});
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"></script>
 <script>
 /* =============================================================
@@ -6309,7 +6608,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Peça à gerência para criar seu usuário e definir o perfil."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.2 · compatível com migração 0007</span></footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.4 · migrações 0007 a 0009</span></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -6331,7 +6630,12 @@ async function recuperarSenha(){
   const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.href });
   telaLogin(error? error.message : "Link de redefinição enviado para "+email.trim()+".", error?null:"ok");
 }
-async function sair(){ if(!await sincronizar()) return; await sb.auth.signOut(); location.reload(); }
+async function sair(){
+  if(typeof WC!=="undefined"&&(WC.sending||WC.recording||WC.file||Object.values(WC.drafts).some(Boolean))){toast("Envie ou limpe o rascunho do chat antes de sair.");go("chat");return;}
+  if(typeof CALL!=="undefined"&&CALL.id)await callEnd();
+  if(MP.dirty||MP.busy){toast("Salve ou descarte as alterações do perfil antes de sair.");go("perfil");return;}
+  if(!await sincronizar())return;await encerrarPresenca();await sb.auth.signOut();location.reload();
+}
 
 /* =============================================================
    2 · CARGA — o banco vira o formato que as telas já usam
@@ -6988,11 +7292,8 @@ async function syncChats(estado){
   for(const c of estado.chats){
     if(igual(c,antes[c.id])) continue;
     if(estado.role!=="gerencia") throw new Error("Peça à gerência para criar o canal desta OS.");
-    const r=await sb.from("canais").upsert({id:c.id,tipo:c.tipo,nome:c.nome||null,os_id:c.osId||null,descricao:c.desc||null});
+    const r=await sb.rpc("chat_os_garantir",{p_dados:{id:c.id,tipo:c.tipo,nome:c.nome||null,os_id:c.osId||null,descricao:c.desc||null},p_membros:pids([...(c.membros||[]),estado.perfilId])});
     if(r.error) throw r.error;
-    const membros=pids([...(c.membros||[]),estado.perfilId]);
-    const m=await sb.from("canal_membros").upsert(membros.map(id=>({canal_id:c.id,perfil_id:id})),{onConflict:"canal_id,perfil_id",ignoreDuplicates:true});
-    if(m.error) throw m.error;
   }
 }
 /* As mensagens do chat só existiam na memória do navegador. */
@@ -7253,6 +7554,7 @@ async function iniciar(){
   if(!podeVer(S.view)) S.view="painel";
   render(); pintarTema();
   ouvirMudancas();
+  iniciarConta();
 }
 
 /* novidades dos outros chegam sozinhas */
@@ -7265,7 +7567,7 @@ function ouvirMudancas(){
     .subscribe();
 }
 let suave=null;
-function recarregarSuave(){ clearTimeout(suave); suave=setTimeout(()=>{ if(!gravando && !temAlteracoes() && !document.querySelector("input:focus,textarea:focus,select:focus,#modalHost .modal")) recarregar(); }, 1200); }
+function recarregarSuave(){ clearTimeout(suave); suave=setTimeout(()=>{ if(S.view!=="perfil" && S.view!=="chat" && !gravando && !temAlteracoes() && !document.querySelector("input:focus,textarea:focus,select:focus,#modalHost .modal")) recarregar(); }, 1200); }
 
 /* ações do cabeçalho e da tela de login */
 document.addEventListener("click", ev=>{
