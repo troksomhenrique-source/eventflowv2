@@ -307,6 +307,7 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
   </div>
 </div>
 <div id="authHost"></div>
+<div id="printHost"></div>
 <div id="modalHost"></div>
 <div class="toast" id="toast"></div>
 <script>
@@ -1123,7 +1124,8 @@ function vOSC(){
       <h2 style="font-size:19px;margin-top:6px">${esc(o?o.evento:c.evento||c.id)}</h2>
       <div class="flex" style="margin-top:5px"><span class="tag">${c.codigo||""}</span>${o?`<span class="tag">${o.codigo||""}</span>`:""}
       <span class="pill ${OSCCOR[c.status]||""}"><span class="dot"></span>${esc(c.status)}</span></div></div>
-    <div class="flex">${acao}${!pode?`<span class="pill warn">somente leitura neste perfil</span>`:""}</div></div>
+    <div class="flex"><button class="btn" data-act="imprimir" data-tipo="carga" data-id="${c.id}">Imprimir romaneio</button>
+      ${acao}${!pode?`<span class="pill warn">somente leitura neste perfil</span>`:""}</div></div>
 
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(275px,1fr))">
     <div class="card"><header><h3>Janela de locação</h3></header><div class="res" style="border:0">
@@ -2287,10 +2289,8 @@ function abaBrief(n){
             <button class="btn" data-act="addNota" data-id="${n.id}">Anotar</button></div>`:""}
           <div id="notasLista" style="display:grid;gap:8px;max-height:260px;overflow-y:auto">${notasHTML(n)}</div>
         </div></div>
-      <div class="card"><header><h3>Escopo calculado</h3><span class="hint">gerado do briefing</span></header>
-        <div id="briefCalc">${escopoHTML(n)}</div></div>
       <div class="card"><header><h3>Fica para a visita técnica</h3></header><div class="pad">
-        <p style="margin:0;font-size:12px;color:var(--ink2);line-height:1.55">O briefing registra a ideia central de cada bloco. Perfil de treliça, medida exata do painel, quantidade de aparelhos, carga do piso, energia e pontos de ancoragem são definidos pela produção depois da visita técnica — o escopo ao lado é só uma estimativa para dimensionar a proposta.</p>
+        <p style="margin:0;font-size:12px;color:var(--ink2);line-height:1.55">O briefing registra a ideia central de cada bloco. Perfil de treliça, medida exata do painel, quantidade de aparelhos, carga do piso, energia e pontos de ancoragem são definidos pela produção depois da visita técnica.</p>
       </div></div>
     </div>
   </div>`;
@@ -2965,7 +2965,9 @@ function abaNeg(n){
   const porAmb = ambs.map(a=>[a, o.linhas.filter(l=>ambDaLinha(l)===a.id)]).filter(x=>x[1].length);
   const soltas = o.linhas.filter(l=>!ambs.some(a=>a.id===ambDaLinha(l)));
   if(soltas.length) porAmb.push([{id:PLENARIA,nome:ambs[0].nome},soltas]);
-  const blocos = porAmb.map(([a,ls])=>[a, CATORC.map(c=>[c, ls.filter(l=>l.cat===c)]).filter(x=>x[1].length),
+  /* categoria fora da lista não pode sumir da tela: entra no fim */
+  const cats = ls => [...CATORC, ...ls.map(l=>l.cat).filter(c=>!CATORC.includes(c))];
+  const blocos = porAmb.map(([a,ls])=>[a, [...new Set(cats(ls))].map(c=>[c, ls.filter(l=>l.cat===c)]).filter(x=>x[1].length),
     ls.reduce((t,l)=>t+(Number(l.qtd)||0)*(l.modo==="diaria"?(Number(l.dias)||1):1)*(Number(l.unit)||0),0)]);
   const inp=(ix,campo,v,cls,tipo)=>`<input class="${cls}" type="${tipo||"number"}" value="${esc(String(v))}" data-orc="${ix}" data-f="${campo}" ${ed?"":"disabled"} step="${campo==="unit"?"10":"1"}" min="0">`;
   return `${ro("orcamento")}
@@ -2979,6 +2981,7 @@ function abaNeg(n){
         <div style="flex:1"></div>
         <span class="pill">${o.linhas.length} linha(s)</span>
         <span class="pill">janela de ${dias} diária${dias>1?"s":""}</span>
+        <button class="btn sm" data-act="imprimir" data-tipo="orcamento" data-id="${n.id}">Imprimir proposta</button>
       </div>
       ${ed?`<div style="padding:12px">${formAdicao(n,dias)}</div>`:""}
       ${ed?barraSelOrc(n):""}
@@ -4423,6 +4426,303 @@ document.addEventListener("input", ev=>{
   if(el.dataset && el.dataset.lgobs!==undefined){ o.logistica.obs=el.value; save(); }
 });
 </script>
+<style>
+/* =================== FOLHA DE IMPRESSÃO ===================
+   Papel branco, tinta preta, independente do tema da tela.
+   Sai pelo "Salvar como PDF" do navegador, então o texto continua
+   selecionável e o arquivo fica leve — melhor que uma captura. */
+#printHost{display:none}
+
+@media print{
+  @page{ size:A4; margin:14mm 12mm 18mm; }
+  html,body{background:#fff !important}
+  body.imprimindo .app,
+  body.imprimindo #modalHost,
+  body.imprimindo #toast,
+  body.imprimindo #authHost{display:none !important}
+  body.imprimindo #printHost{display:block !important}
+  body.imprimindo{color:#111}
+}
+/* pré-visualização na tela, para conferir antes de mandar para o papel */
+body.preview #printHost{display:block;background:#fff;color:#111;max-width:210mm;margin:0 auto;padding:14mm 12mm}
+body.preview .app{display:none}
+
+#printHost{font-family:"IBM Plex Sans",system-ui,sans-serif;color:#111;font-size:10.5pt;line-height:1.45}
+#printHost *{box-sizing:border-box}
+#printHost .folha{page-break-after:always}
+#printHost .folha:last-child{page-break-after:auto}
+
+#printHost .topo{display:flex;align-items:flex-start;gap:16px;border-bottom:2px solid #111;padding-bottom:9px;margin-bottom:14px}
+#printHost .topo .marca{flex:1}
+#printHost .topo .marca b{display:block;font-family:"Archivo",sans-serif;font-size:15pt;font-weight:700;letter-spacing:-.01em;line-height:1.1}
+#printHost .topo .marca span{display:block;font-size:8pt;color:#555;margin-top:2px;line-height:1.35}
+#printHost .topo .doc{text-align:right;white-space:nowrap}
+#printHost .topo .doc b{display:block;font-family:"Archivo",sans-serif;font-size:11pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+#printHost .topo .doc span{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5pt;margin-top:3px}
+#printHost .topo .doc small{display:block;font-size:8pt;color:#555;margin-top:2px}
+
+#printHost h2{font-family:"Archivo",sans-serif;font-size:13pt;font-weight:700;margin:0 0 2px;line-height:1.2}
+#printHost .sub{font-size:9pt;color:#555;margin:0 0 10px}
+
+#printHost .lbl{font-family:"Archivo",sans-serif;font-size:7.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#666}
+#printHost .campos{display:grid;grid-template-columns:repeat(4,1fr);gap:7px 16px;border:1px solid #d5d5d5;border-radius:3px;padding:9px 12px;margin-bottom:11px}
+#printHost .campos .c{min-width:0}
+#printHost .campos .c b{display:block;font-size:10pt;font-weight:600;margin-top:2px;word-wrap:break-word;line-height:1.3}
+#printHost .campos .c b .hr{display:block;font-weight:400;font-size:8.5pt;color:#555;font-family:"IBM Plex Mono",monospace}
+#printHost .campos .c.larga{grid-column:span 2}
+
+#printHost table{width:100%;border-collapse:collapse;margin-bottom:10px}
+#printHost thead{display:table-header-group}
+#printHost tr{break-inside:avoid;page-break-inside:avoid}
+#printHost th{font-family:"Archivo",sans-serif;font-size:7.5pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#444;
+  text-align:left;padding:5px 7px;border-bottom:1.5px solid #111;white-space:nowrap}
+#printHost td{padding:4.5px 7px;border-bottom:1px solid #e2e2e2;vertical-align:top;font-size:9.5pt}
+#printHost th.r,#printHost td.r{text-align:right}
+#printHost td.n{font-family:"IBM Plex Mono",monospace;white-space:nowrap}
+#printHost tr.grupo td{background:#f2f2f2;font-family:"Archivo",sans-serif;font-size:8pt;font-weight:700;
+  letter-spacing:.09em;text-transform:uppercase;padding:5px 7px;border-bottom:1px solid #c9c9c9;border-top:1px solid #c9c9c9}
+#printHost tr.sub td{font-family:"Archivo",sans-serif;font-size:7.5pt;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:#555;padding:4px 7px 3px 16px;border-bottom:1px solid #eee}
+#printHost td .cod{font-family:"IBM Plex Mono",monospace;font-size:8pt;color:#555;display:block;margin-top:1px}
+#printHost td .obs{display:block;font-size:8.5pt;color:#555;margin-top:2px;font-style:italic}
+#printHost td.box{width:22px;text-align:center}
+#printHost td.box i{display:inline-block;width:11px;height:11px;border:1.2px solid #666;border-radius:2px;margin-top:2px}
+
+#printHost .totais{margin-left:auto;width:58%;border-top:2px solid #111;padding-top:7px;break-inside:avoid;page-break-inside:avoid}
+#printHost .totais .l{display:flex;justify-content:space-between;gap:16px;padding:3px 0;font-size:10pt}
+#printHost .totais .l b{font-family:"IBM Plex Mono",monospace}
+#printHost .totais .l.big{border-top:1px solid #111;margin-top:5px;padding-top:7px;font-family:"Archivo",sans-serif;font-size:12pt;font-weight:700}
+#printHost .totais .l.big b{font-size:13pt}
+
+#printHost .nota{break-inside:avoid;page-break-inside:avoid;border:1px solid #d5d5d5;border-left:3px solid #111;border-radius:3px;padding:8px 12px;margin-bottom:9px;font-size:9.5pt;line-height:1.45}
+#printHost .nota .lbl{display:block;margin-bottom:4px}
+#printHost .lbl{display:block}
+#printHost .resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:11px}
+#printHost .resumo .k{border:1px solid #d5d5d5;border-radius:3px;padding:6px 10px}
+#printHost .resumo .k b{display:block;font-family:"IBM Plex Mono",monospace;font-size:14pt;font-weight:600;line-height:1.1}
+
+#printHost .assina{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:13px;break-inside:avoid;page-break-inside:avoid}
+#printHost .assina.q4{grid-template-columns:repeat(4,1fr);gap:14px}
+#printHost .assina .a{border-top:1px solid #111;padding-top:5px;font-size:8pt;color:#444;line-height:1.4}
+#printHost .assina .a b{display:block;font-size:9pt;color:#111;font-weight:600;margin-bottom:2px}
+#printHost .assina.q4 .a{min-height:34px}
+#printHost .legenda{margin:-4px 0 11px;font-size:7.5pt;color:#777;line-height:1.5}
+#printHost .rodape{margin-top:13px;padding-top:6px;border-top:1px solid #d5d5d5;font-size:7.5pt;color:#777;line-height:1.5}
+</style>
+<script>
+/* ================= IMPRESSÃO =================
+   O orçamento e a ordem de carga saem em papel A4 branco. A tela é escura
+   e cheia de controle; o papel é o contrário — só o que a pessoa do outro
+   lado precisa ler, com espaço para assinar. */
+
+/* Editável: é o que aparece no cabeçalho do documento impresso. */
+const EMPRESA = {
+  nome:   "EventFlow",
+  linha1: "Locação de equipamentos para eventos",
+  linha2: ""     /* CNPJ · endereço · telefone · e-mail */
+};
+
+const pEsc = s => esc(s==null?"":String(s));
+const pCampo = (l,v,larga,sufixo) => `<div class="c ${larga?"larga":""}"><span class="lbl">${pEsc(l)}</span>
+  <b>${pEsc(v||"—")}${sufixo?`<span class="hr">${pEsc(sufixo)}</span>`:""}</b></div>`;
+const pTopo = (titulo,codigo,extra) => `<div class="topo">
+  <div class="marca"><b>${pEsc(EMPRESA.nome)}</b>
+    <span>${pEsc(EMPRESA.linha1)}${EMPRESA.linha2?"<br>"+pEsc(EMPRESA.linha2):""}</span></div>
+  <div class="doc"><b>${pEsc(titulo)}</b><span>${pEsc(codigo)}</span>
+    <small>emitido em ${dtl(HOJE)}${extra?" · "+pEsc(extra):""}</small></div>
+</div>`;
+const pPeriodo = (a,b) => a===b ? dtl(a) : dtl(a)+" a "+dtl(b);
+
+/* ---------- orçamento ---------- */
+function folhaOrcamento(n){
+  const c=cli(n.cliente), t=orcTotais(n), ambs=ambientes(n);
+  const dias=Math.max(1,diffDays(n.montagem||HOJE,n.desmontagem||HOJE));
+  const porAmb=ambs.map(a=>[a,n.orc.linhas.filter(l=>ambDaLinha(l)===a.id)]).filter(x=>x[1].length);
+  const soltas=n.orc.linhas.filter(l=>!ambs.some(a=>a.id===ambDaLinha(l)));
+  if(soltas.length) porAmb.push([{id:PLENARIA,nome:ambs[0].nome},soltas]);
+  const valorDe=l=>(Number(l.qtd)||0)*(l.modo==="diaria"?(Number(l.dias)||1):1)*(Number(l.unit)||0);
+
+  const corpo = porAmb.map(([amb,ls])=>{
+    const totAmb=ls.reduce((s,l)=>s+valorDe(l),0);
+    /* a categoria que não está na lista padrão entra no fim, em vez de sumir do papel */
+    const ordem=[...new Set([...CATORC, ...ls.map(l=>l.cat)])];
+    const cats=ordem.map(cc=>[cc,ls.filter(l=>l.cat===cc)]).filter(x=>x[1].length);
+    return (ambs.length>1?`<tr class="grupo"><td colspan="5">${pEsc(amb.nome)}</td><td class="r n">${brl(totAmb)}</td></tr>`:"")
+      + cats.map(([cc,lls])=>`<tr class="sub"><td colspan="6">${pEsc(cc)}</td></tr>`
+        + lls.map(l=>`<tr>
+            <td>${pEsc(l.nome)}${l.cod?`<span class="cod">${pEsc(l.cod)}</span>`:""}
+              ${l.obs?`<span class="obs">${pEsc(l.obs)}</span>`:""}</td>
+            <td class="r n">${dec(l.qtd,0)}</td>
+            <td class="r n">${l.modo==="diaria"?dec(l.dias||1,0):"—"}</td>
+            <td class="r n">${brl(l.unit)}</td>
+            <td class="r n">${l.modo==="diaria"?"diária":"fechado"}</td>
+            <td class="r n">${brl(valorDe(l))}</td></tr>`).join("")).join("");
+  }).join("");
+
+  return `<div class="folha">
+    ${pTopo("Proposta comercial", n.codigo||"", "válida "+(n.orc.validade?"até "+dtl(n.orc.validade):"por 15 dias"))}
+    <h2>${pEsc(n.titulo)}</h2>
+    <p class="sub">${pEsc(c.nome)}${c.contato?" · a/c "+pEsc(c.contato):""}</p>
+
+    <div class="campos">
+      ${pCampo("Local", (n.local||"—")+(n.sala?" · "+n.sala:""), true)}
+      ${pCampo("Cidade", n.cidade)}
+      ${pCampo("Público", n.publico?n.publico.toLocaleString("pt-BR")+" pessoas":"—")}
+      ${pCampo("Montagem", n.montagem?dtl(n.montagem):"—", false, n.montagemHora?"a partir das "+n.montagemHora:"")}
+      ${pCampo("Realização", n.evIni?pPeriodo(n.evIni,n.evFim||n.evIni):"—", true, n.evIniHora?"a partir das "+n.evIniHora:"")}
+      ${pCampo("Desmontagem", n.desmontagem?dtl(n.desmontagem):"—", false, n.desmontagemHora?"a partir das "+n.desmontagemHora:"")}
+      ${pCampo("Período de locação", dias+" diária"+(dias>1?"s":""))}
+      ${ambs.length>1?pCampo("Ambientes", ambs.map(a=>a.nome).join(" · "), true):""}
+      ${pCampo("Contato", [c.tel,c.email].filter(Boolean).join(" · "), true)}
+    </div>
+
+    <table><thead><tr>
+      <th>Item</th><th class="r">Qtd</th><th class="r">Diárias</th>
+      <th class="r">Valor unit.</th><th class="r">Cobrança</th><th class="r">Subtotal</th>
+    </tr></thead><tbody>${corpo||`<tr><td colspan="6">Sem itens lançados.</td></tr>`}</tbody></table>
+
+    <div class="totais">
+      <div class="l"><span>Equipamento de locação</span><b>${brl(t.subEstoque)}</b></div>
+      ${t.subExterno?`<div class="l"><span>Serviços e sublocação</span><b>${brl(t.subExterno)}</b></div>`:""}
+      <div class="l"><span>Subtotal</span><b>${brl(t.subtotal)}</b></div>
+      ${t.descV?`<div class="l"><span>Desconto de ${dec(n.orc.desconto,1)}%</span><b>− ${brl(t.descV)}</b></div>`:""}
+      <div class="l big"><span>Valor total</span><b>${brl(t.total)}</b></div>
+    </div>
+
+    ${n.orc.condicoes?`<div class="nota"><span class="lbl">Condições de pagamento</span>${pEsc(n.orc.condicoes)}</div>`:""}
+    ${n.orc.obsGeral?`<div class="nota"><span class="lbl">Observações</span>${pEsc(n.orc.obsGeral)}</div>`:""}
+
+    <div class="assina">
+      <div class="a"><b>${pEsc(EMPRESA.nome)}</b>Responsável comercial</div>
+      <div class="a"><b>${pEsc(c.nome)}</b>De acordo · data ___/___/______</div>
+    </div>
+
+    <div class="rodape">Os valores acima cobrem locação, montagem, operação e desmontagem no período indicado.
+      Alterações de escopo, prorrogação de diárias ou mudança de local podem alterar o valor.
+      Esta proposta não reserva o equipamento — a reserva se dá com o aceite formal.</div>
+  </div>`;
+}
+
+/* ---------- ordem de carga ---------- */
+function folhaCarga(c){
+  const o=c.osId?osById(c.osId):null;
+  const cl=o?cli(o.cliente):{nome:"—"};
+  const t=somaTecnica(c.itens);
+  const comCod=c.itens.filter(i=>i.cod), avulsos=c.itens.filter(i=>!i.cod);
+  const porCat={}; comCod.forEach(i=>{ const k=item(i.cod).cat||"Outros"; (porCat[k]=porCat[k]||[]).push(i); });
+  const cats=[...CATEGORIAS,...Object.keys(porCat).filter(k=>!CATEGORIAS.includes(k))]
+    .map(k=>[k,porCat[k]||[]]).filter(x=>x[1].length);
+
+  const linha=i=>{ const it=item(i.cod);
+    return `<tr><td class="box"><i></i></td>
+      <td>${pEsc(it.nome)}<span class="cod">${pEsc(i.cod)}</span>
+        ${i.obs?`<span class="obs">${pEsc(i.obs)}</span>`:""}</td>
+      <td class="r n" style="font-weight:600">${i.qtd}</td>
+      <td class="r n">${cases(i.cod,i.qtd)}</td>
+      <td class="r n">${kg(it.peso*i.qtd)}</td>
+      <td class="box"><i></i></td></tr>`; };
+
+  return `<div class="folha">
+    ${pTopo("Ordem de carga", c.codigo||"", c.status)}
+    <h2>${pEsc(o?o.evento:(c.evento||"Carga avulsa"))}</h2>
+    <p class="sub">${pEsc(cl.nome)}${o&&o.local?" · "+pEsc(o.local):""}</p>
+
+    <div class="campos">
+      ${pCampo("Carga", dtl(c.carga), false, c.horaCarga?"a partir das "+c.horaCarga:"")}
+      ${pCampo("Descarga prevista", dtl(c.descarga))}
+      ${pCampo("OS de venda", o?(o.codigo||"—"):"—")}
+      ${pCampo("Conferente", c.conferente||"—")}
+      ${pCampo("Veículo", c.veiculo, true)}
+      ${pCampo("Equipe", c.equipe, true)}
+      ${o&&o.local?pCampo("Endereço de entrega", (o.local||"")+(o.cidade?" · "+o.cidade:""), true):""}
+      ${(c.ambientes||[]).length>1?pCampo("Ambientes", c.ambientes.map(a=>a.nome).join(" · "), true):""}
+    </div>
+
+    <div class="resumo">
+      <div class="k"><span class="lbl">Peças</span><b>${t.pecas}</b></div>
+      <div class="k"><span class="lbl">Cases</span><b>${t.cases}</b></div>
+      <div class="k"><span class="lbl">Peso</span><b>${kg(t.peso)}<span style="font-size:8pt;color:#666"> kgf</span></b></div>
+      <div class="k"><span class="lbl">Demanda</span><b>${dec(t.kva,1)}<span style="font-size:8pt;color:#666"> kVA</span></b></div>
+    </div>
+
+    <table><thead><tr>
+      <th class="box">Sep.</th><th>Item</th><th class="r">Qtd</th>
+      <th class="r">Cases</th><th class="r">Peso (kgf)</th><th class="box">Ret.</th>
+    </tr></thead><tbody>
+      ${cats.map(([k,its])=>`<tr class="grupo"><td colspan="6">${pEsc(k)} · ${its.reduce((s,i)=>s+i.qtd,0)} peças</td></tr>`
+        + its.map(linha).join("")).join("")
+        || `<tr><td colspan="6">Romaneio vazio.</td></tr>`}
+    </tbody></table>
+
+    <p class="legenda">Marque <b>Sep.</b> ao separar e <b>Ret.</b> ao conferir o retorno. Peça avariada não volta ao saldo — registre na descarga.</p>
+
+    ${avulsos.length?`<div class="nota"><span class="lbl">Fora do estoque · recados da produção</span>
+      ${avulsos.map(i=>`<div style="margin-top:3px">• <b>${pEsc(i.nome||"Linha avulsa")}</b>${i.qtd>1?" ("+i.qtd+")":""}${i.obs?" — "+pEsc(i.obs):""}</div>`).join("")}</div>`:""}
+    ${c.obs?`<div class="nota"><span class="lbl">Observações</span>${pEsc(c.obs)}</div>`:""}
+
+    <div class="assina q4">
+      <div class="a"><b>Separação</b>Nome · ___/___/____</div>
+      <div class="a"><b>Recebido no evento</b>Nome · ___/___/____</div>
+      <div class="a"><b>Retorno conferido</b>Nome · ___/___/____</div>
+      <div class="a"><b>Avarias</b>__________________</div>
+    </div>
+
+  </div>`;
+}
+
+/* ---------- disparo ---------- */
+function montarFolha(tipo,id){
+  if(tipo==="orcamento"){ const n=neg(id); return n?folhaOrcamento(n):""; }
+  if(tipo==="carga"){ const c=oscById(id); return c?folhaCarga(c):""; }
+  return "";
+}
+function imprimir(tipo,id){
+  const html=montarFolha(tipo,id);
+  if(!html) return toast("Não encontrei o documento para imprimir.");
+  const host=document.getElementById("printHost");
+  host.innerHTML=html;
+  document.body.classList.add("imprimindo");
+  /* o navegador precisa de um quadro para aplicar o estilo antes de medir as páginas */
+  requestAnimationFrame(()=>{ window.print(); });
+}
+function preverImpressao(tipo,id){
+  const html=montarFolha(tipo,id);
+  if(!html) return;
+  const host=document.getElementById("printHost");
+  host.innerHTML=`<div class="prevbar">
+      <button class="btn pri" data-act="imprimirAgora">Imprimir ou salvar em PDF</button>
+      <button class="btn" data-act="fecharPrev">Voltar</button>
+      <span class="muted" style="font-size:12px">No diálogo, escolha <b>Salvar como PDF</b> — o texto continua selecionável.</span>
+    </div>`+html;
+  document.body.classList.add("preview");
+  window.scrollTo({top:0});
+}
+function fecharPreview(){
+  document.body.classList.remove("preview");
+  document.getElementById("printHost").innerHTML="";
+}
+window.addEventListener("afterprint", ()=>{
+  document.body.classList.remove("imprimindo");
+  if(!document.body.classList.contains("preview")) document.getElementById("printHost").innerHTML="";
+});
+document.addEventListener("click", ev=>{
+  const t=ev.target.closest("[data-act]"); if(!t) return;
+  const a=t.dataset.act;
+  if(a==="imprimir"){ preverImpressao(t.dataset.tipo, t.dataset.id); return; }
+  if(a==="imprimirAgora"){
+    document.body.classList.add("imprimindo");
+    requestAnimationFrame(()=>window.print());
+    return;
+  }
+  if(a==="fecharPrev"){ fecharPreview(); render(); return; }
+});
+</script>
+<style>
+#printHost .prevbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:-6mm -6mm 10mm;padding:10px 12px;border-radius:8px;background:#f4f4f5;border:1px solid #dcdcdf;color:#111}
+#printHost .prevbar .muted{color:#555}
+@media print{ #printHost .prevbar{display:none !important} }
+</style>
 <script>
 /* ---------------- render ---------------- */
 function render(){
