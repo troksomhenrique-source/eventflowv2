@@ -1932,7 +1932,7 @@ function porCategoria(itens){
 const TEMPS={quente:"Quente",morno:"Morno",frio:"Frio"};
 const neg = id => S.negocios.find(n=>n.id===id);
 const vazioBrief = () => ({
-  sala:{nome:"",comprimento:0,largura:0,area:0,peDireito:0,ancoragem:"confirmar",cargaPiso:500,pontos:0,energia:0,acesso:"",elevador:false,obs:""},
+  sala:{nome:"",comprimento:0,largura:0,area:0,peDireito:0,ancoragem:"confirmar",cargaPiso:500,wllPonto:0,pontos:0,energia:0,acesso:"",elevador:false,obs:""},
   led:{tem:false,porte:"Backdrop padrão",pitch:"P3.9",larg:0,alt:0,obs:""},
   palco:{tem:false,porte:"Médio",larg:0,prof:0,alt:0.4,tipo:"Praticável modular",obs:""},
   estrutura:{tem:false,porte:"Grid suspenso",tipo:"Q30",vao:0,config:"Grid",obs:""},
@@ -2003,12 +2003,12 @@ function inferirPortes(n){
 const PLENARIA = "plenaria";
 const areaRetangular = a => Math.round(Math.max(0,Number(a.comprimento)||0)*Math.max(0,Number(a.largura)||0)*100)/100;
 const vazioAmbiente = nome => ({id:uid(), nome:nome||"", comprimento:0,largura:0,area:0, peDireito:0,
-  cargaPiso:500, pontos:0, energia:0, obs:""});
+  cargaPiso:500, wllPonto:0,pontos:0, energia:0, obs:""});
 
 function ambientes(n){
   const b=n.brief||vazioBrief(), s=b.sala||{};
   return [{id:PLENARIA, nome:s.nome||"Plenária", comprimento:s.comprimento||0,largura:s.largura||0,area:s.area||0, peDireito:s.peDireito||0,
-           cargaPiso:s.cargaPiso||500, pontos:s.pontos||0, energia:s.energia||0, obs:s.obs||"", principal:true},
+           cargaPiso:s.cargaPiso||500, pontos:s.pontos||0,wllPonto:s.wllPonto||0, energia:s.energia||0, obs:s.obs||"", principal:true},
           ...(b.ambientes||[])];
 }
 const ambiente  = (n,id) => ambientes(n).find(a=>a.id===id) || ambientes(n)[0];
@@ -2226,6 +2226,7 @@ function ambientesHTML(n,ed){
     <label>área m²<input type="number" min="0" step="0.01" value="${a.area||0}" data-amb="${a.id}" data-f="area" ${ed?"":"disabled"}></label>
     <label>pé-direito<input type="number" step="0.5" value="${a.peDireito||0}" data-amb="${a.id}" data-f="peDireito" ${ed?"":"disabled"}></label>
     <label>piso kgf/m²<input type="number" step="50" value="${a.cargaPiso||500}" data-amb="${a.id}" data-f="cargaPiso" ${ed?"":"disabled"}></label>
+    <label>kgf por ponto<input type="number" min="0" step="0.01" value="${a.wllPonto||0}" data-amb="${a.id}" data-f="wllPonto" ${ed?"":"disabled"}></label>
     <label>pontos<input type="number" step="1" value="${a.pontos||0}" data-amb="${a.id}" data-f="pontos" ${ed?"":"disabled"}></label>
     ${ed?`<button class="btn sm ghost" data-act="rmAmbiente" data-id="${n.id}" data-a="${a.id}" title="Remover">×</button>`:""}
   </div>`;
@@ -2306,7 +2307,7 @@ function abaBrief(n){
         <div class="row2">${fld("Comprimento da sala (m)","sala.comprimento",b.sala.comprimento||0,"number",'min="0" step="0.01"')}${fld("Largura da sala (m)","sala.largura",b.sala.largura||0,"number",'min="0" step="0.01"')}</div>
         <div class="row2">${fld("Sala, salão ou área","sala.nome",b.sala.nome)}${fld("Área aproximada (m²)","sala.area",b.sala.area,"number",'min="0" step="0.01"')}</div>
         ${fld("Pé-direito aproximado (m)","sala.peDireito",b.sala.peDireito,"number",'step="0.5"')}
-        ${fld("Pontos de ancoragem","sala.pontos",b.sala.pontos||0,"number",'min="0" step="1"')}
+        <div class="row2">${fld("Pontos de ancoragem","sala.pontos",b.sala.pontos||0,"number",'min="0" step="1"')}${fld("Capacidade por ponto (kgf)","sala.wllPonto",b.sala.wllPonto||0,"number",'min="0" step="0.01"')}</div>
         <div class="field"><label for="f_sala_obs">Observações do local</label>
           <textarea id="f_sala_obs" rows="2" style="font-family:var(--sans)" data-negb="sala.obs" placeholder="Acesso difícil, restrição de horário, piso de madeira…">${esc(b.sala.obs)}</textarea></div>
       </div></div>
@@ -2770,11 +2771,11 @@ function gerarOSVdeNegocio(negId){
     ambientes:ambs.map(a=>({id:a.id,nome:a.nome,principal:!!a.principal,comprimento:a.comprimento||0,largura:a.largura||0})),
     itens:[...e.map(i=>({...i,id:uid(),aereo:item(i.cod).rig==="aereo"?i.qtd:0})), ...avulsos],
     solo:{area:b.sala.area||200,adm:b.sala.cargaPiso||500,admPont:600,publicoKgm2:pubKg,torres,apoios:4,feito:false},
-    aereo:{pontos:b.sala.pontos||8,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:b.estrutura.vao||10,feito:false},
+    aereo:{pontos:b.sala.pontos||0,wllPonto:b.sala.wllPonto||0,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:b.estrutura.vao||10,feito:false},
     /* cada sala de B.U. começa com os números que o briefing anotou para ela */
     mem:Object.fromEntries(ambs.filter(a=>!a.principal).map(a=>[a.id,{
       solo:{area:a.area||100,adm:a.cargaPiso||500,admPont:600,publicoKgm2:pubKg,torres:!(a.pontos>0),apoios:4,feito:false},
-      aereo:{pontos:a.pontos||0,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:false},
+      aereo:{pontos:a.pontos||0,wllPonto:a.wllPonto||0,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:10,feito:false},
       ancoragens:null}])),
     descritivo:desc,etapaAtual:"escopo"});
   n.osId=id; n.etapa="finalizacao"; n.valor=valor;
@@ -6875,7 +6876,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Solicite seu cadastro ao responsável pela plataforma."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.24.5 · campo de pontos simplificado</span><br><a href="owner.html">Administração da plataforma</a></footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.24.6 · capacidade por ponto no briefing</span><br><a href="owner.html">Administração da plataforma</a></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -6936,7 +6937,7 @@ function mapNegocio(n){
   const b=vazioBrief();
   if(n.negocio_sala){ const s=n.negocio_sala;
     Object.assign(b.sala,{nome:n.sala||"",area:num(s.area_m2),comprimento:num(s.comprimento_m),largura:num(s.largura_m),peDireito:num(s.pe_direito),ancoragem:s.ancoragem,
-      cargaPiso:num(s.carga_piso),energia:num(s.energia_kva),pontos:s.pontos||0,acesso:s.acesso||"",
+      cargaPiso:num(s.carga_piso),energia:num(s.energia_kva),pontos:s.pontos||0,wllPonto:num(s.wll_ponto_kgf),acesso:s.acesso||"",
       elevador:!!s.elevador,obs:s.observacao||""}); }
   (n.briefing_blocos||[]).forEach(x=>{ if(b[x.bloco]){ b[x.bloco].tem=x.incluso; b[x.bloco].porte=x.porte||b[x.bloco].porte; b[x.bloco].obs=x.observacao||""; if(x.bloco==="led" && x.largura_m!=null && x.altura_m!=null){b.led.larg=num(x.largura_m);b.led.alt=num(x.altura_m);} }});
   /* a plenária é o ambiente principal e já está em b.sala; aqui vêm as demais */
@@ -6945,7 +6946,7 @@ function mapNegocio(n){
   if(princ) b.sala.nome = princ.nome || b.sala.nome;
   b.ambientes = ambs.filter(x=>!x.principal).map(x=>({id:x.id, nome:x.nome, comprimento:num(x.comprimento_m),largura:num(x.largura_m),area:num(x.area_m2),
     peDireito:num(x.pe_direito), cargaPiso:num(x.carga_piso), energia:num(x.energia_kva),
-    pontos:x.pontos||0, obs:x.observacao||""}));
+    pontos:x.pontos||0,wllPonto:num(x.wll_ponto_kgf), obs:x.observacao||""}));
   const vt=vazioVT();
   if(n.visitas_tecnicas){ const v=n.visitas_tecnicas;
     Object.assign(vt,{feita:v.realizada,data:v.data||"",hora:v.hora||"",resumo:v.resumo||""}); }
@@ -7301,7 +7302,7 @@ async function syncNegocios(estado){
       const dadosPlen={negocio_id:n.id,nome:n.brief.sala.nome||"Plenária",principal:true,
         area_m2:n.brief.sala.area,comprimento_m:n.brief.sala.comprimento||0,largura_m:n.brief.sala.largura||0,pe_direito:n.brief.sala.peDireito,
         carga_piso:n.brief.sala.cargaPiso,energia_kva:n.brief.sala.energia,
-        pontos:n.brief.sala.pontos,observacao:nz(n.brief.sala.obs),ordem:0};
+        pontos:n.brief.sala.pontos,wll_ponto_kgf:n.brief.sala.wllPonto||0,observacao:nz(n.brief.sala.obs),ordem:0};
       /* A plenária é achada por negocio_id + principal, nunca pelo nome: dar
          nome à sala no briefing é renomear a que existe, não criar outra.
          Pelo nome, um upsert com nome novo inseria uma segunda principal e
@@ -7320,7 +7321,7 @@ async function syncNegocios(estado){
       if(extras.length){
         r=await sb.from("negocio_ambientes").upsert(extras.map((x,i)=>({id:x.id,negocio_id:n.id,nome:x.nome||("Sala "+(i+2)),
           principal:false,comprimento_m:x.comprimento||0,largura_m:x.largura||0,area_m2:x.area||0,pe_direito:x.peDireito||0,carga_piso:x.cargaPiso||500,
-          energia_kva:x.energia||0,pontos:x.pontos||0,observacao:nz(x.obs),ordem:i+1})),
+          energia_kva:x.energia||0,pontos:x.pontos||0,wll_ponto_kgf:x.wllPonto||0,observacao:nz(x.obs),ordem:i+1})),
           {onConflict:"id"});
         if(r.error) throw r.error;
       }
@@ -7331,7 +7332,7 @@ async function syncNegocios(estado){
       if(r.error) throw r.error;
       r=await sb.from("negocio_sala").upsert({negocio_id:n.id,area_m2:n.brief.sala.area,comprimento_m:n.brief.sala.comprimento||0,largura_m:n.brief.sala.largura||0,
         pe_direito:n.brief.sala.peDireito,ancoragem:n.brief.sala.ancoragem,carga_piso:n.brief.sala.cargaPiso,
-        energia_kva:n.brief.sala.energia,pontos:n.brief.sala.pontos,acesso:nz(n.brief.sala.acesso),
+        energia_kva:n.brief.sala.energia,pontos:n.brief.sala.pontos,wll_ponto_kgf:n.brief.sala.wllPonto||0,acesso:nz(n.brief.sala.acesso),
         elevador:!!n.brief.sala.elevador,observacao:nz(n.brief.sala.obs)});
       if(r.error) throw r.error;
     }
