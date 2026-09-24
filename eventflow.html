@@ -293,7 +293,7 @@ button:disabled{cursor:not-allowed;opacity:.6}
   <aside class="side" id="side">
     <div class="brand">
       <span class="mk"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--onAccent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h6M2.5 8h8.5M2.5 11.5h6"/><path d="M11.2 4.6L14 8l-2.8 3.4"/></svg></span>
-      <span><b>EventFlow</b><span>Locação de eventos</span></span>
+      <span><b>EventFlow</b><span id="empresaAtual">Locação de eventos</span></span>
     </div>
     <div class="navwrap" id="nav"></div>
     <div class="sidefoot">
@@ -5976,8 +5976,9 @@ let focoAntesModal=null;
 function modal(title, body, footer){
   focoAntesModal=document.activeElement;
   $("#modalHost").innerHTML = `<div class="ovl" data-act="fecharModal"><div class="modal" data-stop="1" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
-    <header><h3 id="modalTitle">${esc(title)}</h3><button class="x" data-act="fecharModal" aria-label="Fechar">×</button></header>
+    <header><h3 id="modalTitle">${esc(title)}</h3><button type="button" class="x" data-act="fecharModal" aria-label="Fechar">×</button></header>
     <div class="body">${body}</div><footer>${footer}</footer></div></div>`;
+  document.querySelectorAll('#modalHost button[data-act="fecharModal"]').forEach(b=>b.type="button");
 }
 const fecharModal = ()=>{ $("#modalHost").innerHTML=""; if(focoAntesModal?.isConnected) focoAntesModal.focus(); };
 document.addEventListener("keydown",ev=>{
@@ -6193,7 +6194,13 @@ function acaoPrincipal(a, id, t){
 document.addEventListener("click", ev=>{
   const t=ev.target.closest("[data-act]");
   if(!t){ return; }
-  if(t.dataset.act==="fecharModal" && ev.target.closest("[data-stop]") && ev.target.closest("[data-act]")!==t) return;
+  if(t.dataset.act==="fecharModal"){
+    // Campos sem ação herdam o data-act do fundo: só o próprio fundo fecha.
+    if(t.classList.contains("ovl") && ev.target!==t) return;
+    ev.preventDefault();
+    fecharModal();
+    return;
+  }
   acaoPrincipal(t.dataset.act, t.dataset.id, t);
 });
 document.addEventListener("input", ev=>{
@@ -6210,7 +6217,7 @@ document.addEventListener("input", ev=>{
 document.addEventListener("change", ev=>{ if(ev.target.type==="checkbox" && ev.target.dataset.calc) liveCalc(ev.target);
   if(ev.target.dataset && ev.target.dataset.rig!==undefined) render(); });
 $("#scrim").addEventListener("click",()=>{$("#side").classList.remove("open");$("#scrim").classList.remove("on");});
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") fecharModal(); });
+
 
 /* ---------------- Enter envia os formulários da página ---------------- */
 function foco(id){ requestAnimationFrame(()=>{ const e=document.getElementById(id); if(e){ e.focus(); if(e.select) try{e.select();}catch(x){} } }); }
@@ -6656,7 +6663,7 @@ function telaLogin(msg, tipo){
     <div class="brandline"><span class="mk"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="var(--onAccent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h6M2.5 8h8.5M2.5 11.5h6"/><path d="M11.2 4.6L14 8l-2.8 3.4"/></svg></span><b>EventFlow</b></div>
     <form id="formLogin" autocomplete="on">
       <div><h2>Entrar na operação</h2>
-        <p class="sub">Use o e-mail cadastrado pela gerência. O que você vê depende do seu perfil.</p></div>
+        <p class="sub">Use o e-mail cadastrado para sua empresa. O que você vê depende do seu perfil.</p></div>
       ${msg?`<div class="${tipo==="ok"?"ok":"erro"}">${esc(msg)}</div>`:""}
       <div class="field"><label for="liEmail">E-mail</label>
         <input id="liEmail" type="email" autocomplete="username" required placeholder="voce@empresa.com.br"></div>
@@ -6666,8 +6673,8 @@ function telaLogin(msg, tipo){
       <button class="btn ghost" type="button" data-act="recuperar" style="justify-content:center">Esqueci a senha</button>
     </form>
     <footer>${configurado()
-      ? "Primeiro acesso? Peça à gerência para criar seu usuário e definir o perfil."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.5 · migrações 0007 a 0010</span></footer>
+      ? "Primeiro acesso? Solicite seu cadastro ao responsável pela plataforma."
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.7 · migrações 0007 a 0011</span><br><a href="owner.html">Administração da plataforma</a></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -6847,7 +6854,7 @@ const mapMov = m => ({id:m.id, codigo:m.codigo, data:m.data, tipo:m.tipo==="SAID
   avarias:(m.movimento_linhas||[]).filter(l=>l.avaria>0).map(l=>[l.item_cod,l.avaria])});
 
 function urlFoto(path){
-  const { data } = sb.storage.from("vt-fotos").getPublicUrl(path);
+  const data = null;
   return data?.publicUrl || "";
 }
 
@@ -7040,7 +7047,7 @@ async function syncKits(estado){
   const antes=porId(ultimo.kits), agora=porId(estado.kits);
   for(const k of estado.kits){
     if(igual(k,antes[k.cod])) continue;
-    let r=await sb.from("kits").upsert({cod:k.cod,nome:k.nome,categoria:k.cat,observacao:nz(k.obs)});
+    let r=await sb.from("kits").upsert({empresa_id:S.empresaId,cod:k.cod,nome:k.nome,categoria:k.cat,observacao:nz(k.obs)},{onConflict:"empresa_id,cod"});
     if(r.error) throw r.error;
     await substituirRelacoes("kit_itens","kit_cod",k.cod,k.itens.map(x=>({kit_cod:k.cod,item_cod:x.cod,quantidade:x.qtd})));
   }
@@ -7052,7 +7059,7 @@ async function syncFrota(estado){
   const up=estado.frota.filter(v=>!igual(v,antes[v.cod])).map(v=>({cod:v.cod,nome:v.nome,tipo:v.tipo,placa:nz(v.placa),
     capacidade_kg:v.capKg,capacidade_cases:v.capCases,lugares:v.lugares,observacao:nz(v.obs),em_manutencao:!!v.manut}));
   const del=Object.keys(antes).filter(c=>!agora[c]);
-  if(up.length){ const r=await sb.from("frota").upsert(up); if(r.error) throw r.error; }
+  if(up.length){ const r=await sb.from("frota").upsert(up.map(x=>({...x,empresa_id:S.empresaId})),{onConflict:"empresa_id,cod"}); if(r.error) throw r.error; }
   if(del.length){ const r=await sb.from("frota").delete().in("cod",del); if(r.error) throw r.error; }
 }
 async function syncClientes(estado){
@@ -7457,7 +7464,7 @@ lerFotos = async function(negId, files){
         cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
         cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
         cv.toBlob(async blob=>{
-          const path=negId+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,7)+".jpg";
+          const path=S.empresaId+"/"+negId+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,7)+".jpg";
           const up=await sb.storage.from("vt-fotos").upload(path, blob, {contentType:"image/jpeg"});
           if(up.error) return erro(up.error,"Falha ao enviar a foto");
           const ins=await sb.from("vt_fotos").insert({negocio_id:negId,storage_path:path,
@@ -7492,7 +7499,7 @@ lerNota = async function(reembId, files){
       cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
       cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
       cv.toBlob(async blob=>{
-        const path=reembId+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,7)+".jpg";
+        const path=S.empresaId+"/"+reembId+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,7)+".jpg";
         const up=await sb.storage.from("reembolsos").upload(path, blob, {contentType:"image/jpeg"});
         if(up.error) return erro(up.error,"Falha ao enviar o comprovante");
         const antigo=r0.path;
@@ -7591,10 +7598,18 @@ async function iniciar(){
   const { data:{ user } } = await sb.auth.getUser();
   if(!user){ telaLogin(); return; }
 
+  const owner = await sb.rpc("plataforma_owner");
+  if(owner.error){telaLogin("Atualização pendente. Aplique a migração 0011 para acessar esta versão.");return;}
+  if(owner.data===true){window.location.replace("owner.html");return;}
+  const contexto = await sb.rpc("contexto_empresa");
+  if(contexto.error || !contexto.data?.id){await sb.auth.signOut();telaLogin("Acesso indisponível. Sua empresa ou seu perfil está inativo ou ainda não foi cadastrado.");return;}
+  S.empresaId=contexto.data.id;
+  S.empresaNome=contexto.data.nome;
+  const empresaLabel=document.getElementById("empresaAtual");if(empresaLabel){empresaLabel.textContent=S.empresaNome;empresaLabel.title=S.empresaNome;}
   const { data: perfil, error } = await sb.from("perfis").select("*").eq("id", user.id).single();
   if(error || !perfil || !perfil.ativo){
     await sb.auth.signOut();
-    telaLogin("Seu usuário existe, mas ainda não tem perfil na operação. Peça à gerência para liberar.");
+    telaLogin("Seu usuário existe, mas ainda não tem perfil na operação. Peça ao owner para liberar.");
     return;
   }
   S.perfilId = perfil.id;
@@ -7636,7 +7651,7 @@ document.addEventListener("click", ev=>{
   if(t.dataset.act==="recuperar"){ recuperarSenha(); }
 });
 
-sb.auth.onAuthStateChange((evento)=>{ if(evento==="SIGNED_OUT") location.reload(); });
+sb.auth.onAuthStateChange((evento,sessao)=>{ if(evento==="SIGNED_OUT" || (evento==="SIGNED_IN" && S.perfilId && sessao?.user?.id!==S.perfilId)) location.reload(); });
 iniciar();
 </script>
 </body>
