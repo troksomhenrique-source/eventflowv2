@@ -1932,7 +1932,7 @@ function porCategoria(itens){
 const TEMPS={quente:"Quente",morno:"Morno",frio:"Frio"};
 const neg = id => S.negocios.find(n=>n.id===id);
 const vazioBrief = () => ({
-  sala:{nome:"",area:0,peDireito:0,ancoragem:"confirmar",cargaPiso:500,pontos:0,energia:0,acesso:"",elevador:false,obs:""},
+  sala:{nome:"",comprimento:0,largura:0,area:0,peDireito:0,ancoragem:"confirmar",cargaPiso:500,pontos:0,energia:0,acesso:"",elevador:false,obs:""},
   led:{tem:false,porte:"Backdrop padrão",pitch:"P3.9",larg:0,alt:0,obs:""},
   palco:{tem:false,porte:"Médio",larg:0,prof:0,alt:0.4,tipo:"Praticável modular",obs:""},
   estrutura:{tem:false,porte:"Grid suspenso",tipo:"Q30",vao:0,config:"Grid",obs:""},
@@ -2001,12 +2001,13 @@ function inferirPortes(n){
    vendedor fala na ligação — e as demais entram nesta lista.
    O id fixo da plenária deixa as linhas antigas apontando para o lugar certo. */
 const PLENARIA = "plenaria";
-const vazioAmbiente = nome => ({id:uid(), nome:nome||"", area:0, peDireito:0,
+const areaRetangular = a => Math.round(Math.max(0,Number(a.comprimento)||0)*Math.max(0,Number(a.largura)||0)*100)/100;
+const vazioAmbiente = nome => ({id:uid(), nome:nome||"", comprimento:0,largura:0,area:0, peDireito:0,
   cargaPiso:500, pontos:0, energia:0, obs:""});
 
 function ambientes(n){
   const b=n.brief||vazioBrief(), s=b.sala||{};
-  return [{id:PLENARIA, nome:s.nome||"Plenária", area:s.area||0, peDireito:s.peDireito||0,
+  return [{id:PLENARIA, nome:s.nome||"Plenária", comprimento:s.comprimento||0,largura:s.largura||0,area:s.area||0, peDireito:s.peDireito||0,
            cargaPiso:s.cargaPiso||500, pontos:s.pontos||0, energia:s.energia||0, obs:s.obs||"", principal:true},
           ...(b.ambientes||[])];
 }
@@ -2221,7 +2222,8 @@ function ambientesHTML(n,ed){
   const extras=(n.brief.ambientes||[]);
   const linha=(a,ix)=>`<div class="amb">
     <input value="${esc(a.nome)}" data-amb="${a.id}" data-f="nome" placeholder="Ex.: B.U. Vendas" ${ed?"":"disabled"} style="flex:1;min-width:120px">
-    <label>área m²<input type="number" step="10" value="${a.area||0}" data-amb="${a.id}" data-f="area" ${ed?"":"disabled"}></label>
+    ${["comprimento","largura"].map(f=>`<label>${f} (m)<input type="number" min="0" step="0.01" value="${a[f]||0}" data-amb="${a.id}" data-f="${f}" ${ed?"":"disabled"}></label>`).join("")}
+    <label>área m²<input type="number" min="0" step="0.01" value="${a.area||0}" data-amb="${a.id}" data-f="area" ${ed?"":"disabled"}></label>
     <label>pé-direito<input type="number" step="0.5" value="${a.peDireito||0}" data-amb="${a.id}" data-f="peDireito" ${ed?"":"disabled"}></label>
     <label>piso kgf/m²<input type="number" step="50" value="${a.cargaPiso||500}" data-amb="${a.id}" data-f="cargaPiso" ${ed?"":"disabled"}></label>
     <label>pontos<input type="number" step="1" value="${a.pontos||0}" data-amb="${a.id}" data-f="pontos" ${ed?"":"disabled"}></label>
@@ -2293,6 +2295,7 @@ function abaBrief(n){
     <header><h4>${esc(tit)}</h4><label class="sw">${ed?`<input type="checkbox" ${tem?"checked":""} data-negb="${id}.tem" data-sw="${id}" style="width:auto">`:""}${tem?"incluso":"não incluso"}</label></header>
     <div class="in">
       ${sel(pergunta,id+".porte",b[id].porte,opcoes(id))}
+      ${id==="led"?`<div class="row2">${fld("Largura do LED (m)","led.larg",b.led.larg,"number",'min="0" step="0.01"')}${fld("Altura do LED (m)","led.alt",b.led.alt,"number",'min="0" step="0.01"')}</div><p>Área de LED: <b id="ledAreaM2">${dec(b.led.larg*b.led.alt,2)} m²</b></p>`:""}
       <div class="field"><label for="f_${id}_obs">O que o cliente pediu</label>
         <textarea id="f_${id}_obs" rows="2" style="font-family:var(--sans)" data-negb="${id}.obs" placeholder="Anote em palavras, sem se preocupar com número">${esc(b[id].obs)}</textarea></div>
     </div></div>`;
@@ -2300,20 +2303,10 @@ function abaBrief(n){
   <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:14px;align-items:start">
     <div class="grid" style="gap:12px">
       <div class="bsec"><header><h4>Onde é</h4><span class="muted" style="margin-left:auto;font-size:11px">o que o cliente souber informar</span></header><div class="in">
-        <div class="row2">${fld("Sala, salão ou área","sala.nome",b.sala.nome)}${fld("Área aproximada (m²)","sala.area",b.sala.area,"number",'step="10"')}</div>
+        <div class="row2">${fld("Comprimento da sala (m)","sala.comprimento",b.sala.comprimento||0,"number",'min="0" step="0.01"')}${fld("Largura da sala (m)","sala.largura",b.sala.largura||0,"number",'min="0" step="0.01"')}</div>
+        <div class="row2">${fld("Sala, salão ou área","sala.nome",b.sala.nome)}${fld("Área aproximada (m²)","sala.area",b.sala.area,"number",'min="0" step="0.01"')}</div>
         ${fld("Pé-direito aproximado (m)","sala.peDireito",b.sala.peDireito,"number",'step="0.5"')}
-        <div class="anc">
-          <div class="q"><span class="lbl">Pontos de ancoragem do salão</span>
-            <b>O teto recebe carga?</b></div>
-          <div class="ops">
-            ${[["sim","Sim","o salão tem pontos liberados"],["nao","Não","nada pode ser suspenso"],["confirmar","A confirmar","ninguém sabe ainda"]]
-              .map(o=>`<button class="ancop ${b.sala.ancoragem===o[0]?"on":""}" data-act="setAnc" data-id="${n.id}" data-v="${o[0]}" ${ed?"":"disabled"}>
-                <b>${o[1]}</b><span>${o[2]}</span></button>`).join("")}
-          </div>
-          <p>${({sim:"O grid vai <b>suspenso</b>. A produção conta os pontos na visita técnica e faz o memorial de cálculo aéreo.",
-                 nao:"Todo o grid vai em <b>torre de solo</b>. A OS já nasce com a carga do grid somada ao memorial de solo, sem içamento.",
-                 confirmar:"Enquanto não se confirma, o cálculo assume <b>torre de solo</b> — o cenário mais pesado. A visita técnica resolve."})[b.sala.ancoragem]}</p>
-        </div>
+        ${fld("Pontos de ancoragem","sala.pontos",b.sala.pontos||0,"number",'min="0" step="1"')}
         <div class="field"><label for="f_sala_obs">Observações do local</label>
           <textarea id="f_sala_obs" rows="2" style="font-family:var(--sans)" data-negb="sala.obs" placeholder="Acesso difícil, restrição de horário, piso de madeira…">${esc(b.sala.obs)}</textarea></div>
       </div></div>
@@ -2459,7 +2452,7 @@ function aba3D(n){
         <div class="row"><div class="n">Revisões</div><div class="v">${t.revisoes}</div></div>
         <div class="row"><div class="n">Arquivo</div><div class="v" style="font-family:var(--mono);font-size:11.5px">${esc(t.link||"—")}</div></div>
         <div class="row hl"><div class="n"><b>Base do render</b><small>dados travados no briefing</small></div>
-          <div class="v" style="font-family:var(--sans);font-size:12px;text-align:right">${n.brief.led.tem?`LED ${dec(n.brief.led.larg,1)}×${dec(n.brief.led.alt,1)} m<br>`:""}${n.brief.palco.tem?`Palco ${dec(n.brief.palco.larg,1)}×${dec(n.brief.palco.prof,1)} m<br>`:""}${n.brief.sala.area?`Sala ${dec(n.brief.sala.area,0)} m²`:""}</div></div>
+          <div class="v" style="font-family:var(--sans);font-size:12px;text-align:right">${n.brief.led.tem?`LED ${dec(n.brief.led.larg*n.brief.led.alt,2)} m² (${dec(n.brief.led.larg,1)}×${dec(n.brief.led.alt,1)} m)<br>`:""}${n.brief.palco.tem?`Palco ${dec(n.brief.palco.larg,1)}×${dec(n.brief.palco.prof,1)} m<br>`:""}${n.brief.sala.area?`Sala ${dec(n.brief.sala.area,0)} m²`:""}</div></div>
       </div>
       ${ed&&t.necessario&&t.status!=="Aprovado"?`<div class="flex" style="gap:7px">
         <button class="btn sm" data-act="st3d" data-id="${n.id}" data-s="Em produção">Iniciar render</button>
@@ -2662,11 +2655,22 @@ function bindNeg(el){
     save(); render(); return;
   }
   setPath(n,path,val);
+  if(path==="sala.pontos"){
+    n.brief.sala.pontos=Math.max(0,Math.floor(Number(val)||0));
+    n.brief.sala.ancoragem=n.brief.sala.pontos>0?"sim":"nao";
+  }
+  if(path==="sala.comprimento"||path==="sala.largura"){
+    n.brief.sala.area=areaRetangular(n.brief.sala);
+    const field=document.querySelector('[data-negb="sala.area"]');if(field)field.value=n.brief.sala.area;
+  }
+  if(path==="led.larg"||path==="led.alt"){
+    const field=document.getElementById('ledAreaM2');if(field)field.textContent=dec(n.brief.led.larg*n.brief.led.alt,2)+' m²';
+  }
   if(path==="valor"||path==="neg.proposta") n.valor = path==="valor"?val:Math.round(val*(1-(n.neg.desconto||0)/100));
   save();
   const bc=document.getElementById("briefCalc"); if(bc) bc.innerHTML=escopoHTML(n);
   const qc=document.getElementById("qualCalc"); if(qc) qc.innerHTML=qualCalc(n);
-  if(el.dataset.sw){ sec.classList.toggle("off", !el.checked); }
+  if(el.dataset.sw){ const sec=el.closest("[data-sec]"); if(sec){sec.classList.toggle("off", !el.checked);const label=el.closest("label");if(label?.lastChild?.nodeType===3)label.lastChild.textContent=el.checked?"incluso":"não incluso";} }
 }
 function travarCRM(){
   const aba=S.crmAba||"qualificacao";
@@ -2763,7 +2767,7 @@ function gerarOSVdeNegocio(negId){
     publico:n.publico||0,area:b.sala.area||200,
     montagem:n.montagem,evIni:n.evIni||n.montagem,evFim:n.evFim||n.evIni||n.montagem,desmontagem:n.desmontagem,
     valor,produtores:[...n.produtores],produtor:usr(n.produtores[0]).nome,status:"Aguardando produção",criada:HOJE,negId:n.id,
-    ambientes:ambs.map(a=>({id:a.id,nome:a.nome,principal:!!a.principal})),
+    ambientes:ambs.map(a=>({id:a.id,nome:a.nome,principal:!!a.principal,comprimento:a.comprimento||0,largura:a.largura||0})),
     itens:[...e.map(i=>({...i,id:uid(),aereo:item(i.cod).rig==="aereo"?i.qtd:0})), ...avulsos],
     solo:{area:b.sala.area||200,adm:b.sala.cargaPiso||500,admPont:600,publicoKgm2:pubKg,torres,apoios:4,feito:false},
     aereo:{pontos:b.sala.pontos||8,wllPonto:750,fd:1.2,fdes:1.25,wllAcess:2000,fsMin:5,vao:b.estrutura.vao||10,feito:false},
@@ -2898,7 +2902,9 @@ function bindAmbiente(el){
   const n=neg(S.sel); if(!n) return;
   const a=(n.brief.ambientes||[]).find(x=>x.id===el.dataset.amb); if(!a) return;
   const f=el.dataset.f;
-  if(f!=="nome"){ a[f]=Number(el.value)||0; save(); return; }
+  if(f!=="nome"){ a[f]=Math.max(0,Number(el.value)||0);
+    if(f==="comprimento"||f==="largura"){a.area=areaRetangular(a);const field=el.closest('.amb').querySelector('[data-f="area"]');if(field)field.value=a.area;}
+    save(); return; }
   /* duas salas com o mesmo nome no mesmo evento não passam; avisa em vez
      de deixar a gravação quebrar lá na frente */
   const novo=el.value;
@@ -3712,6 +3718,7 @@ function mNovaSalaOS(o){
       <p class="hint">A sala terá seus próprios equipamentos, estruturas, pontos e memoriais. Depois do cadastro, selecione os itens que serão usados nela.</p>
       <div class="field"><label for="osSalaNome">Nome da sala</label>
         <input id="osSalaNome" required maxlength="80" placeholder="Ex.: Sala B.U. 2, Foyer, Auditório"></div>
+      <div class="row2">${["Comprimento","Largura"].map(f=>`<div class="field"><label>${f} (m)</label><input id="osSala${f}" type="number" min="0" step="0.01"></div>`).join("")}</div>
       <div class="field" style="margin-top:12px"><label for="osSalaArea">Área da sala (m²) — opcional</label>
         <input id="osSalaArea" type="number" min="0" max="99999999.99" step="0.01" placeholder="Informe quando confirmada"></div>
       <p id="osSalaErro" role="alert" style="color:var(--crit);margin-top:10px"></p>
@@ -3731,11 +3738,14 @@ function mNovaSalaOS(o){
     }
     if(!Number.isFinite(area)||area<0||area>99999999.99){aviso.textContent="Informe uma área válida, maior ou igual a zero.";return;}
     if(!atual.ambientes?.length) atual.ambientes=[...ambsOS(atual)];
-    const id=uid();atual.ambientes.push({id,nome,principal:false});
+    const id=uid();atual.ambientes.push({id,nome,principal:false,comprimento:Number(document.getElementById("osSalaComprimento").value)||0,largura:Number(document.getElementById("osSalaLargura").value)||0});
     const m=contAmb(atual,id);m.solo.area=area;m.solo.feito=false;m.aereo.feito=false;
-    S.ambSel=id;S.aba="escopo";limparSel();
+    S.ambSel=id;S.aba="pontos";limparSel();
     fecharModal();save();render();
     toast("Sala "+nome+" adicionada à OS. Inclua os equipamentos e confira os memoriais.");
+  });
+  for(const f of ["Comprimento","Largura"])document.getElementById("osSala"+f).addEventListener("input",()=>{
+    document.getElementById("osSalaArea").value=areaRetangular({comprimento:document.getElementById("osSalaComprimento").value,largura:document.getElementById("osSalaLargura").value});
   });
   document.getElementById("osSalaNome").focus();
 }
@@ -3743,12 +3753,12 @@ function mNovaSalaOS(o){
 /* ---- abas da produção ---- */
 function vProdDet(){
   const o=osById(S.sel); if(!o){ S.sel=null; return vProducao(); }
-  const e=etapasOk(o), aba=S.aba||"escopo", osc=oscDaOS(o.id), c=cli(o.cliente);
+  const e=etapasOk(o), aba=S.aba||"pontos", osc=oscDaOS(o.id), c=cli(o.cliente);
   const ed=can("editar_memorial");
   const pend=pendentes(o).length;
   const as=ambsOS(o), pontosOk=as.every(x=>{const m=memAmb(o,x.id); return nPontos(o,x.id)>0||m.solo.torres;});
-  const steps=[["escopo","Escopo","o que vai para o evento",e.escopo&&!pend],
-    ["pontos","Pontos e apoios","base dos dois memoriais",pontosOk],
+  const steps=[["pontos","Pontos e apoios","base dos dois memoriais",pontosOk],
+    ["escopo","Escopo","o que vai para o evento",e.escopo&&!pend],
     ["solo","Memorial de solo",as.length>1?as.length+" salas · kgf/m²":"kgf/m² sobre o piso",e.solo],
     ["aereo","Memorial aéreo",as.length>1?as.length+" salas · carga por ponto":"carga por ponto",e.aereo],
     ["descritivo","Descritivo técnico","texto do projeto",e.descritivo],
@@ -3870,7 +3880,19 @@ function abaEscopo(o,ed){
   <p class="muted" style="font-size:11.5px;margin:0 2px;line-height:1.6">Uma mesma peça pode ir suspensa num evento e apoiada no outro, por isso a aplicação é definida aqui e não no cadastro. Quando a linha for aérea e só parte das unidades subir ao grid, ajuste o campo <b>No grid</b> — o restante entra como carga de piso.</p>`;
 }
 
-/* ---- 2. Pontos e apoios ---- */
+function atualizarPontos(el){
+  const selector=el.dataset.pto!==undefined?`[data-pto="${el.dataset.pto}"][data-pi="${el.dataset.pi}"][data-f="${el.dataset.f}"]`:
+    el.dataset.zona!==undefined?`[data-zona="${el.dataset.zona}"][data-f="${el.dataset.f}"]`:
+    el.dataset.osdim!==undefined?`[data-osdim="${el.dataset.osdim}"]`:null;
+  const drafts=[...document.querySelectorAll('#view .addform input')].map(x=>[x.id,x.value]);
+  const pos=el.selectionStart, value=el.value, y=window.scrollY;
+  render();
+  for(const [id,v] of drafts){const x=document.getElementById(id);if(x)x.value=v;}
+  const next=selector&&document.querySelector(selector);
+  if(next){next.replaceWith(el);el.focus({preventScroll:true});if(pos!==null)try{el.setSelectionRange(pos,pos);}catch{}}
+  window.scrollTo(0,y);
+}
+/* ---- 1. Pontos e apoios ---- */
 function abaPontos(o,ed){
   const A=ambAtiva(o), m=memAmb(o,A.id);
   const ests=estruturasDe(o,A.id), zons=zonasDe(o,A.id);
@@ -3936,6 +3958,7 @@ function abaPontos(o,ed){
       </header>
       <div class="corpo"><div class="pad" style="display:grid;gap:10px">
         <div class="row2">
+          ${["comprimento","largura"].map(f=>`<div class="field"><label>${f} (m)</label><input type="number" min="0" step="0.01" data-zona="${z.id}" data-f="${f}" value="${z[f]||0}" ${ed?"":"disabled"}></div>`).join("")}
           <div class="field"><label for="za${ix}">Área (m²)</label><input id="za${ix}" type="number" step="10" min="0" value="${z.area||0}" data-zona="${z.id}" data-f="area" ${ed?"":"disabled"}></div>
           <div class="field"><label for="zc${ix}">Carga admissível (kgf/m²)</label><input id="zc${ix}" type="number" step="50" min="0" value="${z.adm||0}" data-zona="${z.id}" data-f="adm" ${ed?"":"disabled"}></div>
         </div>
@@ -3948,6 +3971,7 @@ function abaPontos(o,ed){
   };
 
   return `<div class="grid" style="gap:14px">
+    <div class="card"><header><h3>Dimensões · ${esc(A.nome)}</h3></header><div class="pad row2">${["comprimento","largura"].map(f=>`<div class="field"><label>${f} (m)</label><input type="number" min="0" step="0.01" data-osdim="${f}" value="${A[f]||0}" ${ed?"":"disabled"}></div>`).join("")}<p>Área da sala: <b>${dec(areaRetangular(A),2)} m²</b></p></div></div>
     <div class="card"><header><h3>Estruturas aéreas${ambsOS(o).length>1?" · "+esc(A.nome):""}</h3>
       <span class="hint">cada vara pendura nos próprios pontos e é verificada sozinha</span></header>
       <div class="pad" style="display:grid;gap:11px">
@@ -4219,6 +4243,11 @@ document.addEventListener("click", ev=>{
 document.addEventListener("input", ev=>{
   const el=ev.target; if(!can("editar_memorial")) return;
   const o=osById(S.sel); if(!o) return;
+  if(el.dataset && el.dataset.osdim!==undefined){
+    if(!o.ambientes?.length)o.ambientes=ambsOS(o);
+    const A=ambAtiva(o);A[el.dataset.osdim]=Math.max(0,Number(el.value)||0);
+    save();atualizarPontos(el);return;
+  }
   if(el.dataset && el.dataset.osq!==undefined){
     const i=o.itens[Number(el.dataset.osq)]; if(!i) return;
     i.qtd=Math.max(1,Number(el.value)||1);
@@ -4244,14 +4273,15 @@ document.addEventListener("input", ev=>{
     const x=e.pontos[Number(el.dataset.pi)]; if(!x) return;
     const f=el.dataset.f;
     x[f] = f==="nome" ? el.value : Math.max(0,Number(el.value)||0);
-    M.aereo.feito=false; save(); return;
+    M.aereo.feito=false; M.solo.feito=false; save(); atualizarPontos(el); return;
   }
   if(el.dataset && el.dataset.zona!==undefined){
     const A=ambAtiva(o), M=memAmb(o,A.id);
     const z=zonasDe(o,A.id).find(x=>x.id===el.dataset.zona); if(!z) return;
     const f=el.dataset.f;
     z[f] = f==="nome" ? el.value : Math.max(0,Number(el.value)||0);
-    M.solo.feito=false; save(); return;
+    if(f==="comprimento"||f==="largura")z.area=areaRetangular(z);
+    M.solo.feito=false; save(); atualizarPontos(el); return;
   }
   if(el.dataset && el.dataset.anc!==undefined){
     const M=memAmb(o,ambAtiva(o).id);
@@ -6171,7 +6201,7 @@ function acaoPrincipal(a, id, t){
     case "tema": aplicarTema(t.dataset.m); break;
     case "osv": go("vendas",id); break;
     case "irOSV": fecharModal(); go("vendas",id); break;
-    case "prod": go("producao",id); S.aba="escopo"; render(); break;
+    case "prod": go("producao",id); S.aba="pontos"; render(); break;
     case "osc": fecharModal(); go("cargas",id); break;
     case "aba": S.aba=t.dataset.aba; save(); render(); break;
     case "novaOSV": tmpItens=[]; S.osvForm=true; save(); render(); pintarPick(); foco("fEv"); break;
@@ -6845,7 +6875,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Solicite seu cadastro ao responsável pela plataforma."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.24.3 · inventário CSV/Excel</span><br><a href="owner.html">Administração da plataforma</a></footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.24.5 · campo de pontos simplificado</span><br><a href="owner.html">Administração da plataforma</a></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -6905,15 +6935,15 @@ const mapReembolso = r => ({id:r.id, osId:r.os_id, data:r.data, descricao:r.desc
 function mapNegocio(n){
   const b=vazioBrief();
   if(n.negocio_sala){ const s=n.negocio_sala;
-    Object.assign(b.sala,{nome:n.sala||"",area:num(s.area_m2),peDireito:num(s.pe_direito),ancoragem:s.ancoragem,
+    Object.assign(b.sala,{nome:n.sala||"",area:num(s.area_m2),comprimento:num(s.comprimento_m),largura:num(s.largura_m),peDireito:num(s.pe_direito),ancoragem:s.ancoragem,
       cargaPiso:num(s.carga_piso),energia:num(s.energia_kva),pontos:s.pontos||0,acesso:s.acesso||"",
       elevador:!!s.elevador,obs:s.observacao||""}); }
-  (n.briefing_blocos||[]).forEach(x=>{ if(b[x.bloco]){ b[x.bloco].tem=x.incluso; b[x.bloco].porte=x.porte||b[x.bloco].porte; b[x.bloco].obs=x.observacao||""; }});
+  (n.briefing_blocos||[]).forEach(x=>{ if(b[x.bloco]){ b[x.bloco].tem=x.incluso; b[x.bloco].porte=x.porte||b[x.bloco].porte; b[x.bloco].obs=x.observacao||""; if(x.bloco==="led" && x.largura_m!=null && x.altura_m!=null){b.led.larg=num(x.largura_m);b.led.alt=num(x.altura_m);} }});
   /* a plenária é o ambiente principal e já está em b.sala; aqui vêm as demais */
   const ambs=(n.negocio_ambientes||[]).slice().sort((x,y)=>x.ordem-y.ordem);
   const princ=ambs.find(x=>x.principal);
   if(princ) b.sala.nome = princ.nome || b.sala.nome;
-  b.ambientes = ambs.filter(x=>!x.principal).map(x=>({id:x.id, nome:x.nome, area:num(x.area_m2),
+  b.ambientes = ambs.filter(x=>!x.principal).map(x=>({id:x.id, nome:x.nome, comprimento:num(x.comprimento_m),largura:num(x.largura_m),area:num(x.area_m2),
     peDireito:num(x.pe_direito), cargaPiso:num(x.carga_piso), energia:num(x.energia_kva),
     pontos:x.pontos||0, obs:x.observacao||""}));
   const vt=vazioVT();
@@ -6973,7 +7003,7 @@ function mapOS(o){
         .map(a=>({id:a.id,nome:a.nome,qtd:a.quantidade,wll:num(a.wll_kgf)}))}));
   const zonaDe=id=>(o.os_zonas||[]).filter(x=>x.ambiente_id===id)
     .sort((a,b)=>a.ordem-b.ordem)
-    .map(z=>({id:z.id,nome:z.nome,area:num(z.area_m2),adm:num(z.carga_admissivel)}));
+    .map(z=>({id:z.id,nome:z.nome,comprimento:num(z.comprimento_m),largura:num(z.largura_m),area:num(z.area_m2),adm:num(z.carga_admissivel)}));
   const soloDe=x=>({area:num(x.area_apoio),adm:num(x.carga_admissivel),admPont:num(x.carga_pontual_admissivel),
     publicoKgm2:num(x.sobrecarga_publico),apoios:x.apoios_por_equipamento||4,
     torres:!!x.torre_solo,feito:!!x.solo_concluido});
@@ -6995,7 +7025,7 @@ function mapOS(o){
       estr:i.estrutura_id, zona:i.zona_id,
       aereo:i.quantidade_aerea===null?null:i.quantidade_aerea, obs:i.observacao||""})),
     ambientes:(ambs.length?ambs:[{id:idPlen,nome:"Plenária",principal:true}])
-      .map(a=>({id:appId(a.id),nome:a.nome,principal:!!a.principal})),
+      .map(a=>({id:appId(a.id),nome:a.nome,principal:!!a.principal,comprimento:num(a.comprimento_m),largura:num(a.largura_m)})),
     ancoragens:ancDe(idPlen),
     estruturas:estrDe(idPlen), zonas:zonaDe(idPlen),
     mem:Object.fromEntries(ambs.filter(a=>!a.principal).map(a=>[a.id,{
@@ -7269,7 +7299,7 @@ async function syncNegocios(estado){
 
     if(!a || !igual(n.brief.sala,a.brief.sala) || !igual(n.brief.ambientes,a.brief.ambientes)){
       const dadosPlen={negocio_id:n.id,nome:n.brief.sala.nome||"Plenária",principal:true,
-        area_m2:n.brief.sala.area,pe_direito:n.brief.sala.peDireito,
+        area_m2:n.brief.sala.area,comprimento_m:n.brief.sala.comprimento||0,largura_m:n.brief.sala.largura||0,pe_direito:n.brief.sala.peDireito,
         carga_piso:n.brief.sala.cargaPiso,energia_kva:n.brief.sala.energia,
         pontos:n.brief.sala.pontos,observacao:nz(n.brief.sala.obs),ordem:0};
       /* A plenária é achada por negocio_id + principal, nunca pelo nome: dar
@@ -7289,7 +7319,7 @@ async function syncNegocios(estado){
       const extras=(n.brief.ambientes||[]);
       if(extras.length){
         r=await sb.from("negocio_ambientes").upsert(extras.map((x,i)=>({id:x.id,negocio_id:n.id,nome:x.nome||("Sala "+(i+2)),
-          principal:false,area_m2:x.area||0,pe_direito:x.peDireito||0,carga_piso:x.cargaPiso||500,
+          principal:false,comprimento_m:x.comprimento||0,largura_m:x.largura||0,area_m2:x.area||0,pe_direito:x.peDireito||0,carga_piso:x.cargaPiso||500,
           energia_kva:x.energia||0,pontos:x.pontos||0,observacao:nz(x.obs),ordem:i+1})),
           {onConflict:"id"});
         if(r.error) throw r.error;
@@ -7299,7 +7329,7 @@ async function syncNegocios(estado){
       r=await sb.from("negocio_ambientes").delete().eq("negocio_id",n.id).eq("principal",false)
         .not("id","in","("+(vivos.length?vivos.join(","):"00000000-0000-0000-0000-000000000000")+")");
       if(r.error) throw r.error;
-      r=await sb.from("negocio_sala").upsert({negocio_id:n.id,area_m2:n.brief.sala.area,
+      r=await sb.from("negocio_sala").upsert({negocio_id:n.id,area_m2:n.brief.sala.area,comprimento_m:n.brief.sala.comprimento||0,largura_m:n.brief.sala.largura||0,
         pe_direito:n.brief.sala.peDireito,ancoragem:n.brief.sala.ancoragem,carga_piso:n.brief.sala.cargaPiso,
         energia_kva:n.brief.sala.energia,pontos:n.brief.sala.pontos,acesso:nz(n.brief.sala.acesso),
         elevador:!!n.brief.sala.elevador,observacao:nz(n.brief.sala.obs)});
@@ -7309,7 +7339,7 @@ async function syncNegocios(estado){
     const mudou = blocos.filter(x=>!a||!igual(n.brief[x],a.brief[x]));
     if(estado.role==="gerencia" && mudou.length){
       r=await sb.from("briefing_blocos").upsert(mudou.map(x=>({negocio_id:n.id,bloco:x,
-        incluso:!!n.brief[x].tem,porte:nz(n.brief[x].porte),observacao:nz(n.brief[x].obs)})));
+        largura_m:x==="led"?n.brief.led.larg:null,altura_m:x==="led"?n.brief.led.alt:null,incluso:!!n.brief[x].tem,porte:nz(n.brief[x].porte),observacao:nz(n.brief[x].obs)})));
       if(r.error) throw r.error;
     }
     if(estado.role==="gerencia" && (!a || !igual(n.briefNotas,a.briefNotas))){
@@ -7395,9 +7425,9 @@ async function syncOS(estado){
       os_itens:[],os_veiculo_dias:[],os_escala:[]};
     for(const [ordem,x] of as.entries()){
       const bid=ids[x.id], m=memAmb(o,x.id), zs=zonasDe(o,x.id), es=estruturasDe(o,x.id);
-      grafo.os_ambientes.push({id:bid,os_id:o.id,nome:x.nome,principal:ordem===0,ordem});
+      grafo.os_ambientes.push({id:bid,os_id:o.id,nome:x.nome,principal:ordem===0,ordem,comprimento_m:x.comprimento||0,largura_m:x.largura||0});
       zs.forEach((z,k)=>grafo.os_zonas.push({id:z.id,os_id:o.id,ambiente_id:bid,nome:z.nome,
-        area_m2:z.area??0,carga_admissivel:z.adm??500,ordem:k}));
+        comprimento_m:z.comprimento||0,largura_m:z.largura||0,area_m2:z.area??0,carga_admissivel:z.adm??500,ordem:k}));
       es.forEach((e,k)=>{
         grafo.os_estruturas.push({id:e.id,os_id:o.id,ambiente_id:bid,nome:e.nome,
           torre_solo:!!e.torres,zona_id:e.zona||zs[0]?.id||null,ordem:k});
