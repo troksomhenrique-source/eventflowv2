@@ -50,6 +50,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 /* ---------- shell ---------- */
+#app[hidden]{display:none!important}
 .app{display:grid;grid-template-columns:230px 1fr;min-height:100%}
 .side{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;z-index:40}
 .brand{display:flex;align-items:center;gap:9px;padding:16px 14px 14px;border-bottom:1px solid var(--line2)}
@@ -6674,7 +6675,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Solicite seu cadastro ao responsável pela plataforma."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.23.7 · migrações 0007 a 0011</span><br><a href="owner.html">Administração da plataforma</a></footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.09.24.1 · migrações 0007 a 0011</span><br><a href="owner.html">Administração da plataforma</a></footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -6682,11 +6683,13 @@ function telaLogin(msg, tipo){
     if(!configurado()) return telaLogin("Preencha SUPABASE_URL e SUPABASE_KEY no arquivo antes de entrar.");
     const btn=f.querySelector('button[type="submit"]');
     btn.disabled=true; btn.textContent="Entrando…";
+    try{
     const { error } = await sb.auth.signInWithPassword({
       email: document.getElementById("liEmail").value.trim(),
       password: document.getElementById("liSenha").value });
     if(error){ telaLogin(error.message==="Invalid login credentials"?"E-mail ou senha não conferem.":error.message); return; }
-    iniciar();
+    await iniciar();
+    }catch(e){telaLogin("Não foi possível entrar: "+mensagemErro(e));}
   });
   document.getElementById("liEmail").focus();
 }
@@ -7594,6 +7597,9 @@ function telaCarregando(txt){
 }
 
 async function iniciar(){
+  try{await iniciarInterno();}catch(e){telaLogin("Não foi possível entrar: "+mensagemErro(e));}
+}
+async function iniciarInterno(){
   telaCarregando();
   const { data:{ user } } = await sb.auth.getUser();
   if(!user){ telaLogin(); return; }
@@ -7602,13 +7608,12 @@ async function iniciar(){
   if(owner.error){telaLogin("Atualização pendente. Aplique a migração 0011 para acessar esta versão.");return;}
   if(owner.data===true){window.location.replace("owner.html");return;}
   const contexto = await sb.rpc("contexto_empresa");
-  if(contexto.error || !contexto.data?.id){await sb.auth.signOut();telaLogin("Acesso indisponível. Sua empresa ou seu perfil está inativo ou ainda não foi cadastrado.");return;}
+  if(contexto.error || !contexto.data?.id){telaLogin("Acesso indisponível. Sua empresa ou seu perfil está inativo ou ainda não foi cadastrado.");return;}
   S.empresaId=contexto.data.id;
   S.empresaNome=contexto.data.nome;
   const empresaLabel=document.getElementById("empresaAtual");if(empresaLabel){empresaLabel.textContent=S.empresaNome;empresaLabel.title=S.empresaNome;}
   const { data: perfil, error } = await sb.from("perfis").select("*").eq("id", user.id).single();
   if(error || !perfil || !perfil.ativo){
-    await sb.auth.signOut();
     telaLogin("Seu usuário existe, mas ainda não tem perfil na operação. Peça ao owner para liberar.");
     return;
   }
