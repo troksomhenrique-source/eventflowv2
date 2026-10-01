@@ -9970,5 +9970,110 @@ renderShell=function(){const r=_shell.apply(this,arguments);
 if(!document.getElementById("app").hidden){renderShell();render();}
 })();
 </script>
+<style id="v6-mobile-css">/* =====================================================================
+   EventFlow v6 · navegação no celular: barra inferior por categoria
+   Até 900px a faixa de menu do topo some; a barra fica embaixo e cada
+   categoria abre um painel com as telas dela.
+   ===================================================================== */
+.v6-bn,.v6-sheet,.v6-scrim{display:none}
+@media (max-width:900px){
+  .side{display:none!important}
+  .v6-bn{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);position:fixed;left:0;right:0;bottom:0;z-index:60;
+    background:var(--sf);border-top:1px solid var(--ln2);border-radius:22px 22px 0 0;box-shadow:0 -6px 24px -12px rgba(38,39,44,.18);
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom,0px))}
+  .v6-bn button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 2px;min-height:56px;
+    color:var(--ink3);font:500 11.5px/1.2 var(--f);cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent}
+  .v6-bn .ico{width:56px;height:32px;border-radius:99px;display:grid;place-items:center;transition:background .2s var(--e),color .2s}
+  .v6-bn .ico svg{width:22px;height:22px}
+  .v6-bn button[aria-current="true"]{color:var(--acc);font-weight:700}
+  .v6-bn button[aria-current="true"] .ico{background:var(--accS)}
+  .v6-bn button[aria-expanded="true"] .ico{background:var(--accS);color:var(--acc)}
+  .v6-bn .bd{position:absolute;top:2px;left:calc(50% + 10px);min-width:16px;height:16px;border-radius:99px;padding:0 4px;background:var(--c4);color:#fff;
+    font:700 10px/16px var(--f);text-align:center;border:2px solid var(--sf);box-sizing:content-box}
+  .v6-bn span.t{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .v6-scrim.on{display:block;position:fixed;inset:0;z-index:58;background:color-mix(in srgb,var(--ink) 30%,transparent);animation:v6fade .2s var(--e)}
+  .v6-sheet.on{display:block;position:fixed;left:8px;right:8px;z-index:59;bottom:calc(84px + env(safe-area-inset-bottom,0px));
+    background:var(--sf);border:1px solid var(--ln2);border-radius:22px;box-shadow:var(--sh);padding:14px 10px 10px;max-height:62dvh;overflow:auto;
+    animation:v6sobe .24s var(--e)}
+  .v6-sheet h3{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:2px 10px 8px}
+  .v6-sheet .it{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;text-align:left;padding:11px 12px;border-radius:14px;
+    color:var(--ink);font:500 15px var(--f);cursor:pointer;min-height:48px}
+  .v6-sheet .it svg{width:20px;height:20px;flex:none;color:var(--ink3)}
+  .v6-sheet .it.on{background:var(--accS);color:var(--acc);font-weight:600}.v6-sheet .it.on svg{color:var(--acc)}
+  .v6-sheet .it .cnt{margin-left:auto;font:600 12px var(--f);background:var(--sf2);color:var(--ink2);border-radius:99px;padding:1px 8px}
+  .v6-sheet .it .cnt.alert{background:var(--cS);color:var(--c)}
+  .v6-sheet .it.sair{color:var(--c)}.v6-sheet .it.sair svg{color:var(--c)}
+  .v6-sheet hr{border:0;border-top:1px solid var(--ln2);margin:6px 8px}
+  .view{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
+  .toast{bottom:calc(96px + env(safe-area-inset-bottom,0px))!important}
+  .main>header.top{padding-top:calc(10px + env(safe-area-inset-top,0px))}
+}
+@keyframes v6sobe{from{opacity:0;transform:translateY(14px)}}
+@keyframes v6fade{from{opacity:0}}
+@media print{.v6-bn,.v6-sheet,.v6-scrim{display:none!important}}
+</style>
+<script id="v6-mobile">
+(function(){
+"use strict";
+/* ícone de cada categoria (traço 24px, mesmo desenho do v5) */
+const ICG={
+ "Comercial":'<path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/>',
+ "Operação":'<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+ "Cadastros":'<path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8"/>',
+ "Financeiro":'<path d="M4 7a2 2 0 012-2h12v4M4 7v11a2 2 0 002 2h14V9H6a2 2 0 01-2-2zM16 14.5h.01"/>',
+ "Sistema":'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
+};
+const svg=p=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+const icG=g=>svg(ICG[g]||'<path d="M4 8l8-4 8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/>');
+const sairIc='<path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 17l5-5-5-5M15 12H4"/>';
+let aberto=null;
+const grupos=()=>NAV.map(g=>({g:g.g,items:g.items.filter(i=>i.roles.includes(S.role))})).filter(g=>g.items.length);
+/* os contadores já calculados para a barra lateral (OS, cargas, conflitos, pedidos, contas) */
+const cnt=id=>{const c=document.querySelector(`#nav [data-view="${id}"] .cnt`);return c?{n:c.textContent,alerta:c.classList.contains("alert")}:null;};
+function host(){
+  let bn=document.getElementById("v6Bottom");
+  if(!bn){
+    document.body.insertAdjacentHTML("beforeend",`<div class="v6-scrim" id="v6Scrim"></div><div class="v6-sheet" id="v6Sheet" role="dialog" aria-modal="true" aria-labelledby="v6SheetT"></div><nav class="v6-bn" id="v6Bottom" aria-label="Navegação principal"></nav>`);
+    bn=document.getElementById("v6Bottom");
+    document.getElementById("v6Scrim").addEventListener("click",()=>fechar());
+  }
+  return bn;
+}
+function pintar(){
+  const app=document.getElementById("app");if(!app||app.hidden){const b=document.getElementById("v6Bottom");if(b)b.hidden=true;return;}
+  const bn=host();bn.hidden=false;
+  const gs=grupos();
+  bn.innerHTML=gs.map(g=>{
+    const atual=g.items.some(i=>i.id===S.view),alerta=g.items.map(i=>cnt(i.id)).filter(c=>c&&c.alerta).reduce((s,c)=>s+(parseInt(c.n)||0),0);
+    return `<button type="button" data-v6grupo="${esc(g.g)}" aria-current="${atual}" aria-expanded="${aberto===g.g}" aria-haspopup="${g.items.length>1?"menu":"false"}">
+      <span class="ico">${icG(g.g)}</span><span class="t">${esc(g.g)}</span>${alerta?`<span class="bd" aria-label="${alerta} alerta(s)">${alerta>9?"9+":alerta}</span>`:""}</button>`;}).join("");
+  if(aberto) folha(aberto);
+}
+function folha(gNome){
+  const g=grupos().find(x=>x.g===gNome),sh=document.getElementById("v6Sheet");if(!g||!sh)return fechar();
+  sh.innerHTML=`<h3 id="v6SheetT">${esc(g.g)}</h3>`+g.items.map(i=>{const c=cnt(i.id);
+    return `<button type="button" class="it${i.id===S.view?" on":""}" data-v6ir="${esc(i.id)}"${i.id===S.view?' aria-current="page"':""}>${ic(i.ic)}<span>${esc(i.t)}</span>${c?`<span class="cnt${c.alerta?" alert":""}">${esc(c.n)}</span>`:""}</button>`;}).join("")+
+    (g.g==="Sistema"?`<hr><button type="button" class="it sair" data-act="sair">${svg(sairIc)}<span>Sair da conta</span></button>`:"");
+  sh.classList.add("on");document.getElementById("v6Scrim").classList.add("on");
+}
+function fechar(){aberto=null;document.getElementById("v6Sheet")?.classList.remove("on");document.getElementById("v6Scrim")?.classList.remove("on");
+  document.querySelectorAll("#v6Bottom [aria-expanded]").forEach(b=>b.setAttribute("aria-expanded","false"));}
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest("[data-v6grupo]");
+  if(b){const g=grupos().find(x=>x.g===b.dataset.v6grupo);if(!g)return;
+    /* categoria com uma tela só vai direto; as demais abrem o painel */
+    if(g.items.length===1){fechar();go(g.items[0].id);return;}
+    if(aberto===g.g){fechar();return;}
+    aberto=g.g;pintar();const p=document.querySelector("#v6Sheet .it.on")||document.querySelector("#v6Sheet .it");if(p)p.focus({preventScroll:true});return;}
+  const it=ev.target.closest("[data-v6ir]");
+  if(it){fechar();go(it.dataset.v6ir);return;}
+  if(ev.target.closest('#v6Sheet [data-act="sair"]')) fechar();
+});
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&aberto){const g=aberto;fechar();document.querySelector(`[data-v6grupo="${CSS.escape(g)}"]`)?.focus();}});
+const _shell=renderShell;
+renderShell=function(){const r=_shell.apply(this,arguments);pintar();return r;};
+if(!document.getElementById("app").hidden) pintar();
+})();
+</script>
 </body>
 </html>
