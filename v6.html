@@ -8597,8 +8597,8 @@ TITLES.financas=TITLES.financas||["Finanças","Receitas, despesas e saldo da ope
 (function regrupar(){
   const todos=NAV.flatMap(g=>g.items);
   if(!todos.some(i=>i.id==="financas"))todos.push({id:"financas",t:"Finanças",roles:["gerencia"],ic:"chart"});
-  const GR=[["Comercial",["painel","crm","vendas","clientes"]],["Operação",["agenda","producao","cargas","escalas","movimentos","mural","chat","notas"]],
-    ["Cadastros",["estoque","freelas"]],["Financeiro",["financas","reembolsos"]],["Sistema",["equipe","auditoria","organograma","perfil"]]];
+  const GR=[["Comercial",["painel","crm","vendas","clientes"]],["Operação",["agenda","producao","cargas","escalas","movimentos","mural","chat","notas","organograma"]],
+    ["Cadastros",["estoque","freelas"]],["Financeiro",["financas","reembolsos"]],["Sistema",["equipe","auditoria","perfil"]]];
   const usados=new Set(),novo=GR.map(([g,ids])=>({g,items:ids.map(id=>{const it=todos.find(x=>x.id===id);if(it)usados.add(id);return it;}).filter(Boolean)}));
   const resto=todos.filter(i=>!usados.has(i.id));if(resto.length)novo[4].items.push(...resto);
   NAV.length=0;novo.filter(g=>g.items.length).forEach(g=>NAV.push(g));
