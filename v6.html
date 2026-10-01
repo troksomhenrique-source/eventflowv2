@@ -3393,7 +3393,7 @@ function vEstoqueNovo(){
       <div style="flex:1"></div>
       <span class="pill">${(S.frota||[]).filter(v=>veicLivre(v.cod,S.per.de,S.per.ate)).length} de ${(S.frota||[]).length} livres na janela</span>
     </div></div></div>` : "";
-  const arquivos=tab==='itens'?`<div class="card pad" style="margin-bottom:12px"><div class="flex" style="gap:8px;flex-wrap:wrap"><button class="btn" data-inv="exportar-csv">Exportar CSV</button><button class="btn" data-inv="exportar-xlsx">Exportar Excel</button>${S.role==='gerencia'?'<button class="btn" data-inv="importar">Importar arquivo</button>':''}<button class="btn ghost" data-inv="modelo">Baixar modelo</button></div><p class="hint">Exportação de todos os itens da empresa. Importação pela gerência, com prévia e conferência por código.</p></div>`:'';
+  const arquivos=tab==='itens'?`<div class="card pad" style="margin-bottom:12px"><div class="flex" style="gap:8px;flex-wrap:wrap"><button class="btn" data-inv="exportar-xlsx">Exportar Excel completo</button><button class="btn" data-inv="exportar-csv">Exportar CSV (só itens)</button>${S.role==='gerencia'?'<button class="btn" data-inv="importar">Importar arquivo</button>':''}<button class="btn ghost" data-inv="modelo">Baixar modelo</button></div><p class="hint">O Excel leva itens, kits, frota e fotos, cada um na sua aba; o CSV, só os itens. Importação pela gerência, com prévia e conferência por código.</p></div>`:'';
   return head + arquivos + painel + janela + corpo;
 }
 function vKits(){
@@ -10087,6 +10087,201 @@ document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&aberto){const g=a
 const _shell=renderShell;
 renderShell=function(){const r=_shell.apply(this,arguments);pintar();return r;};
 if(!document.getElementById("app").hidden) pintar();
+})();
+</script>
+<script id="v6-inventario">
+/* =====================================================================
+   EventFlow v6 · planilha completa do inventário
+   O Excel leva quatro abas: Inventario (itens, como antes), Kits, Frota e
+   Fotos. O CSV continua só com os itens. Nada é gravado antes da prévia e
+   da confirmação; os itens seguem pela função importar_inventario do banco
+   e kits, frota e fotos entram pela mesma gravação do resto do app.
+   ===================================================================== */
+(function(){
+"use strict";
+const XL="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const KIT_H=["kit_codigo","kit_nome","categoria","para_que_serve","item_codigo","quantidade"];
+const FROTA_H=["codigo","nome","tipo","placa","capacidade_kg","capacidade_cases","lugares","em_manutencao","observacao"];
+const FOTO_H=["item_codigo","foto"];
+const LIMITE_CELULA=32000;                       /* o Excel guarda até 32.767 caracteres por célula */
+const nh=x=>String(x??"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[ -]/g,"_");
+const txt=v=>String(v??"").trim();
+const RE_COD=/^[A-Z0-9][A-Z0-9_.-]{0,49}$/;
+const vazio=()=>({itens:[],kits:[],frota:[],fotos:[]});
+const pacote=r=>Array.isArray(r)?{itens:r,kits:[],frota:[],fotos:[]}:(r||vazio());
+const total=p=>p.itens.length+p.kits.length+p.frota.length+p.fotos.length;
+
+function aba(wb,nome){const k=wb.SheetNames.find(x=>nh(x)===nh(nome));return k?wb.Sheets[k]:null;}
+function linhas(ws,heads,rot){
+  if(!ws||!ws["!ref"]) return [];
+  if(Object.entries(ws).some(([k,v])=>!k.startsWith("!")&&v&&v.f)) throw Error(`A aba ${rot} contém fórmulas. Copie e cole como valores antes de importar.`);
+  const m=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:true,blankrows:false});
+  if(!m.length) return [];
+  const hs=m[0].map(nh),falta=heads.filter(h=>!hs.includes(h));
+  if(falta.length) throw Error(`Aba ${rot}: faltam as colunas ${falta.join(", ")}. Baixe o modelo para ver o formato.`);
+  return m.slice(1).map((a,j)=>({n:j+2,v:Object.fromEntries(heads.map(h=>[h,a[hs.indexOf(h)]]))}))
+    .filter(r=>Object.values(r.v).some(x=>txt(x)!==""));
+}
+const num=(v,rot,aba,n,inteiro)=>{try{return invNumber(typeof v==="number"?v:txt(v),rot,n,inteiro);}catch(e){throw Error(`Aba ${aba}, `+e.message.replace(/^Linha/,"linha"));}};
+
+function lerKits(ws,codsItens){
+  const out=new Map();
+  for(const {n,v} of linhas(ws,KIT_H,"Kits")){
+    const cod=txt(v.kit_codigo).toUpperCase(),item=txt(v.item_codigo).toUpperCase(),nome=txt(v.kit_nome),cat=txt(v.categoria);
+    if(!RE_COD.test(cod)) throw Error(`Aba Kits, linha ${n}: código do kit inválido.`);
+    if(!nome||nome.length>120) throw Error(`Aba Kits, linha ${n}: nome do kit obrigatório (até 120 caracteres).`);
+    if(!CATEGORIAS.includes(cat)) throw Error(`Aba Kits, linha ${n}: categoria precisa ser uma de ${CATEGORIAS.join(", ")}.`);
+    if(!codsItens.has(item)) throw Error(`Aba Kits, linha ${n}: o item ${item||"(vazio)"} não está no inventário nem na aba Inventario.`);
+    const q=num(v.quantidade,"quantidade","Kits",n,true);if(q<1) throw Error(`Aba Kits, linha ${n}: quantidade mínima 1.`);
+    const k=out.get(cod)||{cod,nome,cat,obs:txt(v.para_que_serve).slice(0,400),itens:[]};
+    if(k.nome!==nome) throw Error(`Aba Kits, linha ${n}: o kit ${cod} aparece com nomes diferentes.`);
+    const ex=k.itens.find(x=>x.cod===item);if(ex) ex.qtd+=q; else k.itens.push({cod:item,qtd:q});
+    out.set(cod,k);
+  }
+  if(out.size>500) throw Error("Importe até 500 kits por arquivo.");
+  return [...out.values()];
+}
+function lerFrota(ws){
+  const out=[],vistos=new Set();
+  for(const {n,v} of linhas(ws,FROTA_H,"Frota")){
+    const cod=txt(v.codigo).toUpperCase(),nome=txt(v.nome),tipoIn=nh(v.tipo),tipo=TIPOS_VEIC.find(t=>nh(t)===tipoIn);
+    if(!RE_COD.test(cod)) throw Error(`Aba Frota, linha ${n}: código inválido.`);
+    if(vistos.has(cod)) throw Error(`Aba Frota, linha ${n}: código repetido ${cod}.`);vistos.add(cod);
+    if(!nome||nome.length>120) throw Error(`Aba Frota, linha ${n}: nome obrigatório (até 120 caracteres).`);
+    if(!tipo) throw Error(`Aba Frota, linha ${n}: tipo precisa ser um de ${TIPOS_VEIC.join(", ")}.`);
+    const man=nh(v.em_manutencao);
+    out.push({cod,nome,tipo,placa:txt(v.placa).toUpperCase().slice(0,12),capKg:num(v.capacidade_kg,"capacidade_kg","Frota",n,true),
+      capCases:num(v.capacidade_cases,"capacidade_cases","Frota",n,true),lugares:num(v.lugares,"lugares","Frota",n,true),
+      manut:["sim","s","true","1","x"].includes(man),obs:txt(v.observacao).slice(0,400)});
+  }
+  if(out.length>200) throw Error("Importe até 200 veículos por arquivo.");
+  return out;
+}
+function lerFotos(ws,codsItens){
+  const out=[];
+  for(const {n,v} of linhas(ws,FOTO_H,"Fotos")){
+    const cod=txt(v.item_codigo).toUpperCase(),f=txt(v.foto);
+    if(!codsItens.has(cod)) throw Error(`Aba Fotos, linha ${n}: o item ${cod||"(vazio)"} não está no inventário nem na aba Inventario.`);
+    if(!f) continue;
+    const ok=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(f)||/^https:\/\/[^\s"'<>]{4,1990}$/.test(f);
+    if(!ok) throw Error(`Aba Fotos, linha ${n}: use um link https:// da imagem ou a imagem exportada pelo EventFlow.`);
+    out.push({cod,src:f});
+  }
+  return out;
+}
+
+/* leitura: CSV só itens; Excel lê as quatro abas */
+invRead=async function(file){
+  if(!file||!file.size||file.size>20*1024*1024) throw Error("Selecione um arquivo de até 20 MB.");
+  const ext=file.name.split(".").pop().toLowerCase(),buf=await file.arrayBuffer();
+  if(ext==="csv"){let t;try{t=new TextDecoder("utf-8",{fatal:true}).decode(buf);}catch(e){t=new TextDecoder("windows-1252").decode(buf);}
+    return Object.assign(vazio(),{itens:invValidate(invCsvParse(t))});}
+  if(!["xlsx","xls"].includes(ext)) throw Error("Use CSV, XLSX ou XLS.");
+  const wb=XLSX.read(buf,{type:"array",sheetRows:3002,cellFormula:true,cellDates:false});
+  const outras=["kits","frota","fotos","leia_me","leiame"];
+  const wsInv=aba(wb,"Inventario")||aba(wb,"Inventário")||wb.Sheets[wb.SheetNames.find(x=>!outras.includes(nh(x)))];
+  const p=vazio();
+  if(wsInv&&wsInv["!ref"]){
+    if(Object.entries(wsInv).some(([k,v])=>!k.startsWith("!")&&v&&v.f)) throw Error("A aba Inventario contém fórmulas. Copie e cole como valores antes de importar.");
+    const m=XLSX.utils.sheet_to_json(wsInv,{header:1,defval:"",raw:true,blankrows:true});
+    const temLinhas=m.slice(1).some(a=>a.some(x=>txt(x)!==""));
+    if(temLinhas) p.itens=invValidate(m);
+  }
+  const cods=new Set([...(S.cat||[]).map(i=>i.cod),...p.itens.map(i=>i.cod)]);
+  p.kits=lerKits(aba(wb,"Kits"),cods);
+  p.frota=lerFrota(aba(wb,"Frota"));
+  p.fotos=lerFotos(aba(wb,"Fotos"),cods);
+  if(!total(p)) throw Error("O arquivo não tem itens, kits, veículos nem fotos para importar.");
+  return p;
+};
+
+/* prévia: o que é novo, o que substitui, aba por aba */
+invPreview=function(){
+  const p=pacote(INV.rows),upd=document.getElementById("invMode")?.value==="atualizar",rev=document.getElementById("invReviewed")?.checked;
+  const exI=new Map((S.cat||[]).map(i=>[i.cod,i])),exK=new Set((S.kits||[]).map(k=>k.cod)),exF=new Set((S.frota||[]).map(v=>v.cod));
+  const cI=p.itens.filter(i=>exI.has(i.cod)).length,cK=p.kits.filter(k=>exK.has(k.cod)).length,cF=p.frota.filter(v=>exF.has(v.cod)).length;
+  const conflito=cI+cK+cF>0&&!upd;
+  const b=document.getElementById("invConfirm");if(b) b.disabled=INV.busy||!total(p)||conflito||!rev;
+  const host=document.getElementById("invPreview");if(!host||!total(p)) return;
+  const res=(n,c,rot)=>n?`${rot}: ${n-c} novo(s)${c?" · "+c+" já cadastrado(s)":""}`:"";
+  invMessage([res(p.itens.length,cI,"Itens"),res(p.kits.length,cK,"Kits"),res(p.frota.length,cF,"Frota"),p.fotos.length?`Fotos: ${p.fotos.length}`:""].filter(Boolean).join("\n")+
+    (conflito?"\nHá códigos já cadastrados — escolha “Criar e substituir” ou altere os códigos.":""),conflito);
+  const tab=(tit,cab,linhasH)=>`<h4 style="margin:16px 0 0;font-size:13.5px">${tit}</h4><div class="inv-preview"><table><thead><tr>${cab.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>${linhasH}</tbody></table></div>`;
+  host.innerHTML=
+    (p.itens.length?tab(`Itens (${p.itens.length})`,["Ação","Código / descrição","Marca / modelo","Total","Diária","kg / W"],p.itens.map(i=>{const o=exI.get(i.cod);
+      return `<tr><td>${o?"Substituir":"Criar"}</td><td>${esc(i.cod)}<br>${esc(i.nome)}</td><td>${esc(i.marca)}<br>${esc(i.modelo)}</td><td>${o?esc(String(o.total))+" → ":""}${i.quantidade_total}</td><td>${brl(i.diaria)}</td><td>${i.peso_kg} / ${i.watts}</td></tr>`;}).join("")):"")+
+    (p.kits.length?tab(`Kits (${p.kits.length})`,["Ação","Kit","Categoria","Composição"],p.kits.map(k=>`<tr><td>${exK.has(k.cod)?"Substituir":"Criar"}</td><td>${esc(k.cod)}<br>${esc(k.nome)}</td><td>${esc(k.cat)}</td><td style="white-space:normal">${k.itens.map(x=>x.qtd+"× "+esc(x.cod)).join(", ")}</td></tr>`).join("")):"")+
+    (p.frota.length?tab(`Frota (${p.frota.length})`,["Ação","Veículo","Placa","Carga / cases / lugares"],p.frota.map(v=>`<tr><td>${exF.has(v.cod)?"Substituir":"Criar"}</td><td>${esc(v.cod)}<br>${esc(v.nome)} · ${esc(v.tipo)}${v.manut?" · manutenção":""}</td><td>${esc(v.placa||"—")}</td><td>${v.capKg} kg · ${v.capCases} · ${v.lugares}</td></tr>`).join("")):"")+
+    (p.fotos.length?`<h4 style="margin:16px 0 8px;font-size:13.5px">Fotos (${p.fotos.length})</h4><div style="display:flex;flex-wrap:wrap;gap:6px">${p.fotos.slice(0,60).map(f=>`<img src="${esc(f.src)}" alt="${esc(f.cod)}" title="${esc(f.cod)}" style="width:64px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--ln2)">`).join("")}${p.fotos.length>60?`<span class="hint">+${p.fotos.length-60}</span>`:""}</div>`:"");
+};
+
+/* confirmação: itens no banco, recarrega, depois kits, frota e fotos */
+invConfirm=async function(){
+  const p=pacote(INV.rows);
+  if(INV.busy||S.role!=="gerencia"||!total(p)||!document.getElementById("invReviewed")?.checked) return;
+  const upd=document.getElementById("invMode").value==="atualizar";
+  INV.busy=true;invPreview();invMessage("Salvando…",false);
+  const app=document.getElementById("app"),host=document.getElementById("modalHost");app.inert=true;host.inert=true;
+  try{
+    if(!await sincronizar()) throw Error("Há alterações pendentes que não puderam ser salvas. Confira a conexão e tente novamente.");
+    let r={criados:0,atualizados:0};
+    if(p.itens.length){const x=await sb.rpc("importar_inventario",{p_itens:p.itens,p_atualizar:upd});if(x.error) throw x.error;r=x.data||r;}
+    if(p.itens.length&&!await recarregar()) throw Error("Itens gravados, mas a lista não recarregou. Clique em Atualizar e importe o arquivo de novo para kits, frota e fotos.");
+    let nk=0,nf=0,nfo=0;
+    p.kits.forEach(k=>{const i=S.kits.findIndex(x=>x.cod===k.cod);if(i>=0&&!upd) return;if(i>=0) S.kits[i]=k; else S.kits.push(k);nk++;});
+    p.frota.forEach(v=>{const i=S.frota.findIndex(x=>x.cod===v.cod);if(i>=0&&!upd) return;if(i>=0) S.frota[i]=Object.assign({},S.frota[i],v); else S.frota.push(v);nf++;});
+    if(p.fotos.length){const n=Object.assign({},S.fotosItens||{});p.fotos.forEach(f=>{n[f.cod]=f.src;nfo++;});S.fotosItens=n;}
+    if(nk||nf||nfo){save();
+      if(!await sincronizar()) throw Error("Itens gravados, mas kits ou frota não foram salvos. Confira a mensagem no topo e clique em Atualizar.");
+      if(window.V6&&V6.salvar&&!await V6.salvar()) throw Error("Itens, kits e frota gravados, mas as fotos não foram salvas.");}
+    INV.rows=[];fecharModal();render();
+    toast([p.itens.length?`${r.criados} itens criados e ${r.atualizados} atualizados`:"",nk?`${nk} kit(s)`:"",nf?`${nf} veículo(s)`:"",nfo?`${nfo} foto(s)`:""].filter(Boolean).join(" · ")+".");
+  }catch(e){invMessage((e.code==="PGRST202"||e.code==="42883")?"Falta aplicar a atualização 0015 do inventário no Supabase.":(e.message||"Falha na importação. Confira a conexão."));}
+  finally{INV.busy=false;app.inert=false;host.inert=false;const b=document.getElementById("invConfirm");if(b) b.disabled=!total(pacote(INV.rows));}
+};
+
+/* janela de importação: texto atualizado (as abas são opcionais) */
+const _open=invOpen;
+invOpen=function(){_open.apply(this,arguments);
+  const p=document.querySelector("#modalHost .body p");if(p) p.innerHTML="Escolha o Excel com as abas <b>Inventario</b>, <b>Kits</b>, <b>Frota</b> e <b>Fotos</b> (todas opcionais) ou um CSV só de itens. Nada é gravado antes da confirmação.";
+  const l=document.querySelector('#modalHost label[for="invFile"]');if(l) l.textContent="Arquivo (até 20 MB · 1000 itens)";
+  const c=document.querySelector("#modalHost #invReviewed");if(c&&c.parentElement) c.parentElement.lastChild.textContent="Conferi quantidades, diárias, peso, consumo, kits e frota.";
+};
+
+/* exportação: Excel com as quatro abas + Leia-me; CSV continua só itens */
+function miniatura(src){
+  if(!src||!src.startsWith("data:")||src.length<=LIMITE_CELULA) return Promise.resolve(src&&src.length<=LIMITE_CELULA?src:"");
+  return new Promise(ok=>{const img=new Image();img.onload=()=>{let w=360,q=.78,d="";
+    for(let t=0;t<6;t++){const sc=Math.min(1,w/Math.max(img.width,img.height)),cv=document.createElement("canvas");
+      cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,cv.width,cv.height);
+      cx.drawImage(img,0,0,cv.width,cv.height);d=cv.toDataURL("image/jpeg",q);if(d.length<=LIMITE_CELULA) break;w=Math.round(w*.8);q=Math.max(.5,q-.08);}
+    ok(d.length<=LIMITE_CELULA?d:"");};img.onerror=()=>ok("");img.src=src;});
+}
+const LEIA=[["EventFlow · planilha do inventário"],[""],
+  ["Aba","Para que serve"],
+  ["Inventario","Um item por linha. Categoria: "+CATEGORIAS.join(", ")+". Unidade: pç, cj, rolo, m, kg. Peso em kg e consumo em W por unidade; diária em R$ por unidade/dia."],
+  ["Kits","Uma linha por componente. Repita kit_codigo, kit_nome e categoria em todas as linhas do mesmo kit. item_codigo precisa existir no inventário."],
+  ["Frota","Um veículo por linha. tipo: "+TIPOS_VEIC.join(", ")+". em_manutencao: sim ou não."],
+  ["Fotos","item_codigo e foto: um link https:// da imagem ou a imagem que o próprio EventFlow exporta."],
+  [""],["Na importação, códigos já cadastrados só são substituídos se você escolher “Criar e substituir”. Itens, kits e veículos fora do arquivo continuam cadastrados."]];
+const _exp=invExport;
+invExport=async function(format,rows){
+  if(format==="csv") return _exp(format,rows);
+  try{
+    const modelo=rows===EF_INVENTARIO_MODELO;
+    const wb=XLSX.utils.book_new(),add=(nome,m,larg)=>{const ws=XLSX.utils.aoa_to_sheet(m);ws["!cols"]=larg.map(w=>({wch:w}));if(m.length>1)ws["!autofilter"]={ref:ws["!ref"]};XLSX.utils.book_append_sheet(wb,ws,nome);};
+    add("Inventario",[INV_HEADERS,...rows.map(i=>INV_KEYS.map(k=>i[k]??""))],INV_HEADERS.map((_,i)=>i===1?40:i===12?90:20));
+    const kits=modelo?[]:(S.kits||[]).flatMap(k=>k.itens.map(x=>[k.cod,k.nome,k.cat,k.obs||"",x.cod,x.qtd]));
+    add("Kits",[KIT_H,...kits],[16,34,14,40,18,12]);
+    const fr=modelo?[]:(S.frota||[]).map(v=>[v.cod,v.nome,v.tipo,v.placa||"",+v.capKg||0,+v.capCases||0,+v.lugares||0,v.manut?"sim":"não",v.obs||""]);
+    add("Frota",[FROTA_H,...fr],[12,30,20,12,14,16,10,14,40]);
+    const fotos=[];
+    if(!modelo){const f=S.fotosItens||{};for(const cod of Object.keys(f)){const m=await miniatura(f[cod]);if(m) fotos.push([cod,m]);}}
+    add("Fotos",[FOTO_H,...fotos],[18,60]);
+    add("Leia-me",LEIA,[14,120]);
+    invDownload(modelo?"modelo-inventario-eventflow.xlsx":"inventario-eventflow.xlsx",new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:XL}));
+  }catch(e){toast("Não foi possível gerar o Excel: "+(e.message||e));}
+};
 })();
 </script>
 </body>
