@@ -9112,7 +9112,26 @@ const eu=()=>{try{return me()||{};}catch(e){return {};}};
 const g=id=>document.getElementById(id);
 const val=id=>{const e=g(id);return e?e.value:"";};
 const vv=()=>can("ver_valores");
-const larga=()=>{const m=document.querySelector("#modalHost .modal");if(m)m.classList.add("v6-larga");};
+/* formulários abrem na própria página, no topo da tela — como a ficha do item e o cadastro de cliente */
+let abrindo=false;
+const P=()=>S.v6Painel&&S.v6Painel.view===S.view?S.v6Painel:null;
+function abrir(view,tipo,id,pre,sel){
+  S.v6Painel={view,tipo,id:id||"",pre:pre||{}};
+  abrindo=true;try{if(S.view!==view||(sel&&S.sel!==sel)) go(view,sel); else render();}finally{abrindo=false;}
+  requestAnimationFrame(()=>{const f=document.querySelector("#view .v6-painel");if(!f)return;
+    f.scrollIntoView({block:"start",behavior:"smooth"});
+    const i=f.querySelector("input:not([type=checkbox]):not([type=file]):not([disabled]),select,textarea");if(i)i.focus({preventScroll:true});});
+}
+function fechar(){S.v6Painel=null;render();}
+const painel=html=>`<div class="v6-painel" style="margin-bottom:18px;scroll-margin-top:84px">${html}</div>`;
+const topo=t=>`<div class="top"><h4>${t}</h4><div style="flex:1"></div><button class="btn sm ghost" type="button" data-act="v6Fechar">Fechar</button></div>`;
+const erroEl=id=>`<p class="hint" id="${id}" role="alert" style="color:var(--c);margin:0;font-weight:600"></p>`;
+const erroMsg=(id,t)=>{const e=g(id);if(e)e.textContent=t;else toast(t);};
+/* exclusões pedem um segundo clique no mesmo botão, sem janela */
+function confirmar(b,txt){if(b.dataset.armado) return true;b.dataset.armado="1";const o=b.innerHTML;b.textContent=txt||"Clique de novo para confirmar";
+  setTimeout(()=>{if(b.isConnected){delete b.dataset.armado;b.innerHTML=o;}},4000);return false;}
+document.addEventListener("click",ev=>{const b=ev.target.closest('[data-act="v6Fechar"]');if(b){ev.preventDefault();fechar();}});
+{const _go6=go;go=function(){if(!abrindo) S.v6Painel=null;return _go6.apply(this,arguments);};}
 
 /* ícones extras, traço 24px igual ao v5 */
 const ICX={
@@ -9447,22 +9466,24 @@ async function copiar(txt){try{await navigator.clipboard.writeText(txt);toast("T
   catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand("copy");toast("Texto copiado.");}catch(x){toast("Não consegui copiar.");}t.remove();}}
 V6.copiar=copiar;
 function selShare(){return {pdf:!!g("v6shPdf")?.checked,solo:!!g("v6shSolo")?.checked,aereo:!!g("v6shAereo")?.checked};}
-function abrirShare(osId){
-  const o=osById(osId);if(!o) return toast("OS não encontrada.");
+function painelShare(o){
   const txt=textoMemorial(o,1400),podeArq=!!(navigator.canShare&&navigator.canShare({files:[new File(["x"],"t.pdf",{type:"application/pdf"})]}));
-  modal("Compartilhar memoriais e descritivo",`
-    <p class="hint" style="margin:0">Escolha o que vai junto. No celular, <b>Compartilhar</b> abre a lista de apps — toque em WhatsApp e escolha a conversa. No computador, os arquivos são baixados e o WhatsApp Web abre com o resumo pronto.</p>
-    <div class="v6-sharelist">
-      <label><input type="checkbox" id="v6shPdf" checked> Memoriais + descritivo técnico <span>PDF</span></label>
-      <label><input type="checkbox" id="v6shSolo"> Planilha do memorial de solo <span>Excel</span></label>
-      <label><input type="checkbox" id="v6shAereo"> Planilha do memorial aéreo <span>Excel</span></label></div>
-    <div class="field"><label for="v6shFone">WhatsApp do destinatário (opcional)</label><input id="v6shFone" inputmode="tel" placeholder="(11) 98765-4321" value="${esc(lerP("ef.waFone",""))}"></div>
-    <div class="field"><label>Mensagem que vai junto</label><div class="v6-prev" id="v6shPrev">${esc(txt)}</div></div>`,
-    `<button class="btn" data-act="v6ShCopiar" data-id="${o.id}">${icx("copy",16)}Copiar texto</button>
-     <button class="btn" data-act="v6ShBaixar" data-id="${o.id}">${icx("down",16)}Baixar arquivos</button>
-     <button class="btn v6-wa" data-act="v6ShWa" data-id="${o.id}">${icx("wa",16)}Abrir no WhatsApp</button>
-     ${podeArq?`<button class="btn pri" data-act="v6ShShare" data-id="${o.id}">${icx("share",16)}Compartilhar…</button>`:""}`);
-  larga();
+  return painel(`<form class="addform" autocomplete="off" onsubmit="return false">${topo("Compartilhar memoriais e descritivo")}
+    <p class="hint">Escolha o que vai junto. No celular, <b>Compartilhar</b> abre a lista de apps — toque em WhatsApp e escolha a conversa. No computador, os arquivos são baixados e o WhatsApp Web abre com o resumo pronto.</p>
+    <div class="v6-sharelist" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+      <label><input type="checkbox" id="v6shPdf" checked> Memoriais + descritivo <span>PDF</span></label>
+      <label><input type="checkbox" id="v6shSolo"> Memorial de solo <span>Excel</span></label>
+      <label><input type="checkbox" id="v6shAereo"> Memorial aéreo <span>Excel</span></label></div>
+    <div class="rowf"><div class="field"><label for="v6shFone">WhatsApp do destinatário (opcional)</label><input id="v6shFone" inputmode="tel" placeholder="(11) 98765-4321" value="${esc(lerP("ef.waFone",""))}"></div>
+      <button class="btn go" type="button" data-act="v6ShCopiar" data-id="${o.id}">${icx("copy",16)}Copiar texto</button>
+      <button class="btn go" type="button" data-act="v6ShBaixar" data-id="${o.id}">${icx("down",16)}Baixar arquivos</button>
+      <button class="btn go v6-wa" type="button" data-act="v6ShWa" data-id="${o.id}">${icx("wa",16)}Abrir no WhatsApp</button>
+      ${podeArq?`<button class="btn pri go" type="button" data-act="v6ShShare" data-id="${o.id}">${icx("share",16)}Compartilhar…</button>`:""}</div>
+    <div class="field"><label>Mensagem que vai junto</label><div class="v6-prev">${esc(txt)}</div></div></form>`);
+}
+function abrirShare(osId){
+  if(!osById(osId)) return toast("OS não encontrada.");
+  abrir("producao","share",osId,null,osId);
 }
 V6.compartilhar=abrirShare;
 document.addEventListener("click",async ev=>{
@@ -9477,10 +9498,9 @@ document.addEventListener("click",async ev=>{
   if(a==="v6ShWa"){const f=selShare();if(f.pdf||f.solo||f.aereo){files().forEach(baixarArq);toast("Arquivos baixados. Anexe na conversa pelo clipe do WhatsApp.");}
     window.open(linkWa(fone,txt),"_blank","noopener");return;}
   if(a==="v6ShShare"){const f=files();if(!f.length) return;
-    try{await navigator.share({files:f,title:(o.evento||"Memoriais"),text:txt});fecharModal();}
+    try{await navigator.share({files:f,title:(o.evento||"Memoriais"),text:txt});fechar();}
     catch(e){if(e.name!=="AbortError"){toast("O aparelho não aceitou os arquivos; vou baixar e abrir o WhatsApp.");f.forEach(baixarArq);window.open(linkWa(fone,txt),"_blank","noopener");}}}
 });
-
 /* =====================================================================
    4 · PARCEIROS E SUBLOCAÇÃO
    ===================================================================== */
@@ -9525,8 +9545,9 @@ V6.cardSubloc=({negId,osId,ini,fim})=>{
 };
 if(typeof abaNeg==="function"){const _an=abaNeg;abaNeg=function(n){const h=_an.apply(this,arguments);
   return can("ver_valores")?h+V6.cardSubloc({negId:n.id,osId:n.osId,ini:n.montagem,fim:n.desmontagem}):h;};}
-if(typeof vProdDet==="function"){const _pd=vProdDet;vProdDet=function(){const h=_pd.apply(this,arguments);const o=osById(S.sel);
-  if(!o||!["escopo","logistica"].includes(S.aba||"pontos")) return h;
+if(typeof vProdDet==="function"){const _pd=vProdDet;vProdDet=function(){let h=_pd.apply(this,arguments);const o=osById(S.sel);if(!o) return h;
+  const p=P();if(p&&p.tipo==="share"&&p.id===o.id){const k=h.indexOf('<div class="steps"');h=k<0?painelShare(o)+h:h.slice(0,k)+painelShare(o)+h.slice(k);}
+  if(!["escopo","logistica"].includes(S.aba||"pontos")) return h;
   return h+V6.cardSubloc({negId:o.negId,osId:o.id,ini:o.montagem,fim:o.desmontagem});};}
 
 /* ---- tela ---- */
@@ -9535,7 +9556,9 @@ function vParceiros(){
   const aguard=env.filter(s=>s.status==="Enviada"||s.status==="Contraproposta"),paraMim=rec.filter(s=>s.status==="Enviada");
   const fora=[...env,...rec].filter(s=>s.status==="Retirada");
   const mes=HOJE.slice(0,7),valMes=soma(env.filter(s=>ATIVA.concat("Devolvida").includes(s.status)&&(s.retirada||"").slice(0,7)===mes).map(s=>s.valor));
-  const acao=podeSolic()?`<div hidden><button class="btn pri" data-v5-acao data-act="v6SubNova">+ Novo pedido de sublocação</button></div>`:"";
+  const pn=P(),aberto6=pn&&pn.tipo==="sub";
+  const acao=podeSolic()?`<div hidden><button class="btn ${aberto6?"":"pri"}" data-v5-acao data-act="${aberto6?"v6Fechar":"v6SubNova"}">${aberto6?"Fechar formulário":"+ Novo pedido de sublocação"}</button></div>`:"";
+  const topoP=!pn?"":pn.tipo==="parc"?formParcHtml(pn.id?parc(pn.id):null):pn.tipo==="sub"?formSubHtml(pn.pre):pn.tipo==="pedido"?pedidoHtml(pn.id):"";
   const K=[UI.kpi("k1","swap","Pedidos aguardando resposta",aguard.length,"int",`${env.filter(s=>s.status==="Contraproposta").length} com nova data proposta`,null,1),
     UI.kpi(paraMim.length?"k4":"k2","alert","Recebidos para responder",paraMim.length,"int",`${rec.length} recebido(s) no total`),
     UI.kpi("k3","truck","Pedidos em campo",fora.length,"int",`${soma(fora.map(qtdSub))} peça(s) retiradas`),
@@ -9564,41 +9587,40 @@ function vParceiros(){
       <td>${vz(p.cidade)}</td><td>${p.empresaParceira?pill("Conectado no EventFlow","p-ok"):pill("Pedido pelo WhatsApp","p-n")}</td><td class="r">${env.filter(s=>s.parceiroId===p.id).length}</td></tr>`,
     resumo:l=>`${l.length} parceiro${l.length===1?"":"s"}`,acoes:podeCad()?`<button class="btn sm" data-act="v6ParcNovo">${ic5("plus",2.2)}Novo parceiro</button>`:"",
     vazio:["users","Nenhum parceiro cadastrado.","Cadastre as locadoras parceiras. Com o código EventFlow delas, os pedidos viram integração."]});
-  return acao+avisoLocal("sublocs")+kpis(K)+`<div class="mt" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${seg}</div>`+corpo+(aba==="parceiros"?codigo:"");
+  return acao+avisoLocal("sublocs")+topoP+kpis(K)+`<div class="mt" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${seg}</div>`+corpo+(aba==="parceiros"?codigo:"");
 }
 const kpis=arr=>`<div class="g g4">${arr.join("")}</div>`;
 
-/* ---- cadastro de parceiro ---- */
-function formParc(p){
+/* ---- cadastro de parceiro (na página) ---- */
+function formParcHtml(p){
+  const f=(id,l,v,cls,at)=>`<div class="field ${cls||""}"><label for="${id}">${l}</label><input id="${id}" value="${esc(v||"")}" ${at||""}></div>`;
+  return painel(`<form class="addform" autocomplete="off">${topo(p?"Parceiro · "+esc(p.nome):"Novo parceiro")}
+    <div class="rowf">${f("v6pNome","Empresa",p&&p.nome,"w",'required maxlength="120" placeholder="Razão social ou nome fantasia"')}
+      ${f("v6pDoc","CNPJ",p&&p.doc,"",'maxlength="20" placeholder="00.000.000/0001-00"')}${f("v6pCid","Cidade",p&&p.cidade,"",'maxlength="80"')}</div>
+    <div class="rowf">${f("v6pCont","Contato",p&&p.contato,"",'maxlength="80" placeholder="Quem atende"')}${f("v6pTel","Telefone / WhatsApp",p&&p.tel,"",'inputmode="tel" maxlength="30" placeholder="(11) 90000-0000"')}
+      ${f("v6pMail","E-mail",p&&p.email,"w",'type="email" maxlength="120"')}</div>
+    <div class="rowf">${f("v6pCod","Código EventFlow do parceiro (opcional)",p&&p.empresaParceira,"w",'maxlength="40" placeholder="O parceiro encontra em Parceiros e sublocação"')}
+      ${f("v6pObs","Observações",p&&p.obs,"w",'maxlength="1000"')}
+      ${p?`<button class="btn go" type="button" data-act="v6ParcApagar" data-id="${p.id}" style="color:var(--c)">Excluir</button>`:""}
+      <button class="btn pri go" type="submit" data-act="v6ParcSalvar" data-id="${p?p.id:""}">${p?"Salvar parceiro":"Cadastrar parceiro"}</button></div>
+    ${erroEl("v6pErro")}
+    <p class="hint">${p&&p.empresaParceira?"Conectado: os pedidos chegam direto no EventFlow do parceiro.":"Com o código, os pedidos chegam direto no EventFlow do parceiro. Sem ele, o pedido segue pelo WhatsApp e você registra a resposta aqui."} Enter salva.</p></form>`);
+}
+async function salvarParc(id){
   if(!podeCad()) return toast("Somente a gerência cadastra parceiros.");
-  const f=(id,l,v,at)=>`<div class="field"><label for="${id}">${l}</label><input id="${id}" value="${esc(v||"")}" ${at||""}></div>`;
-  modal(p?"Parceiro · "+p.nome:"Novo parceiro",`<form id="v6FormParc" autocomplete="off" style="display:grid;gap:12px">
-    ${f("v6pNome","Empresa",p&&p.nome,'required maxlength="120" placeholder="Razão social ou nome fantasia"')}
-    <div class="row2">${f("v6pDoc","CNPJ",p&&p.doc,'maxlength="20"')}${f("v6pCid","Cidade",p&&p.cidade,'maxlength="80"')}</div>
-    <div class="row2">${f("v6pCont","Contato",p&&p.contato,'maxlength="80"')}${f("v6pTel","Telefone / WhatsApp",p&&p.tel,'inputmode="tel" maxlength="30"')}</div>
-    ${f("v6pMail","E-mail",p&&p.email,'type="email" maxlength="120"')}
-    <div class="field"><label for="v6pCod">Código EventFlow do parceiro (opcional)</label><input id="v6pCod" value="${esc(p&&p.empresaParceira||"")}" placeholder="Peça ao parceiro: fica em Parceiros e sublocação" maxlength="40">
-      <span class="hint" id="v6pCodOk">${p&&p.empresaParceira?"Conectado: os pedidos chegam direto no EventFlow do parceiro.":"Sem código, o pedido segue pelo WhatsApp e você registra a resposta aqui."}</span></div>
-    <div class="field"><label for="v6pObs">Observações</label><textarea id="v6pObs" rows="3" maxlength="1000">${esc(p&&p.obs||"")}</textarea></div>
-    <p id="v6pErro" role="alert" style="color:var(--c);margin:0"></p></form>`,
-    `${p?`<button class="btn" data-act="v6ParcApagar" data-id="${p.id}" style="color:var(--c);margin-right:auto">Excluir</button>`:""}<button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" type="submit" form="v6FormParc">${p?"Salvar":"Cadastrar parceiro"}</button>`);
-  g("v6FormParc").addEventListener("submit",async ev=>{
-    ev.preventDefault();ev.stopPropagation();
-    const nome=val("v6pNome").trim(),cod=val("v6pCod").trim(),erro=g("v6pErro");
-    if(!nome){erro.textContent="Informe o nome da empresa.";return;}
-    if(cod&&!/^[0-9a-f-]{36}$/i.test(cod)){erro.textContent="O código EventFlow tem 36 caracteres, como aparece na tela do parceiro.";return;}
-    if(cod&&cod===S.empresaId){erro.textContent="Esse é o código da sua própria empresa.";return;}
-    let nomeLink="";
-    if(cod&&typeof sb!=="undefined"&&!ST.local.parceiros){try{const r=await sb.rpc("empresa_por_codigo",{p_id:cod});
-      if(!r.error&&!r.data){erro.textContent="Nenhuma empresa ativa com esse código.";return;} nomeLink=r.data||"";}catch(e){}}
-    const dados={nome,doc:val("v6pDoc").trim(),cidade:val("v6pCid").trim(),contato:val("v6pCont").trim(),tel:val("v6pTel").trim(),email:val("v6pMail").trim(),empresaParceira:cod,obs:val("v6pObs").trim(),ativo:true};
-    if(p) Object.assign(p,dados); else S.parceiros=(S.parceiros||[]).concat(Object.assign({id:novoId()},dados));
-    fecharModal();save();render();toast(nomeLink?"Parceiro conectado: "+nomeLink+".":"Parceiro salvo.");
-  });
-  g("v6pNome").focus();
+  const p=id?parc(id):null,nome=val("v6pNome").trim(),cod=val("v6pCod").trim();
+  if(!nome) return erroMsg("v6pErro","Informe o nome da empresa.");
+  if(cod&&!/^[0-9a-f-]{36}$/i.test(cod)) return erroMsg("v6pErro","O código EventFlow tem 36 caracteres, como aparece na tela do parceiro.");
+  if(cod&&cod===S.empresaId) return erroMsg("v6pErro","Esse é o código da sua própria empresa.");
+  let nomeLink="";
+  if(cod&&typeof sb!=="undefined"&&!ST.local.parceiros){try{const r=await sb.rpc("empresa_por_codigo",{p_id:cod});
+    if(!r.error&&!r.data) return erroMsg("v6pErro","Nenhuma empresa ativa com esse código."); nomeLink=r.data||"";}catch(e){}}
+  const dados={nome,doc:val("v6pDoc").trim(),cidade:val("v6pCid").trim(),contato:val("v6pCont").trim(),tel:val("v6pTel").trim(),email:val("v6pMail").trim(),empresaParceira:cod,obs:val("v6pObs").trim(),ativo:true};
+  if(p) Object.assign(p,dados); else S.parceiros=(S.parceiros||[]).concat(Object.assign({id:novoId()},dados));
+  S.v6ParcAba="parceiros";S.v6Painel=null;save();render();toast(nomeLink?"Parceiro conectado: "+nomeLink+".":"Parceiro salvo.");
 }
 
-/* ---- novo pedido ---- */
+/* ---- novo pedido (na página) ---- */
 let linhasTmp=[];
 function linhaHtml(l,ix){
   const cats={};(S.cat||[]).forEach(c=>{(cats[c.cat||"Outros"]=cats[c.cat||"Outros"]||[]).push(c);});
@@ -9609,114 +9631,124 @@ function linhaHtml(l,ix){
     <div class="field"><label>Qtd</label><input type="number" min="1" step="1" data-v6l="qtd" data-ix="${ix}" value="${esc(l.qtd||1)}"></div>
     <button type="button" class="x" data-act="v6LinhaRm" data-ix="${ix}" aria-label="Remover linha">×</button></div>`;
 }
-const pintarLinhas=()=>{const el=g("v6Linhas");if(el) el.innerHTML=linhasTmp.map(linhaHtml).join("")||`<div class="hint">Nenhuma linha ainda.</div>`;};
-function novoPedido(pre){
-  if(!podeSolic()) return toast("Seu perfil não solicita sublocação.");
-  const ps=(S.parceiros||[]).filter(p=>p.ativo!==false);
-  if(!ps.length){toast("Cadastre um parceiro primeiro.");S.v6ParcAba="parceiros";go("parceiros");return;}
-  const o=pre.os?osById(pre.os):null,n=pre.neg?neg(pre.neg):(o&&o.negId?neg(o.negId):null);
-  const de=pre.de||(o&&o.montagem)||(n&&n.montagem)||HOJE,ate=pre.ate||(o&&o.desmontagem)||(n&&n.desmontagem)||maisDias(de,2);
-  linhasTmp=pre.cod?[{codSolic:pre.cod,desc:item(pre.cod).nome,qtd:Number(pre.qtd)||1}]:[{codSolic:"",desc:"",qtd:1}];
-  const oss=S.os.filter(x=>x.status!=="Encerrada"),negs=S.negocios.filter(x=>!x.osId&&x.etapa!=="perdido");
-  modal("Novo pedido de sublocação",`<form id="v6FormSub" autocomplete="off" style="display:grid;gap:14px">
-    <div class="row2"><div class="field"><label for="v6sPar">Parceiro</label><select id="v6sPar" required>${ps.map(p=>`<option value="${p.id}">${esc(p.nome)}${p.empresaParceira?" · EventFlow":" · WhatsApp"}</option>`).join("")}</select></div>
-      <div class="field"><label for="v6sVinc">Para qual evento</label><select id="v6sVinc"><option value="">Sem vínculo</option>
-        ${oss.length?`<optgroup label="Ordens de Serviço">${oss.map(x=>`<option value="os:${x.id}" ${o&&o.id===x.id?"selected":""}>${esc(x.codigo||"")} · ${esc(x.evento)}</option>`).join("")}</optgroup>`:""}
-        ${negs.length?`<optgroup label="Orçamentos em negociação">${negs.map(x=>`<option value="neg:${x.id}" ${!o&&n&&n.id===x.id?"selected":""}>${esc(x.titulo)}</option>`).join("")}</optgroup>`:""}</select></div></div>
-    <div class="row2"><div class="field"><label for="v6sDe">Eu retiro em</label><input id="v6sDe" type="date" value="${de}" required></div>
-      <div class="field"><label for="v6sAte">Eu devolvo em</label><input id="v6sAte" type="date" value="${ate}" required></div></div>
-    <div class="v6-sec"><h4>O que eu preciso</h4><div class="v6-linhas" id="v6Linhas"></div>
-      <button type="button" class="btn sm" data-act="v6LinhaAdd" style="margin-top:10px">${ic5("plus",2.2)}Adicionar linha</button>
-      <p class="hint" style="margin:8px 0 0">Ligar a linha a um item do seu estoque faz a peça sublocada contar na sua disponibilidade durante a janela — e some o alerta de conflito.</p></div>
-    <div class="row2">${vv()?`<div class="field"><label for="v6sVal">Valor combinado (R$)</label><input id="v6sVal" type="number" min="0" step="10" placeholder="opcional"></div>`:""}
-      <div class="field"><label for="v6sMsg">Recado ao parceiro</label><input id="v6sMsg" maxlength="400" placeholder="Ex.: retiramos com caminhão próprio às 8h"></div></div>
-    <p id="v6sErro" role="alert" style="color:var(--c);margin:0"></p></form>`,
-    `<button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" type="submit" form="v6FormSub">Enviar pedido</button>`);
-  larga();pintarLinhas();
-  g("v6FormSub").addEventListener("submit",ev=>{
-    ev.preventDefault();ev.stopPropagation();
-    const erro=g("v6sErro"),p=parc(val("v6sPar")),r=val("v6sDe"),d=val("v6sAte"),vin=val("v6sVinc");
-    const ls=linhasTmp.map(l=>({id:novoId(),codSolic:l.codSolic||"",desc:(l.desc||"").trim()||(l.codSolic?item(l.codSolic).nome:""),qtd:Math.max(1,Math.round(Number(l.qtd)||0)),codForn:"",obs:""})).filter(l=>l.desc);
-    if(!p){erro.textContent="Escolha o parceiro.";return;}
-    if(!r||!d||d<r){erro.textContent="A devolução precisa ser no mesmo dia ou depois da retirada.";return;}
-    if(!ls.length){erro.textContent="Inclua ao menos um item com descrição.";return;}
-    const os=vin.startsWith("os:")?osById(vin.slice(3)):null,nn=vin.startsWith("neg:")?neg(vin.slice(4)):null;
-    const s={id:novoId(),codigo:codigoSub(),solic:{id:S.empresaId||"",nome:S.empresaNome||""},forn:{id:p.empresaParceira||"",nome:p.nome},parceiroId:p.id,
-      negId:nn?nn.id:(os&&os.negId)||"",osId:os?os.id:"",evento:os?os.evento:nn?nn.titulo:"",retirada:r,devolucao:d,contra:null,status:"Enviada",
-      valor:vv()?Number(val("v6sVal"))||0:0,msg:val("v6sMsg").trim(),itens:ls,hist:[],criado:new Date().toISOString()};
-    hist(s,"Pedido enviado",s.msg);
-    S.sublocs=(S.sublocs||[]).concat(s);fecharModal();save();render();
-    if(externa(s)||ST.local.sublocs){toast("Pedido "+s.codigo+" criado. Envie pelo WhatsApp ao parceiro.");verPedido(s.id);}
-    else toast("Pedido "+s.codigo+" enviado a "+p.nome+".");
-  });
-}
-document.addEventListener("input",ev=>{const e=ev.target.closest("[data-v6l]");if(!e)return;const l=linhasTmp[+e.dataset.ix];if(!l)return;
-  l[e.dataset.v6l]=e.value;if(e.dataset.v6l==="codSolic"&&e.value){l.desc=item(e.value).nome;pintarLinhas();}});
+const linhasHtml=()=>linhasTmp.map(linhaHtml).join("")||`<div class="hint">Nenhuma linha ainda.</div>`;
+const pintarLinhas=()=>{const el=g("v6Linhas");if(el) el.innerHTML=linhasHtml();};
+document.addEventListener("input",ev=>{const e=ev.target.closest("[data-v6l]");if(!e||e.tagName==="SELECT")return;const l=linhasTmp[+e.dataset.ix];if(!l)return;l[e.dataset.v6l]=e.value;});
 document.addEventListener("change",ev=>{const e=ev.target.closest('select[data-v6l]');if(!e)return;const l=linhasTmp[+e.dataset.ix];if(!l)return;
   l.codSolic=e.value;if(e.value){l.desc=item(e.value).nome;}pintarLinhas();});
+function abrirPedido(pre){
+  if(!podeSolic()) return toast("Seu perfil não solicita sublocação.");
+  pre=pre||{};
+  if(!(S.parceiros||[]).some(p=>p.ativo!==false)){toast("Cadastre um parceiro primeiro.");S.v6ParcAba="parceiros";abrir("parceiros","parc","");return;}
+  linhasTmp=pre.cod?[{codSolic:pre.cod,desc:item(pre.cod).nome,qtd:Number(pre.qtd)||1}]:[{codSolic:"",desc:"",qtd:1}];
+  abrir("parceiros","sub","",pre);
+}
+function formSubHtml(pre){
+  const ps=(S.parceiros||[]).filter(p=>p.ativo!==false);
+  const o=pre.os?osById(pre.os):null,n=pre.neg?neg(pre.neg):(o&&o.negId?neg(o.negId):null);
+  const de=pre.de||(o&&o.montagem)||(n&&n.montagem)||HOJE,ate=pre.ate||(o&&o.desmontagem)||(n&&n.desmontagem)||maisDias(de,2);
+  const oss=S.os.filter(x=>x.status!=="Encerrada"),negs=S.negocios.filter(x=>!x.osId&&x.etapa!=="perdido");
+  return painel(`<form class="addform" autocomplete="off">${topo("Novo pedido de sublocação")}
+    <div class="rowf"><div class="field"><label for="v6sPar">Parceiro</label><select id="v6sPar">${ps.map(p=>`<option value="${p.id}">${esc(p.nome)}${p.empresaParceira?" · EventFlow":" · WhatsApp"}</option>`).join("")}</select></div>
+      <div class="field w"><label for="v6sVinc">Para qual evento</label><select id="v6sVinc"><option value="">Sem vínculo</option>
+        ${oss.length?`<optgroup label="Ordens de Serviço">${oss.map(x=>`<option value="os:${x.id}" ${o&&o.id===x.id?"selected":""}>${esc(x.codigo||"")} · ${esc(x.evento)}</option>`).join("")}</optgroup>`:""}
+        ${negs.length?`<optgroup label="Orçamentos em negociação">${negs.map(x=>`<option value="neg:${x.id}" ${!o&&n&&n.id===x.id?"selected":""}>${esc(x.titulo)}</option>`).join("")}</optgroup>`:""}</select></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6sDe">Eu retiro em</label><input id="v6sDe" type="date" value="${de}"></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6sAte">Eu devolvo em</label><input id="v6sAte" type="date" value="${ate}"></div></div>
+    <div class="v6-sec"><h4>O que eu preciso</h4><div class="v6-linhas" id="v6Linhas">${linhasHtml()}</div>
+      <button type="button" class="btn sm" data-act="v6LinhaAdd" style="margin-top:10px">${ic5("plus",2.2)}Adicionar linha</button>
+      <p class="hint" style="margin:8px 0 0">Ligar a linha a um item do seu estoque faz a peça sublocada contar na sua disponibilidade durante a janela — e some o alerta de conflito.</p></div>
+    <div class="rowf">${vv()?`<div class="field" style="flex:0 0 180px"><label for="v6sVal">Valor combinado (R$)</label><input id="v6sVal" type="number" min="0" step="10" placeholder="opcional"></div>`:""}
+      <div class="field w"><label for="v6sMsg">Recado ao parceiro</label><input id="v6sMsg" maxlength="400" placeholder="Ex.: retiramos com caminhão próprio às 8h"></div>
+      <button class="btn pri go" type="submit" data-act="v6SubEnviar">Enviar pedido</button></div>
+    ${erroEl("v6sErro")}</form>`);
+}
+function enviarPedido(){
+  const p=parc(val("v6sPar")),r=val("v6sDe"),d=val("v6sAte"),vin=val("v6sVinc");
+  const ls=linhasTmp.map(l=>({id:novoId(),codSolic:l.codSolic||"",desc:(l.desc||"").trim()||(l.codSolic?item(l.codSolic).nome:""),qtd:Math.max(1,Math.round(Number(l.qtd)||0)),codForn:"",obs:""})).filter(l=>l.desc);
+  if(!p) return erroMsg("v6sErro","Escolha o parceiro.");
+  if(!r||!d||d<r) return erroMsg("v6sErro","A devolução precisa ser no mesmo dia ou depois da retirada.");
+  if(!ls.length) return erroMsg("v6sErro","Inclua ao menos um item com descrição.");
+  const os=vin.startsWith("os:")?osById(vin.slice(3)):null,nn=vin.startsWith("neg:")?neg(vin.slice(4)):null;
+  const s={id:novoId(),codigo:codigoSub(),solic:{id:S.empresaId||"",nome:S.empresaNome||""},forn:{id:p.empresaParceira||"",nome:p.nome},parceiroId:p.id,
+    negId:nn?nn.id:(os&&os.negId)||"",osId:os?os.id:"",evento:os?os.evento:nn?nn.titulo:"",retirada:r,devolucao:d,contra:null,status:"Enviada",
+    valor:vv()?Number(val("v6sVal"))||0:0,msg:val("v6sMsg").trim(),itens:ls,hist:[],criado:new Date().toISOString()};
+  hist(s,"Pedido enviado",s.msg);
+  S.sublocs=(S.sublocs||[]).concat(s);S.v6ParcAba="enviados";save();
+  if(externa(s)||ST.local.sublocs){abrir("parceiros","pedido",s.id);toast("Pedido "+s.codigo+" criado. Envie pelo WhatsApp ao parceiro.");}
+  else{S.v6Painel=null;render();toast("Pedido "+s.codigo+" enviado a "+p.nome+".");}
+}
 
-/* ---- ver / responder pedido ---- */
-function verPedido(id){
-  const s=(S.sublocs||[]).find(x=>x.id===id);if(!s) return toast("Pedido não encontrado.");
+/* ---- ver / responder pedido (na página) ---- */
+function pedidoHtml(id){
+  const s=(S.sublocs||[]).find(x=>x.id===id);if(!s) return "";
   const forn=souForn(s),solic=souSolic(s),respondeAqui=(forn||(solic&&externa(s)))&&podeResp(),st=s.status;
   const mapear=forn&&st==="Enviada"&&podeResp();
   const itens=`<div class="tw"><table><thead><tr><th>Item pedido</th><th class="r">Qtd</th>${forn?`<th>Sai do meu estoque como</th><th class="r">Livre na janela</th>`:solic?`<th>Equivale ao meu item</th>`:""}</tr></thead><tbody>
     ${(s.itens||[]).map((i,ix)=>{const livre=i.codForn?disponivel(i.codForn,s.retirada,s.devolucao)+(ATIVA.includes(st)?(+i.qtd||0):0):null;
       return `<tr><td>${cl(i.desc,i.obs?esc(i.obs):"")}</td><td class="r"><b>${esc(i.qtd)}</b></td>
-      ${forn?`<td>${mapear?`<select data-v6map="${ix}" aria-label="Item do meu estoque para ${esc(i.desc)}" style="min-width:220px"><option value="">— escolher —</option>${(S.cat||[]).map(c=>`<option value="${esc(c.cod)}" ${i.codForn===c.cod?"selected":""}>${esc(c.cod)} · ${esc(c.nome)}</option>`).join("")}</select>`:i.codForn?esc(i.codForn+" · "+item(i.codForn).nome):'<span class="t-vz">—</span>'}</td>
+      ${forn?`<td>${mapear?`<select data-v6map="${ix}" data-sub="${s.id}" aria-label="Item do meu estoque para ${esc(i.desc)}" style="min-width:220px"><option value="">— escolher —</option>${(S.cat||[]).map(c=>`<option value="${esc(c.cod)}" ${i.codForn===c.cod?"selected":""}>${esc(c.cod)} · ${esc(c.nome)}</option>`).join("")}</select>`:i.codForn?esc(i.codForn+" · "+item(i.codForn).nome):'<span class="t-vz">—</span>'}</td>
         <td class="r" data-v6livre="${ix}">${livre==null?'<span class="t-vz">—</span>':`<b style="color:${livre<(+i.qtd||0)?"var(--c)":"var(--ok)"}">${livre}</b>`}</td>`
       :solic?`<td>${i.codSolic?esc(i.codSolic):'<span class="t-vz">fora do estoque</span>'}</td>`:""}</tr>`;}).join("")}</tbody></table></div>`;
   const contra=st==="Contraproposta"&&s.contra?`<div class="v6-contra"><b>Nova data proposta:</b> retirada ${dtl(s.contra.retirada)} · devolução ${dtl(s.contra.devolucao)}${s.contra.msg?`<br>${esc(s.contra.msg)}`:""}</div>`:"";
   const histHtml=`<ul class="v6-hist">${(s.hist||[]).slice().reverse().map(h=>`<li><time>${esc(quandoH(h.ts))}</time><div><b>${esc(h.acao)}</b> · ${esc(h.emp||"")}${h.quem?" ("+esc(h.quem)+")":""}${h.msg?`<br><span class="hint">${esc(h.msg)}</span>`:""}</div></li>`).join("")}</ul>`;
   const B=[];
-  const btn=(act,t,cls)=>`<button class="btn ${cls||""}" data-act="${act}" data-id="${s.id}">${t}</button>`;
-  if(respondeAqui&&st==="Enviada") B.push(btn("v6SubRecusar","Recusar","").replace('class="btn "','class="btn" style="color:var(--c)"'),btn("v6SubContra","Propor outra data"),btn("v6SubAceitar",externa(s)&&solic?"Parceiro aceitou":"Aceitar pedido","pri"));
+  const btn=(act,t,cls,st2)=>`<button type="button" class="btn go ${cls||""}" data-act="${act}" data-id="${s.id}"${st2?` style="${st2}"`:""}>${t}</button>`;
+  if(respondeAqui&&st==="Enviada") B.push(btn("v6SubRecusar","Recusar","","color:var(--c)"),btn("v6SubContra","Propor outra data"),btn("v6SubAceitar",externa(s)&&solic?"Parceiro aceitou":"Aceitar pedido","pri"));
   if(solic&&st==="Contraproposta") B.push(btn("v6SubCancelar","Cancelar pedido"),btn("v6SubAceitarContra","Aceitar nova data","pri"));
   if(solic&&st==="Enviada") B.push(btn("v6SubCancelar","Cancelar pedido"));
-  if(solic&&externa(s)&&["Enviada","Contraproposta"].includes(st)) B.push(`<button class="btn v6-wa" data-act="v6SubWa" data-id="${s.id}">${icx("wa",16)}Enviar pelo WhatsApp</button>`);
+  if(solic&&externa(s)&&["Enviada","Contraproposta"].includes(st)) B.push(`<button type="button" class="btn go v6-wa" data-act="v6SubWa" data-id="${s.id}">${icx("wa",16)}Enviar pelo WhatsApp</button>`);
   if(st==="Aceita"&&(solic||forn)) B.push(...(solic?[btn("v6SubCancelar","Cancelar")]:[]),btn("v6SubRetirar","Registrar retirada","pri"));
   if(st==="Retirada"&&(solic||forn)) B.push(btn("v6SubDevolver","Registrar devolução","pri"));
   const contaLig=(S.contas||[]).some(c=>c.sublocId===s.id);
   if(S.role==="gerencia"&&s.valor>0&&["Aceita","Retirada","Devolvida"].includes(st)&&!contaLig) B.push(btn("v6SubConta",solic?"Lançar em contas a pagar":"Lançar em contas a receber"));
-  modal("Pedido "+(s.codigo||""),`${avisoLocal("sublocs")}
+  return painel(`<form class="addform" autocomplete="off" onsubmit="return false">${topo("Pedido "+esc(s.codigo||""))}
     <div class="flex" style="gap:8px">${pill(st,STSUB[st])}${externa(s)?pill("Parceiro fora da plataforma","p-n"):pill(forn?"Recebido de "+(s.solic.nome||"parceiro"):"Integrado pelo EventFlow","p-i")}</div>
     <div class="v6-kv"><div><span>${forn?"Solicitante":"Parceiro"}</span><b>${esc(forn?s.solic.nome:s.forn.nome)}</b></div><div><span>Evento</span><b>${esc(evSub(s)||"—")}</b></div>
       <div><span>Retirada</span><b>${dtl(s.retirada)}</b></div><div><span>Devolução</span><b>${dtl(s.devolucao)}</b></div>
       ${vv()?`<div><span>Valor combinado</span><b>${s.valor?brl(s.valor):"—"}</b></div>`:""}${s.msg?`<div style="grid-column:1/-1"><span>Recado</span><b style="font-weight:500">${esc(s.msg)}</b></div>`:""}</div>
     ${contra}${itens}
-    ${mapear?`<p class="hint" style="margin:0">Escolha de qual item do seu inventário sai cada linha. Ao aceitar, as peças ficam reservadas de ${dtl(s.retirada)} a ${dtl(s.devolucao)} e saem da disponibilidade do seu estoque.</p>`:""}
-    <div id="v6Contra" hidden class="v6-sec"><h4>Propor outra data</h4><div class="row2"><div class="field"><label for="v6cDe">Retirada</label><input id="v6cDe" type="date" value="${s.retirada}"></div>
-      <div class="field"><label for="v6cAte">Devolução</label><input id="v6cAte" type="date" value="${s.devolucao}"></div></div>
-      <div class="field" style="margin-top:10px"><label for="v6cMsg">Mensagem</label><input id="v6cMsg" maxlength="300" placeholder="Ex.: o lote só volta de outro evento no dia 12"></div>
-      <div class="v6-acts" style="margin-top:10px"><button class="btn pri" data-act="v6SubContraEnviar" data-id="${s.id}">Enviar contraproposta</button></div></div>
-    <div class="v6-sec"><h4>Histórico</h4>${histHtml}</div>`,
-    `<div class="v6-acts"><button class="btn" data-act="fecharModal" style="margin-right:auto">Fechar</button>${B.join("")}</div>`);
-  larga();
+    ${mapear?`<p class="hint">Escolha de qual item do seu inventário sai cada linha. Ao aceitar, as peças ficam reservadas de ${dtl(s.retirada)} a ${dtl(s.devolucao)} e saem da disponibilidade do seu estoque.</p>`:""}
+    <div id="v6Contra" hidden class="v6-sec"><h4>Propor outra data</h4><div class="rowf">
+      <div class="field" style="flex:0 0 160px"><label for="v6cDe">Retirada</label><input id="v6cDe" type="date" value="${s.retirada}"></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6cAte">Devolução</label><input id="v6cAte" type="date" value="${s.devolucao}"></div>
+      <div class="field w"><label for="v6cMsg">Mensagem</label><input id="v6cMsg" maxlength="300" placeholder="Ex.: o lote só volta de outro evento no dia 12"></div>
+      <button type="button" class="btn pri go" data-act="v6SubContraEnviar" data-id="${s.id}">Enviar contraproposta</button></div></div>
+    <div id="v6Recusa" hidden class="v6-sec"><h4>Recusar o pedido</h4><div class="rowf">
+      <div class="field w"><label for="v6rMsg">Motivo (opcional)</label><input id="v6rMsg" maxlength="300" placeholder="Ex.: sem saldo nesta data"></div>
+      <button type="button" class="btn go" data-act="v6SubRecusarEnviar" data-id="${s.id}" style="color:var(--c)">Confirmar recusa</button></div></div>
+    ${B.length?`<div class="rowf" style="justify-content:flex-end">${B.join("")}</div>`:""}
+    <div class="v6-sec"><h4>Histórico</h4>${histHtml}</div></form>`);
 }
-V6.verPedido=verPedido;
+V6.verPedido=id=>abrir("parceiros","pedido",id);
 document.addEventListener("change",ev=>{const e=ev.target.closest("[data-v6map]");if(!e)return;
-  const s=(S.sublocs||[]).find(x=>x.id===document.querySelector('#modalHost [data-act="v6SubAceitar"]')?.dataset.id);if(!s)return;
+  const s=(S.sublocs||[]).find(x=>x.id===e.dataset.sub);if(!s)return;
   const i=s.itens[+e.dataset.v6map];if(!i)return;i.codForn=e.value;
   const cel=document.querySelector(`[data-v6livre="${e.dataset.v6map}"]`);
   if(cel){const l=e.value?disponivel(e.value,s.retirada,s.devolucao):null;cel.innerHTML=l==null?'<span class="t-vz">—</span>':`<b style="color:${l<(+i.qtd||0)?"var(--c)":"var(--ok)"}">${l}</b>`;}});
-function mudar(s,status,acao,msg){s.status=status;hist(s,acao,msg);save();fecharModal();render();}
+/* mudança de status: o pedido continua aberto na página, já atualizado */
+function mudar(s,status,acao,msg){s.status=status;hist(s,acao,msg);save();render();}
+const mostrar=id=>{const c=g(id);if(c){c.hidden=false;const i=c.querySelector("input");if(i)i.focus();}};
 document.addEventListener("click",ev=>{
   const b=ev.target.closest("[data-act]");if(!b)return;const a=b.dataset.act;if(!/^v6(Sub|Parc|Linha|CopiarCod)/.test(a))return;
+  if(b.type==="submit") ev.preventDefault();
   const s=(S.sublocs||[]).find(x=>x.id===b.dataset.id);
   switch(a){
     case "v6ParcAba": S.v6ParcAba=b.dataset.a;render();break;
-    case "v6ParcNovo": formParc(null);break;
-    case "v6ParcEditar": formParc(parc(b.dataset.id));break;
+    case "v6ParcNovo": if(podeCad()) abrir("parceiros","parc","");break;
+    case "v6ParcEditar": if(podeCad()) abrir("parceiros","parc",b.dataset.id);break;
+    case "v6ParcSalvar": salvarParc(b.dataset.id);break;
     case "v6ParcApagar": {const p=parc(b.dataset.id);if(!p)break;
       if((S.sublocs||[]).some(x=>x.parceiroId===p.id&&!["Devolvida","Cancelada","Recusada"].includes(x.status))) return toast("Este parceiro tem pedidos em andamento.");
-      if(!confirm("Excluir o parceiro "+p.nome+"?"))break;S.parceiros=S.parceiros.filter(x=>x.id!==p.id);fecharModal();save();render();toast("Parceiro excluído.");break;}
+      if(!confirmar(b,"Clique de novo para excluir"))break;S.parceiros=S.parceiros.filter(x=>x.id!==p.id);S.v6Painel=null;save();render();toast("Parceiro excluído.");break;}
     case "v6CopiarCod": if(S.empresaId) copiar(S.empresaId).then(()=>toast("Código copiado. Envie ao parceiro."));break;
-    case "v6SubNova": fecharModal();novoPedido({neg:b.dataset.neg,os:b.dataset.os,de:b.dataset.de,ate:b.dataset.ate,cod:b.dataset.cod,qtd:b.dataset.qtd});break;
-    case "v6SubVer": verPedido(b.dataset.id);break;
+    case "v6SubNova": abrirPedido({neg:b.dataset.neg,os:b.dataset.os,de:b.dataset.de,ate:b.dataset.ate,cod:b.dataset.cod,qtd:b.dataset.qtd});break;
+    case "v6SubEnviar": enviarPedido();break;
+    case "v6SubVer": abrir("parceiros","pedido",b.dataset.id);break;
     case "v6LinhaAdd": linhasTmp.push({codSolic:"",desc:"",qtd:1});pintarLinhas();break;
     case "v6LinhaRm": linhasTmp.splice(+b.dataset.ix,1);pintarLinhas();break;
     case "v6SubWa": if(s){const p=parc(s.parceiroId);window.open(linkWa(p&&p.tel,textoPedido(s)),"_blank","noopener");}break;
-    case "v6SubContra": {const c=g("v6Contra");if(c){c.hidden=false;g("v6cDe").focus();}break;}
+    case "v6SubContra": mostrar("v6Contra");break;
     case "v6SubContraEnviar": {if(!s)break;const r=val("v6cDe"),d=val("v6cAte");
       if(!r||!d||d<r) return toast("A devolução precisa ser depois da retirada.");
       if(r===s.retirada&&d===s.devolucao) return toast("Mude ao menos uma das datas.");
@@ -9726,19 +9758,19 @@ document.addEventListener("click",ev=>{
         const sem=s.itens.filter(i=>disponivel(i.codForn,s.retirada,s.devolucao)<(+i.qtd||0));
         if(sem.length) return toast("Sem saldo na janela: "+sem.map(i=>item(i.codForn).nome).join(", ")+". Proponha outra data ou recuse.");}
       mudar(s,"Aceita",souForn(s)?"Pedido aceito":"Parceiro aceitou (registrado)","Reserva "+dtl(s.retirada)+" → "+dtl(s.devolucao));toast("Pedido "+s.codigo+" aceito.");break;}
-    case "v6SubRecusar": {if(!s)break;const m=prompt("Motivo da recusa (opcional):","");if(m===null)break;mudar(s,"Recusada",souForn(s)?"Pedido recusado":"Parceiro recusou (registrado)",m);toast("Pedido recusado.");break;}
+    case "v6SubRecusar": mostrar("v6Recusa");break;
+    case "v6SubRecusarEnviar": if(s){mudar(s,"Recusada",souForn(s)?"Pedido recusado":"Parceiro recusou (registrado)",val("v6rMsg").trim());toast("Pedido recusado.");}break;
     case "v6SubAceitarContra": {if(!s||!s.contra)break;s.retirada=s.contra.retirada;s.devolucao=s.contra.devolucao;const c=s.contra;s.contra=null;
       mudar(s,"Aceita","Nova data aceita",dtl(c.retirada)+" → "+dtl(c.devolucao));toast("Datas confirmadas com o parceiro.");break;}
-    case "v6SubCancelar": {if(!s||!confirm("Cancelar o pedido "+s.codigo+"?"))break;mudar(s,"Cancelada","Pedido cancelado");toast("Pedido cancelado.");break;}
+    case "v6SubCancelar": if(s&&confirmar(b,"Clique de novo para cancelar")){mudar(s,"Cancelada","Pedido cancelado");toast("Pedido cancelado.");}break;
     case "v6SubRetirar": if(s){mudar(s,"Retirada","Equipamento retirado");toast("Retirada registrada.");}break;
     case "v6SubDevolver": if(s){mudar(s,"Devolvida","Equipamento devolvido");toast("Devolução registrada. As peças voltam ao estoque do parceiro.");}break;
     case "v6SubConta": {if(!s)break;const solic=souSolic(s);
       S.contas=(S.contas||[]).concat({id:novoId(),tipo:solic?"pagar":"receber",desc:"Sublocação "+s.codigo+(evSub(s)?" · "+evSub(s):""),cat:"Sublocação",
         contraparte:solic?s.forn.nome:s.solic.nome,emissao:HOJE,venc:s.devolucao,valor:s.valor,pagoEm:"",valorPago:null,forma:"",osId:s.osId||"",sublocId:s.id,reembId:"",parcela:"",obs:""});
-      save();fecharModal();render();toast("Lançado em contas a "+(solic?"pagar":"receber")+", vencimento na devolução.");break;}
+      save();render();toast("Lançado em contas a "+(solic?"pagar":"receber")+", vencimento na devolução.");break;}
   }
 });
-
 /* =====================================================================
    5 · CONTAS A PAGAR E A RECEBER
    ===================================================================== */
@@ -9770,11 +9802,12 @@ function vContas(){
   const FX=["A vencer","1–30 dias","31–60 dias","61–90 dias","Mais de 90"],CF=["var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c)"];
   const ag=FX.map((n,i)=>({n,v:soma(abR.filter(c=>faixa(c)===n).map(c=>c.valor)),c:CF[i]})).filter(x=>x.v>0).map(x=>Object.assign(x,{t:brk(x.v)}));
   const prox=cs.filter(c=>aberto(c)&&c.venc<=maisDias(HOJE,7)).sort((a,b)=>a.venc<b.venc?-1:1).slice(0,6);
-  const acao=`<div hidden><button class="btn pri" data-v5-acao data-act="v6ContaNova">+ Nova conta</button></div>`;
+  const pn=P(),form6=pn&&pn.tipo==="conta"&&!pn.id;
+  const acao=`<div hidden><button class="btn ${form6?"":"pri"}" data-v5-acao data-act="${form6?"v6Fechar":"v6ContaNova"}">${form6?"Fechar formulário":"+ Nova conta"}</button></div>`;
   const reembPend=(S.reembolsos||[]).filter(r=>r.status==="Aprovado"&&!cs.some(c=>c.reembId===r.id)).length;
   const lista=cs.slice().sort((a,b)=>(aberto(b)-aberto(a))||(a.venc<b.venc?-1:a.venc>b.venc?1:0));
   const q=k=>cs.filter(k).length;
-  return acao+avisoLocal("contas")+kpis([
+  return acao+avisoLocal("contas")+painelContas()+kpis([
     UI.kpi("k1","dn","A receber em aberto",soma(abR.map(c=>c.valor)),"brl",`${abR.length} título(s) · ${venR.length} vencido(s)`,M.slice(0,6).map((m,i)=>ent[i]),1),
     UI.kpi("k3","up","A pagar em aberto",soma(abP.map(c=>c.valor)),"brl",`${abP.length} título(s) · ${venP.length} vencido(s)`),
     UI.kpi(venR.length?"k4":"k2","alert","Inadimplência",inad,"pct",`${brl(soma(venR.map(c=>c.valor)))} vencidos a receber`),
@@ -9811,79 +9844,78 @@ function vContas(){
     rodape:l=>{const t=soma(l.map(c=>(c.tipo==="pagar"?-1:1)*c.valor));return `<tfoot><tr><td colspan="4">Saldo do filtro (receber − pagar)</td><td class="r">${t<0?"− ":""}${brl(Math.abs(t))}</td><td></td></tr></tfoot>`;},
     vazio:["wallet","Nenhuma conta lançada.","Lance a primeira, gere os recebíveis das OS ou importe os reembolsos aprovados.",`<button class="btn pri" data-act="v6ContaNova">Lançar conta</button>`]});
 }
-function formConta(c){
-  const nova=!c;c=c||{tipo:S.v6ContaTipo||"receber",desc:"",cat:"",contraparte:"",emissao:HOJE,venc:maisDias(HOJE,30),valor:"",forma:"Pix",obs:"",osId:""};
-  const cats=c.tipo==="pagar"?CATP:CATR,oss=S.os.slice().sort((a,b)=>(b.evIni||"").localeCompare(a.evIni||""));
-  modal(nova?"Nova conta":"Conta · "+c.desc,`<form id="v6FormConta" autocomplete="off" style="display:grid;gap:12px">
-    <div class="seg" role="group" aria-label="Tipo">${[["receber","A receber"],["pagar","A pagar"]].map(([k,t])=>`<button type="button" data-act="v6ContaTipo" data-t="${k}" aria-pressed="${c.tipo===k}" ${nova?"":"disabled"}>${t}</button>`).join("")}</div>
-    <div class="field"><label for="v6cDesc">Descrição</label><input id="v6cDesc" required maxlength="160" value="${esc(c.desc)}" placeholder="${c.tipo==="pagar"?"Ex.: Frete do caminhão 3/4":"Ex.: Saldo do evento Congresso XP"}"></div>
-    <div class="row2"><div class="field"><label for="v6cCont">${c.tipo==="pagar"?"Fornecedor":"Cliente"}</label><input id="v6cCont" maxlength="120" value="${esc(c.contraparte)}" list="v6cContL"><datalist id="v6cContL">${[...new Set([...(S.clientes||[]).map(x=>x.nome),...(S.parceiros||[]).map(x=>x.nome),...(S.freelas||[]).map(x=>x.nome)])].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></div>
-      <div class="field"><label for="v6cCat">Categoria</label><select id="v6cCat">${cats.map(k=>`<option ${c.cat===k?"selected":""}>${esc(k)}</option>`).join("")}${c.cat&&!cats.includes(c.cat)?`<option selected>${esc(c.cat)}</option>`:""}</select></div></div>
-    <div class="row3"><div class="field"><label for="v6cVal">Valor (R$)</label><input id="v6cVal" type="number" min="0" step="0.01" required value="${esc(c.valor)}"></div>
-      <div class="field"><label for="v6cEmi">Emissão</label><input id="v6cEmi" type="date" value="${esc(c.emissao||HOJE)}"></div>
-      <div class="field"><label for="v6cVen">Vencimento</label><input id="v6cVen" type="date" required value="${esc(c.venc)}"></div></div>
-    ${nova?`<div class="row2"><div class="field"><label for="v6cParc">Parcelas</label><input id="v6cParc" type="number" min="1" max="48" step="1" value="1"></div>
-      <div class="field"><label for="v6cInt">Intervalo entre parcelas</label><select id="v6cInt"><option value="30">Mensal</option><option value="15">Quinzenal</option><option value="7">Semanal</option></select></div></div>
-      <p class="hint" style="margin:-4px 0 0">Com mais de uma parcela, o valor é dividido e cada vencimento é gerado a partir do primeiro.</p>`:""}
-    <div class="row2"><div class="field"><label for="v6cForma">Forma</label><select id="v6cForma">${["Pix","Boleto","Transferência","Cartão","Dinheiro","Outros"].map(k=>`<option ${c.forma===k?"selected":""}>${k}</option>`).join("")}</select></div>
-      <div class="field"><label for="v6cOs">Evento (OS)</label><select id="v6cOs"><option value="">Sem vínculo</option>${oss.map(o=>`<option value="${o.id}" ${c.osId===o.id?"selected":""}>${esc(o.codigo||"")} · ${esc(o.evento)}</option>`).join("")}</select></div></div>
-    <div class="field"><label for="v6cObs">Observação</label><input id="v6cObs" maxlength="400" value="${esc(c.obs||"")}"></div>
+const FORMAS=["Pix","Boleto","Transferência","Cartão","Dinheiro","Outros"];
+const optCats=(tipo,sel)=>{const cats=tipo==="pagar"?CATP:CATR;return cats.map(k=>`<option ${sel===k?"selected":""}>${esc(k)}</option>`).join("")+(sel&&!cats.includes(sel)?`<option selected>${esc(sel)}</option>`:"");};
+function formContaHtml(c,tipoNovo){
+  const nova=!c;c=c||{tipo:tipoNovo||"receber",desc:"",cat:"",contraparte:"",emissao:HOJE,venc:maisDias(HOJE,30),valor:"",forma:"Pix",obs:"",osId:""};
+  const oss=S.os.slice().sort((a,b)=>(b.evIni||"").localeCompare(a.evIni||""));
+  const nomes=[...new Set([...(S.clientes||[]).map(x=>x.nome),...(S.parceiros||[]).map(x=>x.nome),...(S.freelas||[]).map(x=>x.nome)])];
+  return painel(`<form class="addform" autocomplete="off" id="v6FormConta" data-tipo="${c.tipo}">${topo(nova?"Nova conta":"Conta · "+esc(c.desc))}
+    <div class="rowf"><div class="field" style="flex:0 0 auto"><label>Tipo</label><div class="seg" role="group" aria-label="Tipo">${[["receber","A receber"],["pagar","A pagar"]].map(([k,t])=>`<button type="button" data-act="v6ContaTipo" data-t="${k}" aria-pressed="${c.tipo===k}" ${nova?"":"disabled"}>${t}</button>`).join("")}</div></div>
+      <div class="field w"><label for="v6cDesc">Descrição</label><input id="v6cDesc" maxlength="160" value="${esc(c.desc)}" placeholder="${c.tipo==="pagar"?"Ex.: Frete do caminhão 3/4":"Ex.: Saldo do evento Congresso XP"}"></div>
+      <div class="field"><label for="v6cCont" id="v6cContL">${c.tipo==="pagar"?"Fornecedor":"Cliente"}</label><input id="v6cCont" maxlength="120" value="${esc(c.contraparte)}" list="v6cContDL"><datalist id="v6cContDL">${nomes.map(n=>`<option value="${esc(n)}">`).join("")}</datalist></div>
+      <div class="field"><label for="v6cCat">Categoria</label><select id="v6cCat">${optCats(c.tipo,c.cat)}</select></div></div>
+    <div class="rowf"><div class="field s" style="flex:0 0 140px"><label for="v6cVal">Valor (R$)</label><input id="v6cVal" type="number" min="0" step="0.01" value="${esc(c.valor)}"></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6cEmi">Emissão</label><input id="v6cEmi" type="date" value="${esc(c.emissao||HOJE)}"></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6cVen">Vencimento</label><input id="v6cVen" type="date" value="${esc(c.venc)}"></div>
+      ${nova?`<div class="field s"><label for="v6cParc">Parcelas</label><input id="v6cParc" type="number" min="1" max="48" step="1" value="1"></div>
+        <div class="field" style="flex:0 0 150px"><label for="v6cInt">Intervalo</label><select id="v6cInt"><option value="30">Mensal</option><option value="15">Quinzenal</option><option value="7">Semanal</option></select></div>`:""}
+      <div class="field" style="flex:0 0 150px"><label for="v6cForma">Forma</label><select id="v6cForma">${FORMAS.map(k=>`<option ${c.forma===k?"selected":""}>${k}</option>`).join("")}</select></div></div>
+    <div class="rowf"><div class="field w"><label for="v6cOs">Evento (OS)</label><select id="v6cOs"><option value="">Sem vínculo</option>${oss.map(o=>`<option value="${o.id}" ${c.osId===o.id?"selected":""}>${esc(o.codigo||"")} · ${esc(o.evento)}</option>`).join("")}</select></div>
+      <div class="field w"><label for="v6cObs">Observação</label><input id="v6cObs" maxlength="400" value="${esc(c.obs||"")}"></div>
+      ${nova?"":`<button class="btn go" type="button" data-act="v6ContaApagar" data-id="${c.id}" style="color:var(--c)">Excluir</button>${aberto(c)?`<button class="btn go" type="button" data-act="v6ContaBaixar" data-id="${c.id}">Baixar</button>`:""}`}
+      <button class="btn pri go" type="submit" data-act="v6ContaSalvar" data-id="${nova?"":c.id}">${nova?"Lançar conta":"Salvar conta"}</button></div>
     ${!nova&&c.pagoEm?`<div class="verdict ok"><div><b>${c.tipo==="receber"?"Recebida":"Paga"} em ${dtl(c.pagoEm)}</b>${brl(c.valorPago??c.valor)}${c.forma?" · "+esc(c.forma):""}</div></div>`:""}
-    <p id="v6cErro" role="alert" style="color:var(--c);margin:0"></p></form>`,
-    `${nova?"":`<button class="btn" data-act="v6ContaApagar" data-id="${c.id}" style="color:var(--c);margin-right:auto">Excluir</button>`}
-     <button class="btn" data-act="fecharModal">Cancelar</button>${!nova&&aberto(c)?`<button class="btn" data-act="v6ContaBaixar" data-id="${c.id}">Baixar</button>`:""}<button class="btn pri" type="submit" form="v6FormConta">${nova?"Lançar":"Salvar"}</button>`);
-  g("v6FormConta").addEventListener("submit",ev=>{
-    ev.preventDefault();ev.stopPropagation();
-    const desc=val("v6cDesc").trim(),valor=Math.round((Number(val("v6cVal"))||0)*100)/100,venc=val("v6cVen"),erro=g("v6cErro");
-    if(!desc){erro.textContent="Descreva a conta.";return;}
-    if(!(valor>0)){erro.textContent="Informe um valor maior que zero.";return;}
-    if(!venc){erro.textContent="Informe o vencimento.";return;}
-    const base={tipo:c.tipo,desc,cat:val("v6cCat"),contraparte:val("v6cCont").trim(),emissao:val("v6cEmi")||HOJE,forma:val("v6cForma"),osId:val("v6cOs"),obs:val("v6cObs").trim()};
-    if(nova){const n=Math.max(1,Math.min(48,Math.round(Number(val("v6cParc"))||1))),int=Number(val("v6cInt"))||30;
-      const parte=Math.floor(valor/n*100)/100,novas=[];
-      for(let i=0;i<n;i++){const v=i===n-1?Math.round((valor-parte*(n-1))*100)/100:parte;
-        const d=!i?venc:int===30?somaMes(venc,i):maisDias(venc,int*i);
-        novas.push(Object.assign({id:novoId(),venc:d,valor:v,pagoEm:"",valorPago:null,sublocId:"",reembId:"",parcela:n>1?(i+1)+"/"+n:""},base));}
-      S.contas=(S.contas||[]).concat(novas);toast(n>1?n+" parcelas lançadas.":"Conta lançada.");
-    }else{Object.assign(c,base,{venc,valor});toast("Conta salva.");}
-    fecharModal();save();render();
-  });
-  g("v6cDesc").focus();
+    ${erroEl("v6cErro")}
+    <p class="hint">${nova?"Com mais de uma parcela, o valor é dividido e cada vencimento é gerado a partir do primeiro. ":""}Enter salva.</p></form>`);
 }
-function baixarConta(c){
-  modal((c.tipo==="receber"?"Registrar recebimento":"Registrar pagamento"),`<form id="v6FormBaixa" style="display:grid;gap:12px">
-    <div class="v6-kv"><div><span>Título</span><b>${esc(c.desc)}</b></div><div><span>Vencimento</span><b>${dtl(c.venc)}</b></div><div><span>Valor</span><b>${brl(c.valor)}</b></div></div>
-    <div class="row3"><div class="field"><label for="v6bData">Data</label><input id="v6bData" type="date" value="${HOJE}" required></div>
-      <div class="field"><label for="v6bVal">Valor ${c.tipo==="receber"?"recebido":"pago"}</label><input id="v6bVal" type="number" min="0" step="0.01" value="${c.valor}"></div>
-      <div class="field"><label for="v6bForma">Forma</label><select id="v6bForma">${["Pix","Boleto","Transferência","Cartão","Dinheiro","Outros"].map(k=>`<option ${c.forma===k?"selected":""}>${k}</option>`).join("")}</select></div></div>
-    <p class="hint" style="margin:0">Juros, multa ou desconto entram na diferença entre o valor do título e o valor ${c.tipo==="receber"?"recebido":"pago"}.</p></form>`,
-    `<button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" type="submit" form="v6FormBaixa">Confirmar baixa</button>`);
-  g("v6FormBaixa").addEventListener("submit",ev=>{ev.preventDefault();ev.stopPropagation();
-    const d=val("v6bData");if(!d) return toast("Informe a data.");
-    c.pagoEm=d;c.valorPago=Math.round((Number(val("v6bVal"))||0)*100)/100;c.forma=val("v6bForma");
-    fecharModal();save();render();toast(c.tipo==="receber"?"Recebimento registrado.":"Pagamento registrado.");});
+function salvarConta(id){
+  const c=id?(S.contas||[]).find(x=>x.id===id):null,nova=!c,tipo=c?c.tipo:(g("v6FormConta")?.dataset.tipo||"receber");
+  const desc=val("v6cDesc").trim(),valor=Math.round((Number(val("v6cVal"))||0)*100)/100,venc=val("v6cVen");
+  if(!desc) return erroMsg("v6cErro","Descreva a conta.");
+  if(!(valor>0)) return erroMsg("v6cErro","Informe um valor maior que zero.");
+  if(!venc) return erroMsg("v6cErro","Informe o vencimento.");
+  const base={tipo,desc,cat:val("v6cCat"),contraparte:val("v6cCont").trim(),emissao:val("v6cEmi")||HOJE,forma:val("v6cForma"),osId:val("v6cOs"),obs:val("v6cObs").trim()};
+  if(nova){const n=Math.max(1,Math.min(48,Math.round(Number(val("v6cParc"))||1))),int=Number(val("v6cInt"))||30;
+    const parte=Math.floor(valor/n*100)/100,novas=[];
+    for(let i=0;i<n;i++){const v=i===n-1?Math.round((valor-parte*(n-1))*100)/100:parte;
+      const d=!i?venc:int===30?somaMes(venc,i):maisDias(venc,int*i);
+      novas.push(Object.assign({id:novoId(),venc:d,valor:v,pagoEm:"",valorPago:null,sublocId:"",reembId:"",parcela:n>1?(i+1)+"/"+n:""},base));}
+    S.contas=(S.contas||[]).concat(novas);toast(n>1?n+" parcelas lançadas.":"Conta lançada.");
+  }else{Object.assign(c,base,{venc,valor});toast("Conta salva.");}
+  S.v6Painel=null;save();render();
+}
+function baixaHtml(c){
+  return painel(`<form class="addform" autocomplete="off">${topo((c.tipo==="receber"?"Registrar recebimento · ":"Registrar pagamento · ")+esc(c.desc))}
+    <div class="v6-kv"><div><span>${c.tipo==="receber"?"Cliente":"Fornecedor"}</span><b>${esc(c.contraparte||"—")}</b></div><div><span>Vencimento</span><b>${dtl(c.venc)}</b></div><div><span>Valor do título</span><b>${brl(c.valor)}</b></div></div>
+    <div class="rowf"><div class="field" style="flex:0 0 160px"><label for="v6bData">Data</label><input id="v6bData" type="date" value="${HOJE}"></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6bVal">Valor ${c.tipo==="receber"?"recebido":"pago"}</label><input id="v6bVal" type="number" min="0" step="0.01" value="${c.valor}"></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6bForma">Forma</label><select id="v6bForma">${FORMAS.map(k=>`<option ${c.forma===k?"selected":""}>${k}</option>`).join("")}</select></div>
+      <div style="flex:1"></div><button class="btn pri go" type="submit" data-act="v6ContaBaixaOk" data-id="${c.id}">Confirmar baixa</button></div>
+    <p class="hint">Juros, multa ou desconto entram na diferença entre o valor do título e o valor ${c.tipo==="receber"?"recebido":"pago"}.</p></form>`);
+}
+const jaLancado=o=>soma((S.contas||[]).filter(c=>c.tipo==="receber"&&c.osId===o.id).map(c=>c.valor));
+function gerarOSHtml(){
+  const oss=S.os.filter(o=>(+o.valor||0)>0).sort((a,b)=>(b.evIni||"").localeCompare(a.evIni||""));
+  return painel(`<form class="addform" autocomplete="off">${topo("Gerar recebíveis de uma OS")}
+    ${oss.length?`<div class="rowf"><div class="field w"><label for="v6oOs">Ordem de Serviço</label><select id="v6oOs">${oss.map(o=>`<option value="${o.id}">${esc(o.codigo||"")} · ${esc(o.evento)} · ${brl(o.valor)}${jaLancado(o)?" (já lançado "+brl(jaLancado(o))+")":""}</option>`).join("")}</select></div>
+      <div class="field s"><label for="v6oSinal">Sinal (%)</label><input id="v6oSinal" type="number" min="0" max="100" step="5" value="50"></div>
+      <div class="field" style="flex:0 0 160px"><label for="v6oDSinal">Vencimento do sinal</label><input id="v6oDSinal" type="date" value="${HOJE}"></div>
+      <div class="field" style="flex:0 0 150px"><label for="v6oPrazo">Saldo: dias após o evento</label><input id="v6oPrazo" type="number" min="0" step="1" value="15"></div>
+      <button class="btn pri go" type="submit" data-act="v6ContasOSOk">Gerar</button></div>
+    ${erroEl("v6oErro")}
+    <p class="hint">Gera duas contas a receber: o sinal e o saldo, que vence a partir do fim do evento. Use 0% de sinal para um título único. O valor é o que ainda não foi lançado para a OS.</p>`
+    :UI.vazio("clip","Nenhuma OS com valor.","Quando houver OS com valor contratado, os recebíveis podem ser gerados aqui.")}</form>`);
 }
 function gerarDeOS(){
-  const oss=S.os.filter(o=>(+o.valor||0)>0).sort((a,b)=>(b.evIni||"").localeCompare(a.evIni||""));
-  if(!oss.length) return toast("Nenhuma OS com valor para gerar recebíveis.");
-  const ja=o=>soma((S.contas||[]).filter(c=>c.tipo==="receber"&&c.osId===o.id).map(c=>c.valor));
-  modal("Gerar recebíveis de uma OS",`<form id="v6FormOS" style="display:grid;gap:12px">
-    <div class="field"><label for="v6oOs">Ordem de Serviço</label><select id="v6oOs">${oss.map(o=>`<option value="${o.id}">${esc(o.codigo||"")} · ${esc(o.evento)} · ${brl(o.valor)}${ja(o)?" (já lançado "+brl(ja(o))+")":""}</option>`).join("")}</select></div>
-    <div class="row3"><div class="field"><label for="v6oSinal">Sinal (%)</label><input id="v6oSinal" type="number" min="0" max="100" step="5" value="50"></div>
-      <div class="field"><label for="v6oDSinal">Vencimento do sinal</label><input id="v6oDSinal" type="date" value="${HOJE}"></div>
-      <div class="field"><label for="v6oPrazo">Saldo: dias após o evento</label><input id="v6oPrazo" type="number" min="0" step="1" value="15"></div></div>
-    <p class="hint" style="margin:0">Gera duas contas a receber: o sinal e o saldo, que vence a partir do fim do evento. Use 0% de sinal para um título único. O valor é o restante ainda não lançado para a OS.</p>
-    <p id="v6oErro" role="alert" style="color:var(--c);margin:0"></p></form>`,
-    `<button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" type="submit" form="v6FormOS">Gerar</button>`);
-  g("v6FormOS").addEventListener("submit",ev=>{ev.preventDefault();ev.stopPropagation();
-    const o=osById(val("v6oOs"));if(!o) return;const resto=Math.round(((+o.valor||0)-ja(o))*100)/100;
-    if(resto<=0){g("v6oErro").textContent="Esta OS já tem todo o valor lançado.";return;}
-    const pc=Math.max(0,Math.min(100,Number(val("v6oSinal"))||0)),sinal=Math.round(resto*pc)/100,saldo=Math.round((resto-sinal)*100)/100;
-    const fim=o.evFim||o.desmontagem||HOJE,c0={tipo:"receber",contraparte:cli(o.cliente).nome,emissao:HOJE,forma:"Pix",osId:o.id,pagoEm:"",valorPago:null,sublocId:"",reembId:"",obs:""};
-    const novas=[];
-    if(sinal>0) novas.push(Object.assign({id:novoId(),desc:"Sinal · "+o.evento,cat:"Sinal / entrada",venc:val("v6oDSinal")||HOJE,valor:sinal,parcela:saldo>0?"1/2":""},c0));
-    if(saldo>0) novas.push(Object.assign({id:novoId(),desc:(sinal>0?"Saldo · ":"")+o.evento,cat:sinal>0?"Saldo do evento":"Locação de evento",venc:maisDias(fim,Number(val("v6oPrazo"))||0),valor:saldo,parcela:sinal>0?"2/2":""},c0));
-    S.contas=(S.contas||[]).concat(novas);fecharModal();save();render();toast(novas.length+" recebível(is) gerado(s) para "+o.evento+".");});
+  const o=osById(val("v6oOs"));if(!o) return;const resto=Math.round(((+o.valor||0)-jaLancado(o))*100)/100;
+  if(resto<=0) return erroMsg("v6oErro","Esta OS já tem todo o valor lançado.");
+  const pc=Math.max(0,Math.min(100,Number(val("v6oSinal"))||0)),sinal=Math.round(resto*pc)/100,saldo=Math.round((resto-sinal)*100)/100;
+  const fim=o.evFim||o.desmontagem||HOJE,c0={tipo:"receber",contraparte:cli(o.cliente).nome,emissao:HOJE,forma:"Pix",osId:o.id,pagoEm:"",valorPago:null,sublocId:"",reembId:"",obs:""};
+  const novas=[];
+  if(sinal>0) novas.push(Object.assign({id:novoId(),desc:"Sinal · "+o.evento,cat:"Sinal / entrada",venc:val("v6oDSinal")||HOJE,valor:sinal,parcela:saldo>0?"1/2":""},c0));
+  if(saldo>0) novas.push(Object.assign({id:novoId(),desc:(sinal>0?"Saldo · ":"")+o.evento,cat:sinal>0?"Saldo do evento":"Locação de evento",venc:maisDias(fim,Number(val("v6oPrazo"))||0),valor:saldo,parcela:sinal>0?"2/2":""},c0));
+  S.contas=(S.contas||[]).concat(novas);S.v6Painel=null;save();render();toast(novas.length+" recebível(is) gerado(s) para "+o.evento+".");
 }
 function importarReemb(){
   const rs=(S.reembolsos||[]).filter(r=>r.status==="Aprovado"&&!(S.contas||[]).some(c=>c.reembId===r.id));
@@ -9895,18 +9927,27 @@ function importarReemb(){
 }
 document.addEventListener("click",ev=>{
   const b=ev.target.closest("[data-act]");if(!b)return;const a=b.dataset.act;if(!/^v6Conta/.test(a))return;
-  if(a!=="v6ContaTipo"&&b.closest("tr")&&a!=="v6ContaEditar") ev.stopPropagation();
+  if(b.type==="submit") ev.preventDefault();
   const c=(S.contas||[]).find(x=>x.id===b.dataset.id);
-  if(a==="v6ContaNova"){S.v6ContaTipo="receber";formConta(null);}
-  else if(a==="v6ContaTipo"){S.v6ContaTipo=b.dataset.t;const d=val("v6cDesc");formConta(null);g("v6cDesc").value=d;}
-  else if(a==="v6ContaEditar"&&c) formConta(c);
-  else if(a==="v6ContaBaixar"&&c) baixarConta(c);
-  else if(a==="v6ContaEstornar"&&c){if(!confirm("Desfazer a baixa de "+c.desc+"?"))return;c.pagoEm="";c.valorPago=null;save();render();toast("Baixa desfeita.");}
-  else if(a==="v6ContaApagar"&&c){if(!confirm("Excluir a conta "+c.desc+"?"))return;S.contas=S.contas.filter(x=>x.id!==c.id);fecharModal();save();render();toast("Conta excluída.");}
-  else if(a==="v6ContasOS") gerarDeOS();
+  if(a==="v6ContaNova") abrir("contas","conta","",{tipo:"receber"});
+  else if(a==="v6ContaTipo"){const f=g("v6FormConta");if(!f)return;const t=b.dataset.t;f.dataset.tipo=t;
+    f.querySelectorAll('[data-act="v6ContaTipo"]').forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.t===t)));
+    g("v6cCat").innerHTML=optCats(t,"");g("v6cContL").textContent=t==="pagar"?"Fornecedor":"Cliente";
+    g("v6cDesc").placeholder=t==="pagar"?"Ex.: Frete do caminhão 3/4":"Ex.: Saldo do evento Congresso XP";if(S.v6Painel)S.v6Painel.pre.tipo=t;}
+  else if(a==="v6ContaSalvar") salvarConta(b.dataset.id);
+  else if(a==="v6ContaEditar"&&c) abrir("contas","conta",c.id);
+  else if(a==="v6ContaBaixar"&&c) abrir("contas","baixa",c.id);
+  else if(a==="v6ContaBaixaOk"&&c){const d=val("v6bData");if(!d) return toast("Informe a data.");
+    c.pagoEm=d;c.valorPago=Math.round((Number(val("v6bVal"))||0)*100)/100;c.forma=val("v6bForma");
+    S.v6Painel=null;save();render();toast(c.tipo==="receber"?"Recebimento registrado.":"Pagamento registrado.");}
+  else if(a==="v6ContaEstornar"&&c){if(!confirmar(b,"Confirmar estorno"))return;c.pagoEm="";c.valorPago=null;save();render();toast("Baixa desfeita.");}
+  else if(a==="v6ContaApagar"&&c){if(!confirmar(b,"Clique de novo para excluir"))return;S.contas=S.contas.filter(x=>x.id!==c.id);S.v6Painel=null;save();render();toast("Conta excluída.");}
+  else if(a==="v6ContasOS") abrir("contas","gerarOS","");
+  else if(a==="v6ContasOSOk") gerarDeOS();
   else if(a==="v6ContasReemb") importarReemb();
-},true);
-
+});
+const painelContas=()=>{const p=P();if(!p) return "";const c=p.id?(S.contas||[]).find(x=>x.id===p.id):null;
+  return p.tipo==="conta"?formContaHtml(c,p.pre.tipo):p.tipo==="baixa"&&c?baixaHtml(c):p.tipo==="gerarOS"?gerarOSHtml():"";};
 /* =====================================================================
    NAVEGAÇÃO, TÍTULOS, CONTADORES
    ===================================================================== */
