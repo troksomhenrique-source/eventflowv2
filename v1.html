@@ -8311,6 +8311,12 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
   corTema();
 })();
 </script>
+
+
+
+
+
+
 <style id="ef-base">/* ---------- EF base: finanças, gráficos, tooltip, revelação (compartilhado; cada versão dá a pele) ---------- */
 .ef-fin{display:grid;gap:var(--ef-gap,20px)}
 .ef-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end}
@@ -8413,7 +8419,7 @@ html,body{overflow-x:clip}
   --accent:#D19A79; --accent2:#DDB096; --accentSoft:#3A2E27; --onAccent:#1E1F21;
   --sig:#D19A79; --onSig:#1E1F21; --led:#8DB59C;
   --ok:#8DB59C; --okSoft:#25302A; --warn:#C9B07E; --warnSoft:#33302A; --crit:#D4998E; --critSoft:#3A2C2A; --onSolid:#1E1F21;
-  --strip:#1A1B1D; --stripLine:#2C2D30;
+  --strip:#232427; --stripLine:#303134;
   --c1:#BD7452; --c2:#2285AC; --c3:#63A772; color-scheme:dark;
 }}
 :root[data-theme="dark"]{
@@ -8422,7 +8428,7 @@ html,body{overflow-x:clip}
   --accent:#D19A79; --accent2:#DDB096; --accentSoft:#3A2E27; --onAccent:#1E1F21;
   --sig:#D19A79; --onSig:#1E1F21; --led:#8DB59C;
   --ok:#8DB59C; --okSoft:#25302A; --warn:#C9B07E; --warnSoft:#33302A; --crit:#D4998E; --critSoft:#3A2C2A; --onSolid:#1E1F21;
-  --strip:#1A1B1D; --stripLine:#2C2D30;
+  --strip:#232427; --stripLine:#303134;
   --c1:#BD7452; --c2:#2285AC; --c3:#63A772; color-scheme:dark;
 }
 
@@ -8666,6 +8672,9 @@ td.num,td.r{font-family:var(--mono)}
   tbody tr.clickable:hover,.res .row[data-act]:hover{box-shadow:inset 2px 0 0 var(--line)}
 }
 .card,.ef-card,.ef-strip{background:var(--surface)}
+.brand b{color:#DAD9D4}
+.v1-fader-scale i{background:none!important;border-top:10px solid var(--line);border-bottom:10px solid var(--line)}
+.v1-fader-scale i.maj{width:2px;border-top:14px solid var(--ink3);border-bottom:14px solid var(--ink3)}
 </style>
 <script id="ef-shared">
 /* =====================================================================
@@ -8937,6 +8946,8 @@ html.ds-compact .grid,html.ds-compact .kpis{gap:10px}
 .ds-prefs button{flex:1;border:0;background:none;color:inherit;font:400 12px var(--sans);padding:4px 6px;border-radius:4px;cursor:pointer;min-height:26px}
 .ds-prefs button[aria-pressed="true"]{background:var(--surface2);color:var(--ink);font-weight:500;box-shadow:inset 0 0 0 1px var(--line)}
 .side .ds-prefs{color:inherit}
+.company[aria-pressed=true] small{color:var(--ink2)}
+.deal .top{position:static;background:none;border:0;padding:0;min-height:0}
 </style>
 <style id="conforto-varredura">/* gerado por conforto.py: mínimo 12px e peso 500 */
 :is(.addform .hint,.amb label,.ambbar button span,.ambhead b,.ambhead span,.ambsel,.ambtag,.ancop span,.apl button,.audit-after,.audit-before,.authcard footer,.av,.bar,.bell .bd,.brand span,.bsec>header .sw,.bsec>header h4,.btn.sm,.cal .cell .n,.cal .dow,.cal .ev,.cal .more,.calcout,.card>header .hint,.chatlist .grp,.cmt .b b,.crow .meta time,.crow .ub,.crow span,.crumb .sub,.daysep,.deal .c,.dia .et,.dia .qt,.drop header h4,.ef-eyebrow,.ef-hb-v small,.ef-period button,.ef-strip .ef-eyebrow){font-size:12px!important}
