@@ -856,9 +856,17 @@ function formOSV(){
       <button class="btn go" type="button" data-act="addItem">Incluir no escopo</button>
       <button class="btn pri go" type="submit" data-act="salvarOSV">Emitir Ordem de Serviço</button>
     </div>
-    <div class="picklist" id="pick"></div>
+    <div class="picklist" id="pick">${pickHtml()}</div>
     <p class="hint">Enter no campo de quantidade inclui o item. Enter nos campos de cima emite a OS.</p></form>`;
 }
+/* escopo da OS avulsa: a lista é desenhada junto com o formulário e redesenhada a cada inclusão */
+function pickHtml(){
+  const its=(typeof tmpItens!=="undefined"?tmpItens:[]);
+  return its.length? its.map((x,i)=>`<div class="it"><span class="tag">${esc(x.cod)}</span><span>${esc(item(x.cod).nome)}</span>
+    <span class="q">${x.qtd}×</span><button class="btn sm ghost" type="button" data-act="rmItem" data-ix="${i}">remover</button></div>`).join("")
+    : `<div class="empty" style="padding:12px">Nenhum equipamento no escopo ainda. Escolha o item, a quantidade e clique em Incluir.</div>`;
+}
+function pintarPick(){ const el=document.getElementById("pick"); if(el) el.innerHTML=pickHtml(); }
 const STCOR={"Aguardando produção":"warn","Em produção":"acc","Liberada":"ok","Encerrada":""};
 function vVendas(){
   return `<div class="sechead"><h2>Ordens de Serviço de Venda</h2><p>Geradas pela gerência a partir de um negócio ganho e encaminhadas ao produtor responsável.</p>
@@ -4063,7 +4071,7 @@ function abaSolo(o,ro){
       ${ro?`<div class="verdict warn"><div><b>Somente leitura</b>Este perfil acompanha o memorial, mas quem edita é a produção.</div></div>`
         :`<button class="btn pri" style="justify-content:center" data-act="fecharSolo" data-id="${o.id}">${m.solo.feito?"Revalidar memorial de solo":"Concluir memorial de solo"}</button>`}
       <button class="btn" style="justify-content:center" data-act="baixarMem" data-tipo="solo" data-id="${o.id}">Baixar planilha de solo (Excel) · todas as salas</button>
-      <button class="btn" style="justify-content:center" data-act="v6Share" data-id="${o.id}">Compartilhar memoriais (WhatsApp, e-mail…)</button>
+      <button class="btn" style="justify-content:center" data-act="v6Share" data-id="${o.id}">Compartilhar memoriais</button>
     </div></div>`;
 }
 /* ---- 4. Memorial aéreo, gerado ---- */
@@ -4103,7 +4111,7 @@ function abaAereo(o,ro){
       ${ro?`<div class="verdict warn"><div><b>Somente leitura</b>Quem edita o memorial é a produção.</div></div>`
         :`<button class="btn pri" style="justify-content:center" data-act="fecharAereo" data-id="${o.id}">${m.aereo.feito?"Revalidar memorial aéreo":"Concluir memorial aéreo"}</button>`}
       <button class="btn" style="justify-content:center" data-act="baixarMem" data-tipo="aereo" data-id="${o.id}">Baixar planilha do aéreo (Excel) · todas as salas</button>
-      <button class="btn" style="justify-content:center" data-act="v6Share" data-id="${o.id}">Compartilhar memoriais (WhatsApp, e-mail…)</button>
+      <button class="btn" style="justify-content:center" data-act="v6Share" data-id="${o.id}">Compartilhar memoriais</button>
     </div></div>`;
 }
 function soloRes(r,p){
@@ -8509,8 +8517,12 @@ UI.countAll=(root,animar)=>root.querySelectorAll("[data-v5n]").forEach(el=>{
 
 /* ---------- gráficos (helpers da referência) ---------- */
 function smooth(pts){let d="M"+pts[0][0]+","+pts[0][1];
+  /* os pontos de controle ficam entre as duas pontas do trecho: a curva não
+     ultrapassa os valores reais (nem desce abaixo de zero perto de um pico) */
+  const entre=(v,a,b)=>Math.min(Math.max(v,Math.min(a,b)),Math.max(a,b));
   for(let i=0;i<pts.length-1;i++){const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
-    d+=" C"+(p1[0]+(p2[0]-p0[0])/6)+","+(p1[1]+(p2[1]-p0[1])/6)+" "+(p2[0]-(p3[0]-p1[0])/6)+","+(p2[1]-(p3[1]-p1[1])/6)+" "+p2[0]+","+p2[1];}
+    const c1y=entre(p1[1]+(p2[1]-p0[1])/6,p1[1],p2[1]),c2y=entre(p2[1]-(p3[1]-p1[1])/6,p1[1],p2[1]);
+    d+=" C"+(p1[0]+(p2[0]-p0[0])/6)+","+c1y+" "+(p2[0]-(p3[0]-p1[0])/6)+","+c2y+" "+p2[0]+","+p2[1];}
   return d;}
 UI.smooth=smooth;
 UI.spark=(vals,col)=>{if(!vals||vals.length<2)return"";const w=96,h=36,mx=Math.max(...vals),mn=Math.min(...vals);
@@ -8682,10 +8694,16 @@ function decorar(){
   v.querySelectorAll(".sechead h2, .between h2").forEach(h=>{if(norm(h.textContent)===norm(t[0]))h.classList.add("v5-dup");});
   /* ação principal da tela vai para a topbar (o botão original continua sendo quem age) */
   const ac=document.getElementById("v5Acao");
+  const temFechar=[...v.querySelectorAll(".addform .top button, .v6-painel .top button")].some(b=>/^\s*Fechar\s*$/.test(b.textContent)&&b.getClientRects().length);
   if(ac){const alvo=v.querySelector("[data-v5-acao]")||v.querySelector(".sechead .btn.pri, .between .btn.pri");
     v.querySelectorAll("[data-v5-alvo]").forEach(x=>x.removeAttribute("data-v5-alvo"));
     if(alvo){alvo.setAttribute("data-v5-alvo","1");alvo.classList.add("v5-proxied");const rot=alvo.textContent.trim().replace(/^\+\s*/,"");
-      ac.innerHTML=(/^\+/.test(alvo.textContent.trim())?ic5("plus",2.2):"")+esc(rot);ac.hidden=false;}else ac.hidden=true;}
+      ac.innerHTML=(/^\+/.test(alvo.textContent.trim())?ic5("plus",2.2):"")+esc(rot);ac.hidden=false;
+      /* o formulário aberto já tem o próprio “Fechar”: não repete “Fechar formulário” na barra do topo */
+      if(/^Fechar/.test(rot)&&temFechar) ac.hidden=true;
+    }else ac.hidden=true;
+    /* telas que mostram “Fechar formulário” no próprio cabeçalho: some quando o formulário já tem o seu */
+    if(temFechar) v.querySelectorAll(".sechead .btn, .between .btn").forEach(b=>{if(/^\s*Fechar formulário\s*$/.test(b.textContent))b.hidden=true;});}
   const animar=UI.anim&&anima();
   v.classList.toggle("v5-anim",animar);
   const fila=UI.charts.splice(0);fila.forEach(f=>{try{f();}catch(e){console.warn("gráfico",e);}});
@@ -9055,6 +9073,10 @@ if(!document.getElementById("app").hidden){renderShell();render();}
    ícone de categoria · galeria com foto · compartilhar · parceiros · contas
    ===================================================================== */
 /* ícone de categoria: só o contorno, sem fundo colorido */
+/* colunas laterais com botão de texto longo: o botão quebra linha em vez de empurrar a coluna */
+.grid[style*="330px"]>.grid>.btn,.grid[style*="320px"]>.grid>.btn{white-space:normal;height:auto;min-height:40px;line-height:1.3;padding-top:9px;padding-bottom:9px;text-align:center}
+.grid[style*="330px"]>*,.grid[style*="320px"]>*{min-width:0}
+@media (max-width:900px){.grid[style*="minmax(0,330px)"],.grid[style*="minmax(0,320px)"],.grid[style*="minmax(0,300px)"]{grid-template-columns:minmax(0,1fr)!important}}
 /* gráfico de barras: o valor fica sempre visível, acima da barra */
 .bars{gap:8px}
 .bc{gap:6px;min-width:0}
