@@ -1494,6 +1494,17 @@ function fluxo(osId,txt,para,view,sel,mural){
 .cmt .b{background:var(--surface2);border-radius:9px;padding:7px 10px;font-size:12.5px;line-height:1.45;min-width:0}
 .cmt .b b{font-size:11.5px;display:block;margin-bottom:1px}
 .likebtn.on{color:var(--accent);border-color:var(--accent)}
+.mural-envio{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;flex-wrap:wrap}
+/* link ou palavra comprida quebra linha em vez de vazar do cartão */
+.post .tx,.cmt .b,.post .hd{overflow-wrap:anywhere;word-break:break-word}
+.post .bd{min-width:0;flex:1}
+.post .hd{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline}
+.cmt input{flex:1;min-width:0}
+@media (max-width:600px){
+  .mural-envio .btn{flex:1 1 100%;min-height:40px}
+  .post .acts .membros{display:none}
+  .post .in,.post .acts,.post .cmts{padding-left:12px;padding-right:12px}
+}
 @media (max-width:900px){
   .chatwrap{grid-template-columns:1fr;height:auto;min-height:0}
   .chatlist{border-right:0;border-bottom:1px solid var(--line)}
@@ -1509,7 +1520,7 @@ function vMural(){
       <div class="card"><div class="pad" style="display:flex;gap:11px">
         ${av(me(),30)}
         <div style="flex:1;min-width:0"><textarea id="muralTxt" rows="2" placeholder="Compartilhe um aviso com o time…"></textarea>
-        <div class="between" style="margin-top:8px"><span class="muted" style="font-size:11px">Publicado como ${esc(me().nome)} · visível para toda a operação</span>
+        <div class="mural-envio"><span class="muted" style="font-size:11px">Publicado como ${esc(me().nome)} · visível para toda a operação</span>
         <button class="btn pri sm" data-act="publicar">Publicar</button></div></div>
       </div></div>
       ${S.posts.map(p=>{const a=usr(p.autor);const curti=p.likes.includes(me().id);
@@ -10055,7 +10066,7 @@ if(!document.getElementById("app").hidden){renderShell();render();}
   .v6-sheet .it.sair{color:var(--c)}.v6-sheet .it.sair svg{color:var(--c)}
   .v6-sheet hr{border:0;border-top:1px solid var(--ln2);margin:6px 8px}
   .view{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
-  .toast{bottom:calc(96px + env(safe-area-inset-bottom,0px))!important}
+  .toast{bottom:calc(96px + env(safe-area-inset-bottom,0px))!important;width:max-content;max-width:calc(100vw - 32px);border-radius:16px;text-align:center;line-height:1.4}
   .main>header.top{padding-top:calc(10px + env(safe-area-inset-top,0px))}
 }
 @keyframes v6sobe{from{opacity:0;transform:translateY(14px)}}
