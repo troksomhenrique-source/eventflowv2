@@ -4,24 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FFFFFF">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16171B">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F6F5F1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#26272B">
 <meta name="description" content="EventFlow — ERP e CRM para locadora de eventos.">
 <title>EventFlow</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
 <style>
 :root{
-  /* EventFlow DS v2: base monocromática (tinta sobre papel) + um único accent cobalto
+  /* EventFlow DS v2: base monocromática (tinta sobre papel) + um único accent discreto (baixa saturação)
      para ação primária, item ativo, foco e seleção. Todos os pares de texto passam WCAG AA. */
-  --ink:#121318; --ink2:#45464E; --ink3:#5F616A;
-  --bg:#F2F2F4; --surface:#FFFFFF; --surface2:#F7F7F9; --line:#DDDEE3; --line2:#EBEBEF;
-  --accent:#2B47C9; --accent2:#2239A6; --accentSoft:#E9EDFC; --onAccent:#FFFFFF;
-  --ok:#22603F; --okSoft:#E5EFE9; --warn:#7A5410; --warnSoft:#F6EEDD; --crit:#A3301F; --critSoft:#F9E7E3;
-  --onSolid:#FFFFFF;
-  --shadow:0 1px 2px rgba(18,19,24,.06), 0 12px 32px -14px rgba(18,19,24,.28);
-  --shadowUp:0 1px 2px rgba(18,19,24,.05);
-  --ring:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent);
+  --ink:#37362F; --ink2:#4A4945; --ink3:#65635E;
+  --bg:#ECEAE4; --surface:#F6F5F1; --surface2:#F0EEE9; --line:#D6D3CB; --line2:#E3E0D9;
+  --accent:#3E5598; --accent2:#34488A; --accentSoft:#E3E6EF; --onAccent:#F6F5F1;
+  --ok:#3F6B52; --okSoft:#E3EBE5; --warn:#7A6230; --warnSoft:#EFE8D8; --crit:#9A4A3E; --critSoft:#F1E2DE;
+  --onSolid:#F6F5F1;
+  --shadow:0 1px 2px rgba(55,54,47,.06), 0 6px 16px -10px rgba(55,54,47,.18);
+  --shadowUp:0 1px 1px rgba(55,54,47,.04);
+  --ring:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);
+  --c1:#41629F; --c2:#A1642D; --c3:#449970;
   --r:10px; --r2:6px; --rp:999px;
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
   --ease-out:cubic-bezier(0.23,1,0.32,1); --ease-drawer:cubic-bezier(0.32,0.72,0,1);
@@ -30,25 +31,27 @@
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --ink:#ECEDF0; --ink2:#B3B5BD; --ink3:#9294A0;
-  --bg:#0C0D10; --surface:#16171B; --surface2:#1D1E23; --line:#2C2E35; --line2:#23252B;
-  --accent:#93A6FF; --accent2:#B0BEFF; --accentSoft:#1D2346; --onAccent:#0B0F24;
-  --ok:#86CBA4; --okSoft:#15261D; --warn:#E0BC7E; --warnSoft:#2A2215; --crit:#F0A193; --critSoft:#2E1A17;
-  --onSolid:#0B0F24;
-  --shadow:0 1px 2px rgba(0,0,0,.5), 0 14px 34px -16px rgba(0,0,0,.9);
-  --shadowUp:0 1px 1px rgba(0,0,0,.35);
-  --ring:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent);
+  --ink:#D6D5D0; --ink2:#B5B4AF; --ink3:#9B9A95;
+  --bg:#1F2023; --surface:#26272B; --surface2:#2D2E32; --line:#3A3B40; --line2:#313236;
+  --accent:#9AA8D4; --accent2:#B0BBDF; --accentSoft:#30354A; --onAccent:#1F2023;
+  --ok:#8DB59C; --okSoft:#25302A; --warn:#C9B07E; --warnSoft:#33302A; --crit:#D4998E; --critSoft:#3A2C2A;
+  --onSolid:#1F2023;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 16px -10px rgba(0,0,0,.45);
+  --shadowUp:0 1px 1px rgba(0,0,0,.2);
+  --ring:0 0 0 3px color-mix(in srgb,var(--accent) 24%,transparent);
+  --c1:#5D80BF; --c2:#A1642D; --c3:#4AA076;
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
-  --ink:#ECEDF0; --ink2:#B3B5BD; --ink3:#9294A0;
-  --bg:#0C0D10; --surface:#16171B; --surface2:#1D1E23; --line:#2C2E35; --line2:#23252B;
-  --accent:#93A6FF; --accent2:#B0BEFF; --accentSoft:#1D2346; --onAccent:#0B0F24;
-  --ok:#86CBA4; --okSoft:#15261D; --warn:#E0BC7E; --warnSoft:#2A2215; --crit:#F0A193; --critSoft:#2E1A17;
-  --onSolid:#0B0F24;
-  --shadow:0 1px 2px rgba(0,0,0,.5), 0 14px 34px -16px rgba(0,0,0,.9);
-  --shadowUp:0 1px 1px rgba(0,0,0,.35);
-  --ring:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent);
+  --ink:#D6D5D0; --ink2:#B5B4AF; --ink3:#9B9A95;
+  --bg:#1F2023; --surface:#26272B; --surface2:#2D2E32; --line:#3A3B40; --line2:#313236;
+  --accent:#9AA8D4; --accent2:#B0BBDF; --accentSoft:#30354A; --onAccent:#1F2023;
+  --ok:#8DB59C; --okSoft:#25302A; --warn:#C9B07E; --warnSoft:#33302A; --crit:#D4998E; --critSoft:#3A2C2A;
+  --onSolid:#1F2023;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 16px -10px rgba(0,0,0,.45);
+  --shadowUp:0 1px 1px rgba(0,0,0,.2);
+  --ring:0 0 0 3px color-mix(in srgb,var(--accent) 24%,transparent);
+  --c1:#5D80BF; --c2:#A1642D; --c3:#4AA076;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -7902,7 +7905,7 @@ button,.btn,.navitem,.pill,.tabs,.roles,.themesel,.modes,.apl{-webkit-user-selec
 .navgrp{font-size:11px;letter-spacing:.08em;padding:18px 10px 6px;color:var(--ink3)}
 .navgrp:first-child{padding-top:8px}
 .navitem{min-height:36px;padding:7px 10px;gap:10px;font-size:13.5px;border-radius:var(--r2);color:var(--ink2);
-  transition:background-color 120ms ease,color 120ms ease}
+  transition:background-color 150ms ease,color 150ms ease}
 .navitem svg{opacity:.75}
 .navitem.on{background:var(--accentSoft);color:var(--accent);font-weight:600}
 .navitem.on svg{opacity:1}
@@ -7913,7 +7916,7 @@ button,.btn,.navitem,.pill,.tabs,.roles,.themesel,.modes,.apl{-webkit-user-selec
 
 /* ---------- shell: topbar ---------- */
 .main>header.top{min-height:60px;padding:10px 24px;gap:12px;border-bottom-color:var(--line2);
-  background:color-mix(in srgb,var(--surface) 86%,transparent);backdrop-filter:saturate(160%) blur(12px);-webkit-backdrop-filter:saturate(160%) blur(12px)}
+  background:var(--surface)}
 .crumb{flex-direction:column;gap:0;align-items:flex-start}
 .crumb h1{font-size:17px;font-weight:700;line-height:1.25;letter-spacing:-.018em}
 .crumb .sub{font-size:12.5px;color:var(--ink3);line-height:1.35}
@@ -7947,9 +7950,9 @@ button,.btn,.navitem,.pill,.tabs,.roles,.themesel,.modes,.apl{-webkit-user-selec
 .tag{font-size:11.5px;padding:1px 6px;border-radius:5px}
 
 .btn{min-height:34px;padding:7px 13px;gap:7px;font-size:13px;border-radius:var(--r2);border-color:var(--line);
-  transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease,transform 120ms var(--ease-out),box-shadow 120ms ease}
+  transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease,transform 150ms var(--ease-out),box-shadow 150ms ease}
 .btn.sm{min-height:28px;padding:4px 10px;font-size:12px}
-.btn.pri{box-shadow:0 1px 0 rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.12)}
+.btn.pri{box-shadow:none}
 .btn:active:not(:disabled),.tabs button:active,.roles button:active,.themesel button:active,.modes button:active,.navitem:active,.ancop:active,.dia:active{transform:scale(.97)}
 .btn:disabled{opacity:.5}
 .x:active{transform:scale(.92)}
@@ -7959,7 +7962,7 @@ button,.btn,.navitem,.pill,.tabs,.roles,.themesel,.modes,.apl{-webkit-user-selec
 .dot{width:6px;height:6px}
 
 input,select,textarea{min-height:36px;padding:7px 10px;font-size:14px;border-radius:var(--r2);border-color:var(--line);
-  transition:border-color 120ms ease,box-shadow 120ms ease}
+  transition:border-color 150ms ease,box-shadow 150ms ease}
 textarea{font-size:13px}
 input[type=checkbox],input[type=radio]{min-height:0;accent-color:var(--accent);width:auto}
 input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:var(--ring);outline:none}
@@ -7977,7 +7980,7 @@ input::placeholder,textarea::placeholder{color:var(--ink3);opacity:.85}
   -webkit-overflow-scrolling:touch}
 th{font-size:11px;letter-spacing:.06em;padding:9px 12px;color:var(--ink3);background:var(--surface2);border-bottom-color:var(--line2)}
 td{padding:10px 12px;border-bottom-color:var(--line2)}
-tbody tr{transition:background-color 100ms ease}
+tbody tr{transition:background-color 150ms ease}
 tbody tr.clickable:focus-visible{outline-offset:-2px}
 
 /* KPIs: número é a âncora da tela */
@@ -7994,7 +7997,7 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 .res .row .n{font-size:13px}
 .res .row .n small{font-size:12px}
 .res .row .v u{font-size:12px}
-.res .row[data-act]{transition:background-color 100ms ease}
+.res .row[data-act]{transition:background-color 150ms ease}
 .meter{height:6px}
 .verdict{font-size:13px;padding:12px 14px;border-radius:var(--r)}
 .verdict b{font-size:12.5px;letter-spacing:.02em;text-transform:none}
@@ -8002,7 +8005,7 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 /* abas e segmentados: um só desenho */
 .tabs,.roles,.themesel,.modes,.apl{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r2);padding:2px;gap:2px;overflow:visible}
 .tabs button,.roles button,.themesel button,.modes button,.apl button{border:0;border-radius:4px;background:none;font-size:12.5px;color:var(--ink2);
-  min-height:28px;padding:4px 11px;transition:background-color 120ms ease,color 120ms ease,transform 120ms var(--ease-out)}
+  min-height:28px;padding:4px 11px;transition:background-color 150ms ease,color 150ms ease,transform 150ms var(--ease-out)}
 .apl button{font-size:12px;min-height:26px;padding:3px 9px}
 .tabs button.on,.roles button.on,.themesel button.on,.modes button.on,.apl button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line2)}
 
@@ -8011,7 +8014,7 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 .kbcol{background:var(--surface2);border-color:var(--line2)}
 .kbcol>h4{font-size:12px;letter-spacing:.05em;padding:12px 12px 8px}
 .kbcol>h4 .n{font-size:11.5px}
-.deal{padding:12px;border-color:var(--line2);transition:border-color 120ms ease,box-shadow 120ms ease}
+.deal{padding:12px;border-color:var(--line2);transition:border-color 150ms ease,box-shadow 150ms ease}
 .deal .t{font-size:13.5px}
 .deal .c{font-size:12px}
 .deal .val{font-size:12.5px}
@@ -8100,7 +8103,7 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 .addform h4{font-size:13px}
 .addform .top{position:static;background:none;border:0;padding:0;min-height:0;backdrop-filter:none;-webkit-backdrop-filter:none;flex-wrap:wrap}
 .addform .hint{font-size:12px}
-.dropz{border-radius:var(--r);padding:22px;font-size:13px;transition:border-color 120ms ease,color 120ms ease}
+.dropz{border-radius:var(--r);padding:22px;font-size:13px;transition:border-color 150ms ease,color 150ms ease}
 .foto span{font-size:11.5px}
 .conta-info{font-size:13px}
 .audit-before,.audit-after{font-size:11.5px}
@@ -8111,11 +8114,11 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 :is(#view,#modalHost,#authHost,.drop) [style*="font-size:12.5px"]{font-size:13px!important}
 
 /* ---------- modal ---------- */
-.ovl{background:color-mix(in srgb,#05060A 52%,transparent);padding:32px 16px;animation:ds-fade 180ms ease-out}
+.ovl{background:color-mix(in srgb,var(--ink) 38%,transparent);padding:32px 16px;animation:ds-fade 180ms ease-out}
 .modal{border-radius:var(--r);border-color:var(--line2);box-shadow:var(--shadow),0 0 0 1px rgba(0,0,0,.02);animation:ds-modal 200ms var(--ease-out)}
 .modal>header{padding:16px 20px;min-height:56px}
 .modal>header h3{font-size:16px;font-weight:700;letter-spacing:-.015em}
-.modal>header .x{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--r2);font-size:20px;transition:background-color 120ms ease,color 120ms ease,transform 120ms var(--ease-out)}
+.modal>header .x{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--r2);font-size:20px;transition:background-color 150ms ease,color 150ms ease,transform 150ms var(--ease-out)}
 .modal .body{padding:20px;gap:14px}
 .modal>footer{padding:12px 20px;gap:8px;border-radius:0 0 var(--r) var(--r)}
 .row2,.row3{gap:12px}
@@ -8123,12 +8126,12 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 
 /* ---------- toast ---------- */
 .toast{bottom:calc(24px + env(safe-area-inset-bottom,0px));padding:10px 18px;border-radius:var(--rp);font-size:13px;font-weight:500;
-  transition:opacity 200ms ease,transform 260ms var(--ease-out);transform:translateX(-50%) translateY(12px) scale(.98)}
+  transition:opacity 200ms ease,transform 200ms var(--ease-out);transform:translateX(-50%) translateY(12px) scale(.98)}
 .toast.on{transform:translateX(-50%) translateY(0) scale(1)}
 
 /* ---------- login e carregamento ---------- */
-.authwrap{background:radial-gradient(1200px 600px at 50% -10%,color-mix(in srgb,var(--accent) 7%,transparent),transparent 60%),var(--bg)}
-.authcard{max-width:400px;border-radius:var(--r);border-color:var(--line2);animation:ds-rise 260ms var(--ease-out)}
+.authwrap{background:var(--bg)}
+.authcard{max-width:400px;border-radius:var(--r);border-color:var(--line2);animation:ds-rise 200ms var(--ease-out)}
 .authcard .brandline{padding:24px 24px 0}
 .authcard .brandline .mk{width:34px;height:34px;border-radius:9px}
 .authcard .brandline b{font-size:18px}
@@ -8141,9 +8144,7 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 .authcard a,#view a:not([class]),#modalHost a:not([class]){color:var(--accent);text-underline-offset:2px}
 .carregando{font-size:14px;gap:16px;align-content:center}
 .carregando>div{display:flex;flex-direction:column;align-items:center;gap:14px}
-.carregando>div::after{content:"";width:160px;height:3px;border-radius:3px;
-  background:linear-gradient(90deg,transparent,var(--accent),transparent) var(--line2);background-size:40% 100%;background-repeat:no-repeat;
-  animation:ds-load 1.1s linear infinite}
+.carregando>div::after{content:"";width:160px;height:3px;border-radius:3px;background:var(--line)}
 
 /* ---------- acessibilidade: pular para o conteúdo ---------- */
 .ds-skip{position:fixed;left:12px;top:calc(8px + env(safe-area-inset-top,0px));z-index:300;transform:translateY(-150%);
@@ -8199,9 +8200,9 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
 @media (max-width:1024px){
   .app{grid-template-columns:1fr}
   .side{position:fixed;left:0;top:0;bottom:0;width:min(288px,86vw);height:100dvh;transform:translateX(-101%);
-    transition:transform 280ms var(--ease-drawer);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);z-index:40}
+    transition:transform 220ms var(--ease-drawer);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);z-index:40}
   .side.open{transform:none;box-shadow:var(--shadow)}
-  .scrim{display:block;position:fixed;inset:0;background:color-mix(in srgb,#05060A 48%,transparent);z-index:35;opacity:0;pointer-events:none;transition:opacity 220ms ease}
+  .scrim{display:block;position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 38%,transparent);z-index:35;opacity:0;pointer-events:none;transition:opacity 220ms ease}
   .scrim.on{opacity:1;pointer-events:auto}
   .burger{display:inline-grid;place-items:center;border-color:var(--line)}
   .view{padding:20px}
@@ -8225,7 +8226,7 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
   .card>header .hint{margin-left:0;flex-basis:100%;order:3}
   .grid[style*="minmax(320px"]{grid-template-columns:1fr!important}
   .ovl{padding:0;align-items:flex-end}
-  .modal{max-width:none;width:100%;margin:0;border-radius:14px 14px 0 0;max-height:94dvh;overflow-y:auto;animation:ds-sheet 280ms var(--ease-drawer)}
+  .modal{max-width:none;width:100%;margin:0;border-radius:14px 14px 0 0;max-height:94dvh;overflow-y:auto;animation:ds-sheet 220ms var(--ease-drawer)}
   .modal>footer{position:sticky;bottom:0;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));border-radius:0}
   .modal>footer .btn{flex:1;justify-content:center}
   .modal>header{position:sticky;top:0;background:var(--surface);z-index:2}
@@ -8301,12 +8302,95 @@ tbody tr.clickable:focus-visible{outline-offset:-2px}
     const t=document.documentElement.getAttribute("data-theme");
     document.querySelectorAll('meta[name="theme-color"]').forEach(m=>{
       if(!m.dataset.media) m.dataset.media=m.getAttribute("media")||"";
-      if(t){ m.removeAttribute("media"); m.content=t==="dark"?"#16171B":"#FFFFFF"; }
-      else { m.setAttribute("media",m.dataset.media); m.content=m.dataset.media.includes("dark")?"#16171B":"#FFFFFF"; }
+      if(t){ m.removeAttribute("media"); m.content=t==="dark"?"#26272B":"#F6F5F1"; }
+      else { m.setAttribute("media",m.dataset.media); m.content=m.dataset.media.includes("dark")?"#26272B":"#F6F5F1"; }
     });
   }
   new MutationObserver(corTema).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
   corTema();
+})();
+</script>
+<style id="conforto-base">/* =====================================================================
+   CONFORTO (CLAUDE.md): camada final de todas as páginas.
+   Garante, por cima de qualquer estilo anterior:
+   - pesos só 400/500 (só esses pesos são carregados + sem negrito sintético)
+   - nada em caixa alta, sem espaçamento de letra exagerado
+   - texto de apoio nunca abaixo de 12px
+   - animações curtas (150 a 250ms), sem loop, sem efeito de scroll
+   - sem gradiente, brilho, desfoque de fundo ou sombra pesada
+   - densidade (confortável/compacta) e texto maior selecionáveis
+   ===================================================================== */
+html{font-synthesis:none}
+b,strong,th,h1,h2,h3,h4,h5,h6,optgroup{font-weight:500}
+body :not(#printHost):not(#printHost *){text-transform:none!important}
+body :not(#printHost *):not(h1):not(h2):not(.crumb h1):not(.ef-hero-v):not(.stat):not(.kpi .v){letter-spacing:0!important}
+small{font-size:max(12px,.86em)}
+svg text{font-size:12px}
+:is(#view,#modalHost,#authHost,#nav,.drop,#app) :is([style*="font-size:9px"],[style*="font-size:9.5px"],[style*="font-size:10px"],[style*="font-size:10.5px"],[style*="font-size:11px"],[style*="font-size:11.5px"]){font-size:12px!important}
+:is(#view,#modalHost,#app) :is([style*="font-weight:600"],[style*="font-weight:700"],[style*="font-weight:800"],[style*="font-weight:900"],[style*="font-weight:bold"]){font-weight:500!important}
+
+/* movimento: só feedback e orientação, curto; nada em loop nem ligado ao scroll */
+.ef-rv,.ef-rv:not(.ef-in){opacity:1!important;transform:none!important;transition:none!important}
+.ef-bar,.ef-hb-t i,.ef-spark-l,.ow-bar i,.card,.history,.authcard,.login,.drop{animation:none!important}
+.carregando>div::after{animation:none!important}
+.modal{animation-duration:200ms!important}
+.ovl{animation-duration:150ms!important}
+.side{transition-duration:220ms!important}
+.scrim{transition-duration:200ms!important}
+.toast{transition-duration:200ms!important}
+dialog[open]{animation-duration:200ms!important}
+@media (max-width:640px){.modal{animation-duration:220ms!important}}
+::view-transition-group(root),::view-transition-old(root),::view-transition-new(root){animation:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important}}
+
+/* sem vidro, brilho ou gradiente */
+.main>header.top,header,.top{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.tblwrap,.tablewrap,.inv-preview{background:none!important;scrollbar-width:thin}
+.v3-spot,.v3-fill{display:none!important}
+
+/* densidade e tamanho do texto (preferência do usuário) */
+html.ds-large .app,html.ds-large #modalHost,html.ds-large main#app{zoom:1.12}
+html.ds-compact td,html.ds-compact th{padding-top:6px!important;padding-bottom:6px!important}
+html.ds-compact .res .row{padding-top:6px;padding-bottom:6px}
+html.ds-compact .card>header{padding-top:9px;padding-bottom:8px}
+html.ds-compact .kpi,html.ds-compact .ef-tile{padding-top:10px;padding-bottom:10px}
+html.ds-compact .view{padding-top:14px}
+html.ds-compact .grid,html.ds-compact .kpis{gap:10px}
+.ds-prefs{display:grid;gap:6px;width:100%}
+.ds-prefs .ds-seg{display:flex;align-items:center;gap:6px;font-size:12px;color:inherit}
+.ds-prefs .ds-seg>span{min-width:62px;opacity:.85}
+.ds-prefs .ds-seg>div{display:flex;flex:1;gap:2px;padding:2px;border:1px solid var(--line);border-radius:6px}
+.ds-prefs button{flex:1;border:0;background:none;color:inherit;font:400 12px var(--sans);padding:4px 6px;border-radius:4px;cursor:pointer;min-height:26px}
+.ds-prefs button[aria-pressed="true"]{background:var(--surface2);color:var(--ink);font-weight:500;box-shadow:inset 0 0 0 1px var(--line)}
+.side .ds-prefs{color:inherit}
+</style>
+<style id="conforto-varredura">/* gerado por conforto.py: mínimo 12px e peso 500 */
+:is(.addform .hint,.amb label,.ambbar button span,.ambhead b,.ambhead span,.ambsel,.ambtag,.ancop span,.apl button,.audit-after,.audit-before,.authcard footer,.av,.bar,.bell .bd,.brand span,.bsec>header .sw,.bsec>header h4,.btn.sm,.cal .cell .n,.cal .dow,.cal .ev,.cal .more,.calcout,.card>header .hint,.chatlist .grp,.cmt .b b,.crow .meta time,.crow .ub,.crow span,.crumb .sub,.daysep,.deal .c,.dia .et,.dia .qt,.drop header h4,.escolhas label,.espec .tg,.field label,.foto span){font-size:12px!important}
+:is(.freela span,.integracao-link input,.inv-preview summary,.kbcol>h4,.kbcol>h4 .n,.kitcard .comp div u,.kpi .d,.kpi .k,.lbl,.mem .l .k small,.mem .l .v u,.modes button,.msg .who,.msg .who time,.msg.sys .bub,.navgrp,.navitem .cnt,.nota .meta,.nota .meta u,.note .chk div,.note .chk i,.nrow .ico,.nrow time,.orctbl tr.amb td,.orctbl tr.cat td,.pessoa .alerta,.pessoa .fn,.pill,.plate,.post .hd span,.prod .tx span,.rec,.res .row .n small,.res .row .v u,.roles button,.sechead p,.selbar input,.selbar label,.selbar select,.spec){font-size:12px!important}
+:is(.step .mk,.step .tx small,.tag,.themesel button,.tl2 .mk,.tl2 .tx,.tlhead .d,.tlrow .lead span,.veic .tx span,.wa-author,.wa-count,.wa-meta,.wa-meta button,.who .rl,th){font-size:12px!important}
+.nowline::after{font-size:12px!important}
+:is(.addform h4,.amb label,.amb>input,.ambbar button b,.ambhead b,.ambtag,.anc .q b,.anc p b,.ancop b,.apl button,.authcard .brandline b,.authcard h2,.av,.bar,.bell .bd,.brand b,.bsec>header h4,.btn,.cal .cell.today .n,.cal .dow,.calcout b,.card>header h3,.chathead h3,.chatlist .grp,.crow .ub,.crow b,.crumb h1,.deal .t,.deal .val,.dia .dd,.dia .et,.ds-skip,.espec .tg,.estr>header .nm,.estr>header b,.field label,.freela b,.kitcard .comp div b,.kitcard>header h4,.kpi .d){font-weight:500!important}
+:is(.kpi .v,.lbl,.mem .l .v,.men,.modal>header h3,.modes button,.msg .who,.navgrp,.navitem .cnt,.navitem.on,.nota .meta u,.nota .tit b,.note h4,.nrow .ico,.orctbl tr.amb td,.orctbl tr.cat td,.pessoa .alerta,.pessoa .fn,.picklist .it .q,.pill,.plate,.post .hd b,.prod .tx b,.rec,.res .row .v,.roles button,.sechead h2,.selbar label,.spec b,.step .mk,.step .tx,.sync-status[data-erro="true"],.tabs button,.themesel button,.tl2 .mk,.tl2 .tx,.tlhead .d.mstart,.tlrow .lead b,.toast,.totrow b){font-weight:500!important}
+:is(.veic .tx b,.viagem>header h4,.wa-author,.wa-avatar,.who .nm,.who .rl,th){font-weight:500!important}
+.nowline::after{font-weight:500!important}
+</style>
+<script id="conforto">
+/* Preferências de leitura (CLAUDE.md): densidade confortável/compacta e texto padrão/maior.
+   Ficam salvas neste navegador; aplicadas antes de pintar para não piscar. */
+(function(){
+  const root=document.documentElement;
+  const ler=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+  const gravar=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+  const P={dens:ler("ef.dens")||"conf",txt:ler("ef.txt")||"pad"};
+  function aplicar(){ root.classList.toggle("ds-compact",P.dens==="comp"); root.classList.toggle("ds-large",P.txt==="maior");
+    document.querySelectorAll(".ds-prefs [data-pref]").forEach(b=>b.setAttribute("aria-pressed",P[b.dataset.pref]===b.dataset.v?"true":"false")); }
+  aplicar();
+  const seg=(rot,k,ops)=>`<div class="ds-seg" role="group" aria-label="${rot}"><span>${rot}</span><div>${ops.map(([v,t])=>`<button type="button" data-pref="${k}" data-v="${v}">${t}</button>`).join("")}</div></div>`;
+  const html=`<div class="ds-prefs">${seg("Densidade","dens",[["conf","Confortável"],["comp","Compacta"]])}${seg("Texto","txt",[["pad","Padrão"],["maior","Maior"]])}</div>`;
+  const alvo=document.querySelector(".sidefoot")||document.querySelector("body>header>div:last-child");
+  if(alvo&&!alvo.querySelector(".ds-prefs")){ alvo.insertAdjacentHTML(alvo.classList.contains("sidefoot")?"afterbegin":"beforeend",html); aplicar(); }
+  document.addEventListener("click",ev=>{ const b=ev.target.closest(".ds-prefs [data-pref]"); if(!b) return;
+    P[b.dataset.pref]=b.dataset.v; gravar(b.dataset.pref==="dens"?"ef.dens":"ef.txt",b.dataset.v); aplicar(); });
 })();
 </script>
 </body>
