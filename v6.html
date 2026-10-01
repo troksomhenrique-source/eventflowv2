@@ -8597,10 +8597,10 @@ TITLES.financas=TITLES.financas||["Finanças","Receitas, despesas e saldo da ope
 (function regrupar(){
   const todos=NAV.flatMap(g=>g.items);
   if(!todos.some(i=>i.id==="financas"))todos.push({id:"financas",t:"Finanças",roles:["gerencia"],ic:"chart"});
-  const GR=[["Comercial",["painel","crm","vendas","clientes"]],["Operação",["agenda","producao","cargas","escalas","movimentos","mural","chat","notas","organograma"]],
+  const GR=[["Comercial",["painel","crm","vendas","clientes"]],["Comunicação",["mural","chat","notas"]],["Operação",["agenda","producao","cargas","escalas","movimentos","organograma"]],
     ["Cadastros",["estoque","freelas"]],["Financeiro",["financas","reembolsos"]],["Sistema",["equipe","auditoria","perfil"]]];
   const usados=new Set(),novo=GR.map(([g,ids])=>({g,items:ids.map(id=>{const it=todos.find(x=>x.id===id);if(it)usados.add(id);return it;}).filter(Boolean)}));
-  const resto=todos.filter(i=>!usados.has(i.id));if(resto.length)novo[4].items.push(...resto);
+  const resto=todos.filter(i=>!usados.has(i.id));if(resto.length)novo[novo.length-1].items.push(...resto);
   NAV.length=0;novo.filter(g=>g.items.length).forEach(g=>NAV.push(g));
 })();
 
@@ -10000,6 +10000,10 @@ if(!document.getElementById("app").hidden){renderShell();render();}
   .v6-bn .bd{position:absolute;top:2px;left:calc(50% + 10px);min-width:16px;height:16px;border-radius:99px;padding:0 4px;background:var(--c4);color:#fff;
     font:700 10px/16px var(--f);text-align:center;border:2px solid var(--sf);box-sizing:content-box}
   .v6-bn span.t{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* seis categorias: cada botão ocupa a largura do próprio nome, então “Comunicação” não é cortado */
+  .v6-bn.g6{display:flex;justify-content:space-between;gap:2px;padding-left:4px;padding-right:4px}
+  .v6-bn.g6 button{flex:1 1 auto;min-width:0;font-size:10.5px;letter-spacing:-.01em;padding:4px 0}.v6-bn.g6 .ico{width:46px}
+  .v6-bn.g6 span.t{overflow:visible}
   .v6-scrim.on{display:block;position:fixed;inset:0;z-index:58;background:color-mix(in srgb,var(--ink) 30%,transparent);animation:v6fade .2s var(--e)}
   .v6-sheet.on{display:block;position:fixed;left:8px;right:8px;z-index:59;bottom:calc(84px + env(safe-area-inset-bottom,0px));
     background:var(--sf);border:1px solid var(--ln2);border-radius:22px;box-shadow:var(--sh);padding:14px 10px 10px;max-height:62dvh;overflow:auto;
@@ -10027,6 +10031,7 @@ if(!document.getElementById("app").hidden){renderShell();render();}
 /* ícone de cada categoria (traço 24px, mesmo desenho do v5) */
 const ICG={
  "Comercial":'<path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/>',
+ "Comunicação":'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
  "Operação":'<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
  "Cadastros":'<path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8"/>',
  "Financeiro":'<path d="M4 7a2 2 0 012-2h12v4M4 7v11a2 2 0 002 2h14V9H6a2 2 0 01-2-2zM16 14.5h.01"/>',
@@ -10051,7 +10056,7 @@ function host(){
 function pintar(){
   const app=document.getElementById("app");if(!app||app.hidden){const b=document.getElementById("v6Bottom");if(b)b.hidden=true;return;}
   const bn=host();bn.hidden=false;
-  const gs=grupos();
+  const gs=grupos();bn.classList.toggle("g6",gs.length>5);
   bn.innerHTML=gs.map(g=>{
     const atual=g.items.some(i=>i.id===S.view),alerta=g.items.map(i=>cnt(i.id)).filter(c=>c&&c.alerta).reduce((s,c)=>s+(parseInt(c.n)||0),0);
     return `<button type="button" data-v6grupo="${esc(g.g)}" aria-current="${atual}" aria-expanded="${aberto===g.g}" aria-haspopup="${g.items.length>1?"menu":"false"}">
