@@ -6897,7 +6897,7 @@ function telaLogin(msg, tipo){
     </form>
     <footer>${configurado()
       ? "Primeiro acesso? Solicite seu cadastro ao responsável pela plataforma."
-      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.10.01.6 · v6: parceiros, contas, fotos e compartilhar</span><br><a href="owner-v3.html">Administração da plataforma</a></footer>
+      : "<b>Falta configurar.</b> Abra este arquivo num editor e preencha SUPABASE_URL e SUPABASE_KEY no topo do último bloco de script."}<br><span id="appVersion">Versão 2026.10.01.6 · v6: parceiros, contas, fotos e compartilhar</span><br>O dono da plataforma entra por aqui também.</footer>
   </div></div>`;
   const f=document.getElementById("formLogin");
   f.addEventListener("submit", async ev=>{
@@ -7823,12 +7823,15 @@ async function iniciar(){
 }
 async function iniciarInterno(){
   telaCarregando();
+  /* os módulos do fim do arquivo (v5, v6, dono da plataforma) envolvem funções
+     usadas aqui; o login só segue depois de o arquivo inteiro ser lido */
+  if(document.readyState==="loading") await new Promise(r=>document.addEventListener("DOMContentLoaded",r,{once:true}));
   const { data:{ user } } = await sb.auth.getUser();
   if(!user){ telaLogin(); return; }
 
   const owner = await sb.rpc("plataforma_owner");
   if(owner.error){telaLogin("Atualização pendente. Aplique a migração 0011 para acessar esta versão.");return;}
-  if(owner.data===true){window.location.replace("owner-v3.html");return;}
+  if(owner.data===true){await iniciarOwner(user);return;}  /* dono da plataforma: administração na mesma casca */
   const contexto = await sb.rpc("contexto_empresa");
   if(contexto.error || !contexto.data?.id){telaLogin("Acesso indisponível. Sua empresa ou seu perfil está inativo ou ainda não foi cadastrado.");return;}
   S.empresaId=contexto.data.id;
@@ -10057,6 +10060,8 @@ function pintar(){
   const app=document.getElementById("app");if(!app||app.hidden){const b=document.getElementById("v6Bottom");if(b)b.hidden=true;return;}
   const bn=host();bn.hidden=false;
   const gs=grupos();bn.classList.toggle("g6",gs.length>5);
+  /* uma categoria só (ex.: dono da plataforma): as telas dela vão direto na barra */
+  if(gs.length===1){bn.innerHTML=gs[0].items.map(i=>`<button type="button" data-v6ir="${esc(i.id)}" aria-current="${i.id===S.view}"><span class="ico">${ic(i.ic).replace('width="14" height="14"','width="22" height="22"')}</span><span class="t">${esc(i.t)}</span></button>`).join("");aberto=null;return;}
   bn.innerHTML=gs.map(g=>{
     const atual=g.items.some(i=>i.id===S.view),alerta=g.items.map(i=>cnt(i.id)).filter(c=>c&&c.alerta).reduce((s,c)=>s+(parseInt(c.n)||0),0);
     return `<button type="button" data-v6grupo="${esc(g.g)}" aria-current="${atual}" aria-expanded="${aberto===g.g}" aria-haspopup="${g.items.length>1?"menu":"false"}">
@@ -10282,6 +10287,224 @@ invExport=async function(format,rows){
     invDownload(modelo?"modelo-inventario-eventflow.xlsx":"inventario-eventflow.xlsx",new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:XL}));
   }catch(e){toast("Não foi possível gerar o Excel: "+(e.message||e));}
 };
+})();
+</script>
+<script id="v6-owner">
+/* =====================================================================
+   EventFlow v6 · administração da plataforma (dono)
+   Substitui o antigo owner-v3.html: o dono entra pelo mesmo login e vê,
+   na mesma casca do app, as telas Visão geral, Empresas e pessoas e
+   Histórico. Mesmas funções do banco: owner_listar, owner_criar_empresa,
+   owner_empresa_status, owner_alterar_usuario e a função owner-admin.
+   Formulários abrem na própria página, como no resto do v6.
+   ===================================================================== */
+(function(){
+"use strict";
+const OWN=window.OWN={on:false,dados:{empresas:[],pessoas:[],historico:[]},sel:null,form:null,busy:false,carregando:false,erro:""};
+const {pill,cl}=UI.util,ic5=UI.ic;
+const ROLES={gerencia:"Gerência",producao:"Produção",estoque:"Estoque"};
+const ACAO={empresa_criada:"Empresa criada",empresa_status:"Situação da empresa alterada",usuario_criado:"Pessoa cadastrada",usuario_alterado:"Acesso de pessoa alterado"};
+const g=id=>document.getElementById(id),val=id=>{const e=g(id);return e?e.value:"";};
+const norm=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const kpis=a=>`<div class="g g4">${a.join("")}</div>`;
+const quando=t=>{try{return new Date(t).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch(e){return "";}};
+function msg(e){if(e&&e.code==="42501") return "Acesso exclusivo do dono da plataforma.";return (e&&(e.message||e.error_description))||"Não foi possível concluir. Tente novamente.";}
+async function pedido(p){let t;try{return await Promise.race([p,new Promise((_,r)=>{t=setTimeout(()=>r(new Error("O servidor não confirmou em 25 segundos. A solicitação pode continuar no servidor: atualize a lista antes de tentar de novo.")),25000);})]);}finally{clearTimeout(t);}}
+async function rpc(n,p){const r=await pedido(sb.rpc(n,p));if(r.error) throw r.error;return r.data;}
+
+/* ---- navegação própria do dono ---- */
+PERFIS.owner={label:"Dono da plataforma"};
+TITLES["own-painel"]=["Visão geral","Empresas, equipes e acessos da plataforma"];
+TITLES["own-empresas"]=["Empresas e pessoas","Cada empresa tem sua própria operação e equipe"];
+TITLES["own-historico"]=["Histórico da plataforma","Últimas ações administrativas"];
+IC.building='<path d="M2.5 14V3.5L8 2v12M8 6h5.5v8M4.5 5.5h1.5M4.5 8h1.5M4.5 10.5h1.5M10 8.5h1.5M10 11h1.5M1.5 14h13"/>';
+NAV.unshift({g:"Plataforma",items:[{id:"own-painel",t:"Visão geral",roles:["owner"],ic:"grid"},{id:"own-empresas",t:"Empresas e pessoas",roles:["owner"],ic:"building"},{id:"own-historico",t:"Histórico",roles:["owner"],ic:"doc"}]});
+const _render=render;
+render=function(){
+  if(OWN.on&&!String(S.view).startsWith("own-")) S.view="own-painel";
+  if(!OWN.on&&String(S.view).startsWith("own-")) S.view="painel";
+  return _render.apply(this,arguments);
+};
+const _sair=sair;
+sair=async function(){if(!OWN.on) return _sair.apply(this,arguments);await sb.auth.signOut();location.reload();};
+
+/* ---- entrada: chamada pelo login quando a conta é dona da plataforma ---- */
+window.iniciarOwner=async function(user){
+  OWN.on=true;
+  S.role="owner";S.perfilId=user.id;S.empresaId=null;S.empresaNome="Plataforma";
+  const apelido=String(user.email||"dono").split("@")[0].replace(/[._-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+  S.perfis=[{id:user.id,nome:apelido,cargo:user.email||"",role:"owner",ini:apelido.slice(0,2).toUpperCase(),cor:"#4B5BD0"}];
+  S.view="own-painel";S.sel=null;
+  const lb=g("empresaAtual");if(lb){lb.textContent="Administração da plataforma";lb.title="Administração da plataforma";}
+  g("authHost").innerHTML="";g("app").hidden=false;
+  render();if(typeof pintarTema==="function") pintarTema();
+  await carregar();
+};
+async function carregar(nota){
+  OWN.carregando=true;OWN.erro="";render();
+  try{const d=await rpc("owner_listar");OWN.dados={empresas:d.empresas||[],pessoas:d.pessoas||[],historico:d.historico||[]};
+    if(!OWN.dados.empresas.some(e=>e.id===OWN.sel)) OWN.sel=OWN.dados.empresas[0]?.id||null;}
+  catch(e){OWN.erro=msg(e);}
+  finally{OWN.carregando=false;render();if(nota) toast(nota);}
+}
+OWN.carregar=carregar;
+
+/* ---- telas ---- */
+const emp=id=>OWN.dados.empresas.find(e=>e.id===id);
+const pessoasDe=id=>OWN.dados.pessoas.filter(p=>p.empresa_id===id);
+const aviso=()=>OWN.erro?`<div class="v6-banner" role="alert">${ic5("alert")}<div><b>Não foi possível carregar.</b> ${esc(OWN.erro)} <button class="lnk" data-act="ownRecarregar">Tentar de novo</button></div></div>`:"";
+const carregandoHtml=()=>OWN.carregando&&!OWN.dados.empresas.length?`<div class="card">${UI.vazio("clock","Carregando a plataforma…","")}</div>`:"";
+
+VEXTRA["own-painel"]=function(){
+  const {empresas,pessoas,historico}=OWN.dados,at=pessoas.filter(p=>p.ativo),ativas=empresas.filter(e=>e.ativa);
+  const porPapel={};at.forEach(p=>{const k=ROLES[p.papel]||p.papel;porPapel[k]=(porPapel[k]||0)+1;});
+  const semGer=ativas.filter(e=>!pessoasDe(e.id).some(p=>p.ativo&&p.papel==="gerencia"));
+  const top=ativas.map(e=>({e,n:pessoasDe(e.id).filter(p=>p.ativo).length})).sort((a,b)=>b.n-a.n).slice(0,6);
+  const CORES=["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--acc)"];
+  return `<div hidden><button class="btn pri" data-v5-acao data-act="ownNovaEmpresa">+ Nova empresa</button></div>`+aviso()+carregandoHtml()+
+  kpis([UI.kpi("k1","home","Empresas na plataforma",empresas.length,"int",`${ativas.length} ativa(s) · ${empresas.length-ativas.length} suspensa(s)`,null,1),
+    UI.kpi("k2","users","Pessoas com acesso ativo",at.length,"int",`${pessoas.length} cadastrada(s)`),
+    UI.kpi("k3","key","Na gerência",at.filter(p=>p.papel==="gerencia").length,"int","perfis de gestão ativos"),
+    UI.kpi(semGer.length?"k4":"k2",semGer.length?"alert":"check","Empresas sem gerente",semGer.length,"int",semGer.length?"cadastre alguém da gerência":"todas com gestão")])+`
+  <div class="g g23 mt"><div class="card"><div class="ch"><div><h3>Equipe ativa por empresa</h3><p>Pessoas com acesso liberado</p></div><button class="lnk" data-act="go" data-view="own-empresas">Ver empresas</button></div>
+    ${top.length?UI.gFunil(top.map((x,i)=>({n:x.e.nome.split(" ")[0],q:Math.max(x.n,.0001),c:CORES[i],rot:x.n+" pessoa"+(x.n===1?"":"s"),dir:String(x.n)}))):UI.vazio("home","Nenhuma empresa ativa.","Cadastre a primeira empresa para começar.",`<button class="btn pri" data-act="ownNovaEmpresa">Cadastrar empresa</button>`)}</div>
+    <div class="card"><div class="ch"><div><h3>Acessos por permissão</h3><p>Pessoas ativas em todas as empresas</p></div></div>
+    ${at.length?UI.gDonut(UI.fatias(porPapel),String(at.length),"pessoas"):UI.vazio("users","Ninguém com acesso ainda.","")}</div></div>
+  <div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Pedem atenção</h3><p>Empresas ativas sem ninguém na gerência</p></div></div>
+    ${semGer.length?semGer.map(e=>`<div class="alert" data-act="ownAbrirEmpresa" data-id="${e.id}" role="button" tabindex="0" style="cursor:pointer"><div class="ki k4">${ic5("alert")}</div><div><b>${esc(e.nome)}</b><span>${pessoasDe(e.id).length} pessoa(s), nenhuma na gerência</span></div>${pill("Cadastrar gerente","p-c")}</div>`).join("")
+      :UI.vazio("check","Tudo em ordem.","Toda empresa ativa tem alguém da gerência.")}</div>
+    <div class="card"><div class="ch"><div><h3>Atividade recente</h3><p>Últimas ações na plataforma</p></div><button class="lnk" data-act="go" data-view="own-historico">Histórico</button></div>
+    ${historico.length?`<div class="act">${historico.slice(0,5).map(h=>`<div class="ai"><div class="ki k1">${ic5(h.acao==="empresa_criada"?"plus":h.acao==="usuario_criado"?"users":"refresh")}</div><div><b>${esc(ACAO[h.acao]||h.acao)}</b><span>${esc(emp(h.empresa_id)?.nome||"Empresa")} · ${esc(quando(h.ocorrido_em))}</span></div></div>`).join("")}</div>`
+      :UI.vazio("doc","Nenhuma ação registrada.","")}</div></div>`;
+};
+
+function formEmpresa(){
+  return `<div class="v6-painel" style="margin-bottom:18px"><form class="addform" autocomplete="off"><div class="top"><h4>Nova empresa</h4><div style="flex:1"></div><button class="btn sm ghost" type="button" data-act="ownFechar">Fechar</button></div>
+    <div class="rowf"><div class="field w"><label for="owNome">Nome da empresa</label><input id="owNome" maxlength="120" placeholder="Razão social ou nome fantasia"></div>
+      <div class="field"><label for="owDoc">CNPJ / documento (opcional)</label><input id="owDoc" maxlength="40"></div>
+      <button class="btn pri go" type="submit" data-act="ownSalvarEmpresa" ${OWN.busy?"disabled":""}>${OWN.busy?"Salvando…":"Cadastrar empresa"}</button></div>
+    <p class="hint" id="owErro" role="alert" style="color:var(--c);font-weight:600;margin:0"></p>
+    <p class="hint">Depois de criar, cadastre a primeira pessoa da gerência para a empresa começar a operar.</p></form></div>`;
+}
+function formPessoa(c,p){
+  return `<div class="v6-painel" style="margin-bottom:18px"><form class="addform" autocomplete="off"><div class="top"><h4>${p?"Editar acesso · "+esc(p.nome):"Cadastrar pessoa em "+esc(c.nome)}</h4><div style="flex:1"></div><button class="btn sm ghost" type="button" data-act="ownFechar">Fechar</button></div>
+    <div class="rowf"><div class="field w"><label for="owPNome">Nome completo</label><input id="owPNome" maxlength="120" value="${esc(p?.nome||"")}"></div>
+      ${p?`<div class="field w"><label>E-mail de acesso</label><input value="${esc(p.email||"")}" disabled></div>`:`<div class="field w"><label for="owPEmail">E-mail de acesso</label><input id="owPEmail" type="email" autocomplete="off"></div>`}</div>
+    <div class="rowf"><div class="field"><label for="owPCargo">Cargo</label><input id="owPCargo" maxlength="100" value="${esc(p?.cargo||"")}"></div>
+      <div class="field"><label for="owPPapel">Permissão</label><select id="owPPapel">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k===(p?.papel||"producao")?"selected":""}>${v}</option>`).join("")}</select></div>
+      ${p?`<div class="field"><label for="owPAtivo">Situação</label><select id="owPAtivo"><option value="true" ${p.ativo?"selected":""}>Ativo</option><option value="false" ${!p.ativo?"selected":""}>Inativo</option></select></div>`
+        :`<div class="field"><label for="owPSenha">Senha inicial</label><input id="owPSenha" type="password" autocomplete="new-password" minlength="8"></div>`}
+      <button class="btn pri go" type="submit" data-act="ownSalvarPessoa" data-id="${p?p.id:""}" ${OWN.busy?"disabled":""}>${OWN.busy?"Salvando…":p?"Salvar acesso":"Cadastrar pessoa"}</button></div>
+    <p class="hint" id="owErro" role="alert" style="color:var(--c);font-weight:600;margin:0"></p>
+    ${p?"":`<p class="hint">Nenhum e-mail é enviado automaticamente: informe a senha inicial à pessoa.</p>`}</form></div>`;
+}
+VEXTRA["own-empresas"]=function(){
+  const {empresas}=OWN.dados,c=emp(OWN.sel),f=OWN.form;
+  const formAberto=f&&f.tipo==="empresa";
+  const acao=`<div hidden><button class="btn ${formAberto?"":"pri"}" data-v5-acao data-act="${formAberto?"ownFechar":"ownNovaEmpresa"}">${formAberto?"Fechar formulário":"+ Nova empresa"}</button></div>`;
+  const busca=norm(OWN.busca||"");
+  const lista=empresas.filter(e=>!busca||norm(e.nome+" "+(e.documento||"")).includes(busca));
+  const listaHtml=`<div class="card"><div class="ch"><div><h3>Empresas</h3><p>${empresas.length} cadastrada(s)</p></div></div>
+    <input id="owBusca" placeholder="Buscar empresa ou CNPJ" value="${esc(OWN.busca||"")}" style="margin-bottom:10px" aria-label="Buscar empresa">
+    ${lista.length?`<div class="act">${lista.map(e=>{const n=pessoasDe(e.id).length,on=e.id===OWN.sel;
+      return `<div class="ai" data-act="ownAbrirEmpresa" data-id="${e.id}" role="button" tabindex="0" aria-pressed="${on}" style="cursor:pointer;${on?"background:var(--accS)":""}">${UI.util.avI(e.nome)}<div style="min-width:0"><b>${esc(e.nome)}</b><span>${e.ativa?"Ativa":"Suspensa"} · ${n} pessoa${n===1?"":"s"}</span></div>${e.ativa?"":pill("Suspensa","p-w")}</div>`;}).join("")}</div>`
+      :UI.vazio("home",empresas.length?"Nenhuma empresa nesta busca.":"Nenhuma empresa ainda.",empresas.length?"":"Comece cadastrando a primeira.")}</div>`;
+  let det="";
+  if(c){
+    const ps=pessoasDe(c.id),ger=ps.filter(p=>p.ativo&&p.papel==="gerencia").length;
+    det=(f&&f.tipo==="pessoa"?formPessoa(c,f.id?OWN.dados.pessoas.find(p=>p.id===f.id):null):"")+
+    `<div class="card"><div class="ch"><div style="display:flex;gap:12px;align-items:center">${UI.util.avI(c.nome)}<div><h3 style="font-size:18px">${esc(c.nome)}</h3><p>${c.documento?esc(c.documento):"Sem CNPJ informado"}</p></div></div>
+      <div class="flex">${pill(c.ativa?"Ativa":"Suspensa",c.ativa?"p-ok":"p-w")}
+      <button class="btn sm" data-act="ownStatus" data-id="${c.id}" style="${c.ativa?"color:var(--c)":""}">${c.ativa?"Suspender acesso":"Reativar empresa"}</button>
+      <button class="btn sm pri" data-act="ownNovaPessoa" ${c.ativa?"":"disabled"}>${ic5("plus",2.2)}Cadastrar pessoa</button></div></div>
+      <div class="v6-kv" style="margin-bottom:6px"><div><span>Pessoas</span><b>${ps.length} (${ps.filter(p=>p.ativo).length} ativas)</b></div><div><span>Na gerência</span><b>${ger}</b></div>
+        <div style="grid-column:span 2"><span>Código de parceiro (para sublocação entre empresas)</span><b><code style="font:600 12.5px var(--f);background:var(--sf2);border-radius:8px;padding:2px 8px;user-select:all">${esc(c.id)}</code> <button class="lnk" data-act="ownCopiar" data-v="${esc(c.id)}">Copiar</button></b></div></div>
+      ${c.ativa?"":`<div class="v6-banner" style="margin:10px 0 0">${ic5("alert")}<div>Empresa suspensa: as pessoas não acessam a operação. Os registros estão preservados.</div></div>`}</div>`+
+    UI.lista({id:"ownPessoas",linhas:ps.slice().sort((a,b)=>(b.ativo-a.ativo)||String(a.nome).localeCompare(b.nome,"pt-BR")),chave:p=>p.id,titulo:"Equipe",sub:"Clique para editar nome, cargo, permissão ou situação",
+      chips:{opts:[["","Todas",ps.length],["on","Ativas",ps.filter(p=>p.ativo).length],["off","Inativas",ps.filter(p=>!p.ativo).length]],match:(p,v)=>v==="on"?p.ativo:!p.ativo},
+      cols:[{t:"Pessoa",k:"no",get:p=>norm(p.nome)},{t:"Cargo"},{t:"Permissão",k:"pa",get:p=>p.papel},{t:"Situação",k:"si",get:p=>p.ativo?0:1}],
+      tr:p=>`<tr class="clickable" data-act="ownEditarPessoa" data-id="${p.id}"><td>${cl(p.nome,esc(p.email||""))}</td><td>${p.cargo?esc(p.cargo):'<span class="t-vz">—</span>'}</td>
+        <td>${pill(ROLES[p.papel]||p.papel,p.papel==="gerencia"?"p-i":"p-n")}</td><td>${pill(p.ativo?"Ativo":"Inativo",p.ativo?"p-ok":"p-w")}</td></tr>`,
+      resumo:l=>`${l.length} pessoa${l.length===1?"":"s"}`,
+      vazio:["users","Monte a primeira equipe.","Cadastre alguém da gerência para começar a operação.",c.ativa?`<button class="btn pri" data-act="ownNovaPessoa">Cadastrar pessoa</button>`:""]});
+  }else det=`<div class="card">${UI.vazio("home","Escolha uma empresa.","Ou cadastre a primeira para montar a equipe.")}</div>`;
+  return acao+aviso()+carregandoHtml()+(formAberto?formEmpresa():"")+
+    `<div class="g" style="grid-template-columns:minmax(0,1fr) minmax(0,2.2fr);align-items:start" id="owGrade">${listaHtml}<div style="display:grid;gap:18px;min-width:0">${det}</div></div>`;
+};
+VEXTRA["own-historico"]=function(){
+  const h=OWN.dados.historico,q={};h.forEach(x=>q[x.acao]=(q[x.acao]||0)+1);
+  return aviso()+UI.lista({id:"ownHist",mt:false,linhas:h,chave:(x,i)=>x.id||x.ocorrido_em+x.acao,titulo:"Ações administrativas",sub:"As 100 mais recentes",
+    chips:{opts:[["","Todas",h.length],...Object.keys(q).map(k=>[k,ACAO[k]||k,q[k]])],match:(x,v)=>x.acao===v},
+    cols:[{t:"Ação",k:"ac",get:x=>x.acao},{t:"Empresa",k:"em",get:x=>norm(emp(x.empresa_id)?.nome)},{t:"Quando",k:"qu",get:x=>x.ocorrido_em||""},{t:"Responsável"}],
+    tr:x=>`<tr><td>${pill(ACAO[x.acao]||x.acao,x.acao==="empresa_criada"||x.acao==="usuario_criado"?"p-ok":"p-i")}</td><td>${esc(emp(x.empresa_id)?.nome||"—")}</td><td>${esc(quando(x.ocorrido_em))}</td>
+      <td>${x.autor_id?(x.autor_id===S.perfilId?"Você":`<span class="hint">${esc(String(x.autor_id).slice(0,8))}…</span>`):'<span class="t-vz">operação administrativa</span>'}</td></tr>`,
+    resumo:l=>`${l.length} ação(ões)`,vazio:["doc","Nenhuma alteração registrada.",""]});
+};
+
+/* ---- ações ---- */
+const erroForm=t=>{const e=g("owErro");if(e) e.textContent=t;else toast(t);};
+function abrirForm(f){OWN.form=f;if(S.view!=="own-empresas") go("own-empresas"); else render();
+  requestAnimationFrame(()=>{const p=document.querySelector("#view .v6-painel");if(p){p.scrollIntoView({block:"start",behavior:"smooth"});p.querySelector("input:not([disabled]),select")?.focus({preventScroll:true});}});}
+const _go=go;go=function(v){if(OWN.on&&v!=="own-empresas") OWN.form=null;return _go.apply(this,arguments);};
+async function salvarEmpresa(){
+  const nome=val("owNome").trim().replace(/\s+/g," "),doc=val("owDoc").trim();
+  if(nome.length<2) return erroForm("Informe o nome da empresa (mínimo 2 caracteres).");
+  if(OWN.dados.empresas.some(e=>norm(e.nome)===norm(nome))) return erroForm("Já existe uma empresa com esse nome.");
+  OWN.busy=true;render();
+  try{const id=await rpc("owner_criar_empresa",{p_nome:nome,p_documento:doc||null});OWN.sel=id||OWN.sel;OWN.form=null;OWN.busy=false;
+    await carregar("Empresa "+nome+" criada. Agora cadastre a gerência.");if(emp(OWN.sel)?.ativa) abrirForm({tipo:"pessoa"});}
+  catch(e){OWN.busy=false;render();erroForm(msg(e));}
+}
+async function salvarPessoa(id){
+  const c=emp(OWN.sel);if(!c) return;
+  const nome=val("owPNome").trim().replace(/\s+/g," "),cargo=val("owPCargo").trim(),papel=val("owPPapel");
+  if(nome.length<2) return erroForm("Informe o nome completo.");
+  if(id){
+    OWN.busy=true;const ativo=val("owPAtivo")==="true";render();
+    try{await rpc("owner_alterar_usuario",{p_id:id,p_nome:nome,p_cargo:cargo,p_papel:papel,p_ativo:ativo});OWN.form=null;OWN.busy=false;await carregar("Acesso de "+nome+" atualizado.");}
+    catch(e){OWN.busy=false;render();erroForm(msg(e));}
+    return;
+  }
+  const email=val("owPEmail").trim().toLowerCase(),senha=val("owPSenha");
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return erroForm("Informe um e-mail válido.");
+  if(senha.length<8) return erroForm("A senha inicial precisa ter pelo menos 8 caracteres.");
+  if(OWN.dados.pessoas.some(p=>norm(p.email)===email)) return erroForm("Esse e-mail já tem acesso na plataforma.");
+  OWN.busy=true;render();
+  try{
+    const r=await pedido(sb.functions.invoke("owner-admin",{body:{action:"criar_usuario",empresa_id:c.id,nome,email,cargo,papel,senha}}));
+    if(r.error){let d;try{d=await r.error.context?.json();}catch(x){}throw new Error(d?.error||d?.message||r.error.message||"Não foi possível cadastrar. Confira se a função owner-admin foi publicada.");}
+    if(r.data?.error) throw new Error(r.data.error);
+    if(!r.data?.id) throw new Error("A função respondeu, mas não confirmou a criação da pessoa. Confira o código publicado em owner-admin.");
+    const ck=await rpc("owner_listar");
+    if(!ck?.pessoas?.some(x=>x.id===r.data.id&&x.empresa_id===c.id)) throw new Error("A conta foi criada, mas não apareceu vinculada à empresa. Não repita o cadastro: confira o perfil dessa conta no banco.");
+    OWN.form=null;OWN.busy=false;await carregar(nome+" cadastrado(a). Informe a senha inicial à pessoa.");
+  }catch(e){OWN.busy=false;render();erroForm(msg(e));}
+}
+function confirmar(b,t){if(b.dataset.armado) return true;b.dataset.armado="1";const o=b.innerHTML;b.textContent=t;setTimeout(()=>{if(b.isConnected){delete b.dataset.armado;b.innerHTML=o;}},4000);return false;}
+document.addEventListener("click",async ev=>{
+  const b=ev.target.closest("[data-act]");if(!b||!OWN.on) return;const a=b.dataset.act;if(!a.startsWith("own")) return;
+  if(b.type==="submit") ev.preventDefault();
+  switch(a){
+    case "ownRecarregar": carregar();break;
+    case "ownNovaEmpresa": abrirForm({tipo:"empresa"});break;
+    case "ownFechar": OWN.form=null;render();break;
+    case "ownSalvarEmpresa": if(!OWN.busy) salvarEmpresa();break;
+    case "ownAbrirEmpresa": OWN.sel=b.dataset.id;OWN.form=null;if(S.view!=="own-empresas") go("own-empresas"); else render();break;
+    case "ownNovaPessoa": abrirForm({tipo:"pessoa"});break;
+    case "ownEditarPessoa": abrirForm({tipo:"pessoa",id:b.dataset.id});break;
+    case "ownSalvarPessoa": if(!OWN.busy) salvarPessoa(b.dataset.id);break;
+    case "ownCopiar": try{await navigator.clipboard.writeText(b.dataset.v);toast("Código copiado.");}catch(e){toast("Selecione o código e copie.");}break;
+    case "ownStatus": {const c=emp(b.dataset.id);if(!c) break;
+      if(!confirmar(b,c.ativa?"Clique de novo: suspender o acesso":"Clique de novo para reativar")) break;
+      try{await rpc("owner_empresa_status",{p_empresa:c.id,p_ativa:!c.ativa});await carregar(c.ativa?"Empresa suspensa. Os registros foram preservados.":"Empresa reativada.");}
+      catch(e){toast(msg(e));}break;}
+  }
+});
+document.addEventListener("input",ev=>{if(ev.target.id!=="owBusca"||!OWN.on) return;OWN.busca=ev.target.value;const pos=ev.target.selectionStart;render();const i=g("owBusca");if(i){i.focus();try{i.setSelectionRange(pos,pos);}catch(e){}}});
+document.addEventListener("keydown",ev=>{if(!OWN.on||(ev.key!=="Enter"&&ev.key!==" ")) return;const r=ev.target.closest('[role="button"][data-act^="own"]');if(r){ev.preventDefault();r.click();}});
+/* “Atualizar” do topo recarrega a lista da plataforma */
+document.addEventListener("click",ev=>{if(!OWN.on) return;const b=ev.target.closest('[data-act="recarregar"]');if(b){ev.stopImmediatePropagation();carregar("Lista atualizada.");}},true);
+const css=document.createElement("style");css.textContent="@media (max-width:900px){#owGrade{grid-template-columns:minmax(0,1fr)!important}}";document.head.appendChild(css);
 })();
 </script>
 </body>
