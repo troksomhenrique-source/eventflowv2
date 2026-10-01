@@ -5325,6 +5325,8 @@ body.preview .app{display:none}
 
 #printHost .nota{break-inside:avoid;page-break-inside:avoid;border:1px solid #d5d5d5;border-left:3px solid #111;border-radius:3px;padding:8px 12px;margin-bottom:9px;font-size:9.5pt;line-height:1.45}
 #printHost .nota .lbl{display:block;margin-bottom:4px}
+#printHost .nota{display:block!important;background:#fff!important;box-shadow:none!important;border-radius:3px!important;color:#111!important}
+#printHost .nota .lbl{display:block!important;width:auto!important;margin:0 0 4px!important;white-space:nowrap}
 #printHost .lbl{display:block}
 #printHost .resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:11px}
 #printHost .resumo .k{border:1px solid #d5d5d5;border-radius:3px;padding:6px 10px}
@@ -5354,12 +5356,20 @@ const EMPRESA = {
 const pEsc = s => esc(s==null?"":String(s));
 const pCampo = (l,v,larga,sufixo) => `<div class="c ${larga?"larga":""}"><span class="lbl">${pEsc(l)}</span>
   <b>${pEsc(v||"—")}${sufixo?`<span class="hr">${pEsc(sufixo)}</span>`:""}</b></div>`;
-const pTopo = (titulo,codigo,extra) => `<div class="topo">
-  <div class="marca"><b>${pEsc(EMPRESA.nome)}</b>
-    <span>${pEsc(EMPRESA.linha1)}${EMPRESA.linha2?"<br>"+pEsc(EMPRESA.linha2):""}</span></div>
+/* o papel sai com a marca de quem está logado: nome da empresa e, quando o
+   cadastro tiver, CNPJ e contatos */
+const pEmpresa = () => {
+  const i=S.empresaInfo||{}, nome=S.empresaNome||EMPRESA.nome;
+  const doc=i.documento||i.cnpj||"", contato=[i.telefone,i.email,i.site].filter(Boolean).join(" · ");
+  const end=[i.endereco,i.cidade].filter(Boolean).join(" · ");
+  return {nome, linha1:EMPRESA.linha1, linha2:[doc?"CNPJ "+doc:"",contato,end].filter(Boolean).join(" · ")||EMPRESA.linha2};
+};
+const pTopo = (titulo,codigo,extra) => { const E=pEmpresa(); return `<div class="topo">
+  <div class="marca"><b>${pEsc(E.nome)}</b>
+    <span>${pEsc(E.linha1)}${E.linha2?"<br>"+pEsc(E.linha2):""}</span></div>
   <div class="doc"><b>${pEsc(titulo)}</b><span>${pEsc(codigo)}</span>
     <small>emitido em ${dtl(HOJE)}${extra?" · "+pEsc(extra):""}</small></div>
-</div>`;
+</div>`; };
 const pPeriodo = (a,b) => a===b ? dtl(a) : dtl(a)+" a "+dtl(b);
 
 /* ---------- orçamento ---------- */
@@ -5422,7 +5432,7 @@ function folhaOrcamento(n){
     ${n.orc.obsGeral?`<div class="nota"><span class="lbl">Observações</span>${pEsc(n.orc.obsGeral)}</div>`:""}
 
     <div class="assina">
-      <div class="a"><b>${pEsc(EMPRESA.nome)}</b>Responsável comercial</div>
+      <div class="a"><b>${pEsc(pEmpresa().nome)}</b>Responsável comercial${(()=>{const u=typeof me==="function"?me():null;return u&&u.nome&&u.nome!=="Sistema"?" · "+pEsc(u.nome):"";})()}</div>
       <div class="a"><b>${pEsc(c.nome)}</b>De acordo · data ___/___/______</div>
     </div>
 
@@ -5454,12 +5464,13 @@ function folhaCarga(c){
   return `<div class="folha">
     ${pTopo("Ordem de carga", c.codigo||"", c.status)}
     <h2>${pEsc(o?o.evento:(c.evento||"Carga avulsa"))}</h2>
-    <p class="sub">${pEsc(cl.nome)}${o&&o.local?" · "+pEsc(o.local):""}</p>
+    ${(()=>{const lin=[cl.nome!=="—"?cl.nome:"",o&&o.local?o.local:"",o&&o.cidade?o.cidade:""].filter(Boolean);
+      return `<p class="sub">${lin.length?pEsc(lin.join(" · ")):(o?"":"Carga avulsa · sem OS de venda vinculada")}</p>`;})()}
 
     <div class="campos">
       ${pCampo("Carga", dtl(c.carga), false, c.horaCarga?"a partir das "+c.horaCarga:"")}
       ${pCampo("Descarga prevista", dtl(c.descarga))}
-      ${pCampo("OS de venda", o?(o.codigo||"—"):"—")}
+      ${pCampo("OS de venda", o?(o.codigo||"—"):"avulsa")}
       ${pCampo("Conferente", c.conferente||"—")}
       ${pCampo("Veículo", c.veiculo, true)}
       ${pCampo("Equipe", c.equipe, true)}
@@ -7836,6 +7847,7 @@ async function iniciarInterno(){
   if(contexto.error || !contexto.data?.id){telaLogin("Acesso indisponível. Sua empresa ou seu perfil está inativo ou ainda não foi cadastrado.");return;}
   S.empresaId=contexto.data.id;
   S.empresaNome=contexto.data.nome;
+  S.empresaInfo=contexto.data;   /* CNPJ e contatos, quando o cadastro tiver, vão para o cabeçalho dos documentos */
   const empresaLabel=document.getElementById("empresaAtual");if(empresaLabel){empresaLabel.textContent=S.empresaNome;empresaLabel.title=S.empresaNome;}
   const { data: perfil, error } = await sb.from("perfis").select("*").eq("id", user.id).single();
   if(error || !perfil || !perfil.ativo){
