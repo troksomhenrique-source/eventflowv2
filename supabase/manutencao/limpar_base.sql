@@ -76,10 +76,18 @@ begin
   execute 'truncate table ' || lista || ' restart identity';
   raise notice 'Tabelas limpas: %', lista;
 
-  -- numeração dos códigos (OS, OSC, movimentos…) volta a começar do 1
+  -- numeração dos códigos (OS, OSC, movimentos…) volta a começar do 1 — mas só
+  -- as sequências avulsas que nenhuma tabela mantida usa. As que pertencem a
+  -- uma coluna já foram reiniciadas pelo TRUNCATE ... RESTART IDENTITY; mexer
+  -- nas das tabelas mantidas faria um cadastro novo repetir um número existente.
   for s in select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
             where n.nspname = 'public' and c.relkind = 'S'
-              and c.relname not ilike '%owner%' and c.relname not ilike '%plataforma%' loop
+              and c.relname not ilike '%owner%' and c.relname not ilike '%plataforma%'
+              and not exists (select 1 from pg_depend d where d.objid = c.oid and d.deptype in ('a','i'))
+              and not exists (select 1 from pg_attrdef ad join pg_class t on t.oid = ad.adrelid
+                               join pg_namespace nt on nt.oid = t.relnamespace and nt.nspname = 'public'
+                              where pg_get_expr(ad.adbin, ad.adrelid) ilike '%' || c.relname || '%'
+                                and (t.relname = any(manter) or t.relname ilike '%owner%' or t.relname ilike '%plataforma%')) loop
     execute format('alter sequence public.%I restart', s.relname);
   end loop;
 
