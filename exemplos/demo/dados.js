@@ -126,7 +126,7 @@ function negocio(o){
     local_nome:o.local,sala:o.sala||"Plenária",endereco:o.end||"",cidade:o.cidade,publico:o.publico,prazo_decisao:o.prazo||d(10),
     montagem:o.mont,montagem_hora:"07:00",evento_inicio:o.ini,evento_inicio_hora:o.hIni||"19:00",evento_fim:o.fim||o.ini,evento_fim_hora:"23:00",
     desmontagem:o.desm,desmontagem_hora:"23:30",valor:ix>=4||o.os?valor:(o.estimado||0),os_id:null,
-    negocio_sala:{area_m2:o.area||900,comprimento_m:o.comp||40,largura_m:o.larg||22.5,pe_direito:o.pd||9,ancoragem:o.anc||"liberada",
+    negocio_sala:{area_m2:o.area||900,comprimento_m:o.comp||40,largura_m:o.larg||22.5,pe_direito:o.pd||9,ancoragem:o.anc||"sim",
       carga_piso:500,energia_kva:o.kva||180,pontos:o.pontos||12,wll_ponto_kgf:o.wll||750,acesso:o.acesso||"Doca para carreta, portão 5",elevador:false,observacao:""},
     negocio_ambientes:[{id:plen,nome:o.sala||"Plenária",principal:true,ordem:0}].concat((o.bus||[]).map((b,k)=>({id:nid("2"),nome:b,principal:false,ordem:k+1,
       comprimento_m:14,largura_m:10,area_m2:140,pe_direito:4,carga_piso:400,energia_kva:15,pontos:0,wll_ponto_kgf:0,observacao:""}))),
@@ -153,6 +153,9 @@ function negocio(o){
     const ambs=[{id:oPlen,nome:o.sala||"Plenária",principal:true,ordem:0,comprimento_m:o.comp||40,largura_m:o.larg||22.5}]
       .concat((o.bus||[]).map((b,k)=>({id:nid("6"),nome:b,principal:false,ordem:k+1,comprimento_m:14,largura_m:10})));
     const aereos=new Set(o.aereo||[]);
+    /* plateia e grid principal da plenária: os pontos de ancoragem pertencem ao grid */
+    const zonas=[{id:nid("6"),ambiente_id:oPlen,nome:"Plateia",comprimento_m:o.comp||40,largura_m:o.larg||22.5,area_m2:(o.comp||40)*(o.larg||22.5),carga_admissivel:500,ordem:0}];
+    const est=aereos.size?[{id:nid("6"),ambiente_id:oPlen,nome:"Grid principal",torre_solo:false,zona_id:zonas[0].id,ordem:0}]:[];
     const osItens=(o.itens||[]).map(x=>{const i=it(x[0]);const amb=x[2]!=null?ambs[x[2]].id:oPlen;
       return {id:nid("7"),item_cod:i.cod,quantidade:x[1],quantidade_aerea:aereos.has(i.cod)?x[1]:0,ambiente_id:amb,descricao:null,categoria:null,observacao:x[3]||null};});
     const escala=(o.escala||[]).map(e=>({id:nid("8"),data:e[0],freelancer_id:e[1].startsWith("b")?e[1]:null,perfil_id:e[1].startsWith("a")?e[1]:null,
@@ -162,8 +165,8 @@ function negocio(o){
       publico:o.publico,area_m2:o.area||900,montagem:o.mont,evento_inicio:o.ini,evento_fim:o.fim||o.ini,desmontagem:o.desm,valor,status:o.os,
       descritivo:o.descritivo||"",criado_em:ts(o.criada||-20),
       os_produtores:[{perfil_id:o.prod||PR[0],responsavel:true}].concat((o.coprod||[]).map(p=>({perfil_id:p,responsavel:false}))),
-      os_ambientes:ambs,os_estruturas:[],os_zonas:[],os_itens:osItens,
-      os_ancoragens:aereos.size?Array.from({length:Math.min(o.pontos||8,12)},(_,k)=>({id:nid("6"),ambiente_id:oPlen,estrutura_id:null,nome:"P"+(k+1),quantidade:1,wll_kgf:o.wll||750})):[],
+      os_ambientes:ambs,os_estruturas:est,os_zonas:zonas,os_itens:osItens,
+      os_ancoragens:est.length?Array.from({length:Math.min(o.pontos||8,12)},(_,k)=>({id:nid("6"),ambiente_id:oPlen,estrutura_id:est[0].id,nome:"P"+(k+1),quantidade:1,wll_kgf:o.wll||750})):[],
       os_memorial:ambs.map(a=>({ambiente_id:a.id,area_apoio:a.principal?96:24,carga_admissivel:500,carga_pontual_admissivel:1500,sobrecarga_publico:a.principal?400:250,
         apoios_por_equipamento:4,torre_solo:false,solo_concluido:o.os!=="Aguardando produção",fator_dinamico:1.2,fator_desbalanceamento:1.25,wll_acessorio:2000,
         fs_minimo:5,vao_livre:10,aereo_concluido:o.os==="Liberada"||o.os==="Encerrada"})),

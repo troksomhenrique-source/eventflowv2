@@ -72,13 +72,15 @@ add("ordens_venda", O.map(o => so(o, ["id", "codigo", "negocio_id", "cliente_id"
 add("os_produtores", O.flatMap(o => o.os_produtores.map(p => ({ os_id: o.id, ...p }))));
 add("os_ambientes", O.flatMap(o => o.os_ambientes.map(a => ({ os_id: o.id, ...a }))));
 add("os_memorial", O.flatMap(o => o.os_memorial.map(m => ({ os_id: o.id, ...m }))));
-add("os_ancoragens", O.flatMap(o => o.os_ancoragens.map(a => ({ os_id: o.id, ...so(a, ["id", "ambiente_id", "nome", "quantidade", "wll_kgf"]) }))));
+add("os_zonas", O.flatMap(o => o.os_zonas.map(z => ({ os_id: o.id, ...z }))));
+add("os_estruturas", O.flatMap(o => o.os_estruturas.map(e => ({ os_id: o.id, ...e }))));
+add("os_ancoragens", O.flatMap(o => o.os_ancoragens.map(a => ({ os_id: o.id, ...so(a, ["id", "ambiente_id", "estrutura_id", "nome", "quantidade", "wll_kgf"]) }))));
 add("os_itens", O.flatMap(o => o.os_itens.map(i => ({ os_id: o.id, ...so(i, ["id", "ambiente_id", "item_cod", "quantidade", "quantidade_aerea", "observacao"]) }))));
 add("os_logistica", O.map(o => ({ os_id: o.id, observacao: o.os_logistica.observacao })));
 add("os_veiculo_dias", O.flatMap(o => o.os_veiculo_dias.map(v => ({ os_id: o.id, ...v }))));
 add("os_escala", O.flatMap(o => o.os_escala.map(e => ({ os_id: o.id, ...e }))));
 
-add("ordens_carga", D.cargas.map(c => so(c, ["id", "codigo", "os_id", "evento_avulso", "status", "data_carga", "hora_carga", "data_descarga", "veiculo", "equipe", "observacao"])));
+add("ordens_carga", D.cargas.map(c => ({ ...so(c, ["id", "codigo", "os_id", "evento_avulso", "data_carga", "hora_carga", "data_descarga", "veiculo", "equipe", "observacao"]), status: "Liberada" })));
 add("osc_itens", D.cargas.flatMap(c => c.osc_itens.map(i => ({ ordem_carga_id: c.id, item_cod: i.item_cod, descricao: null, quantidade: i.quantidade, observacao: i.observacao }))));
 add("movimentos", D.movs.map(m => so(m, ["id", "codigo", "data", "tipo", "ordem_carga_id", "referencia", "usuario_id"])));
 add("movimento_linhas", D.movs.flatMap(m => m.movimento_linhas.map(l => ({ movimento_id: m.id, ...l }))));
@@ -94,7 +96,7 @@ add("post_curtidas", D.posts.flatMap(p => p.post_curtidas.map(c => ({ post_id: p
 add("post_comentarios", D.posts.flatMap(p => p.post_comentarios.map(c => ({ post_id: p.id, ...c }))));
 add("notificacoes", D.notificacoes.map(n => so(n, ["id", "texto", "tipo", "destino", "tela", "referencia", "criado_em"])));
 
-add("canais", D.chat.canais.map(c => ({ id: c.id, tipo: c.tipo, nome: c.nome || null, criado_em: c.criado_em, criado_por: G1 })));
+add("canais", D.chat.canais.map(c => ({ id: c.id, tipo: c.tipo === "dm" ? "dm" : "@GRUPO", nome: c.nome || null, criado_em: c.criado_em, criado_por: G1 })));
 add("canal_membros", D.chat.canais.flatMap(c => c.membros.map(m => ({ canal_id: c.id, perfil_id: m.perfil_id, admin: m.admin, lido_em: m.lido_em }))));
 add("mensagens", D.chat.msgs.map(m => ({ id: m.id, canal_id: m.canal_id, autor_id: m.autor_id, texto: m.texto, sistema: false, criado_em: m.criado_em })));
 
@@ -156,6 +158,11 @@ begin
     if m is not null then
       return to_jsonb((((now() at time zone 'America/Sao_Paulo')::date + m[1]::int) + make_time(m[2]::int, m[3]::int, 0)) at time zone 'America/Sao_Paulo');
     end if;
+    if s = '@GRUPO' then
+      return to_jsonb(coalesce((select e.enumlabel from pg_enum e join pg_type t on t.oid = e.enumtypid
+                                 where t.typname = 'tipo_canal' and e.enumlabel not in ('dm', 'os', 'direta', 'direto')
+                                 order by (e.enumlabel in ('grupo', 'equipe', 'geral')) desc, e.enumsortorder limit 1), 'grupo'));
+    end if;
     if s like '@IMG:%' then
       return to_jsonb((select url from pg_temp.demo_img where tipo = substr(s, 6)));
     end if;
@@ -171,6 +178,7 @@ create or replace function pg_temp.ins(t text, d jsonb) returns boolean language
 declare cols text;
 begin
   d := jsonb_strip_nulls(pg_temp.fix(d));
+  d := coalesce((select jsonb_object_agg(k, v) from jsonb_each(d) e(k, v) where v <> '""'::jsonb), '{}'::jsonb);
   if exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = t and column_name = 'empresa_id')
      and not d ? 'empresa_id' then
     d := d || jsonb_build_object('empresa_id', current_setting('demo.emp'));
@@ -233,6 +241,12 @@ end $$;
 do $$
 declare emp uuid := current_setting('demo.emp')::uuid; r record; passada int; sobrou boolean;
 begin
+  begin
+    if to_regclass('public.ordens_carga') is not null then
+      update public.ordens_carga set status = 'Liberada' where empresa_id = emp and status <> 'Liberada';
+    end if;
+  exception when others then null;
+  end;
   for passada in 1..8 loop
     sobrou := false;
     for r in select c.table_name from information_schema.columns c join information_schema.tables t
@@ -241,7 +255,7 @@ begin
                 and c.table_name not in ('empresas', 'perfis') and c.table_name !~* '(owner|plataforma)' loop
       begin
         execute format('delete from public.%I where empresa_id = $1', r.table_name) using emp;
-      exception when foreign_key_violation then sobrou := true;
+      exception when others then sobrou := true;
       end;
     end loop;
     exit when not sobrou;
@@ -307,6 +321,21 @@ select key, value #>> '{}' from jsonb_each(${J(Object.fromEntries(usadosDes.map(
 -- ---------- 5 · conteúdo, gravado como a diretora (gerência) ----------
 select pg_temp.como(${Q(G1)});
 ${T.map(([t, linhas]) => `select pg_temp.lote('${t}', ${J(linhas)});`).join("\n")}
+
+/* cargas: agora que itens e movimentos existem, cada uma recebe o status real */
+do $$
+declare x jsonb;
+begin
+  insert into pg_temp.demo_res(tabela) values ('ordens_carga · status');
+  for x in select * from jsonb_array_elements(${J(D.cargas.filter(c => c.status !== "Liberada").map(c => ({ id: c.id, status: c.status })))}) loop
+    begin
+      update public.ordens_carga set status = x->>'status' where id = (x->>'id')::uuid;
+      update pg_temp.demo_res set ok = ok + 1 where tabela = 'ordens_carga · status';
+    exception when others then
+      update pg_temp.demo_res set falhas = falhas + 1, erro = coalesce(erro, sqlerrm) where tabela = 'ordens_carga · status';
+    end;
+  end loop;
+end $$;
 
 /* negócio ↔ OS: alguns bancos guardam o vínculo também no negócio */
 do $$
