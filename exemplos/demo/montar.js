@@ -1,36 +1,37 @@
-// Monta o modo demonstração dentro do v6.html.
+// Gera os arquivos para publicar a partir do v6.html.
 // Uso (na raiz do repositório): node exemplos/demo/montar.js
-// Junta o catálogo e as ilustrações de exemplos/gerador com os arquivos
-// desta pasta e grava três blocos no v6.html (substitui se já existirem):
-//   <style id="v6-demo-css">   antes do </head>
-//   <script id="v6-demo">      logo depois do supabase-js: troca o cliente pelo banco falso
-//   <script id="v6-demo-ui">   no fim do arquivo: botões do login e faixa de aviso
+//
+//   publicar/app/index.html    o sistema, para a sua equipe e clientes
+//   publicar/demo/index.html   a demonstração: entra com um clique nos logins
+//                              da empresa de demonstração (supabase/demo/empresa_demo.sql)
 const fs = require("fs"), path = require("path");
 const RAIZ = path.join(__dirname, "..", "..");
-const ARQ = path.join(RAIZ, "v6.html");
-const { itens, kits, frota } = require("../gerador/catalogo");
-const { svg, tipos } = require("../gerador/desenhos");
+const ORIGEM = path.join(RAIZ, "v6.html");
+const CFG = require("./config");
 
-const usados = new Set(itens.map(i => i[12]));
-const desenhos = Object.fromEntries(tipos.filter(t => usados.has(t) || t === "rack").map(t => [t, svg(t)]));
-const json = v => JSON.stringify(v).replace(/<\//g, "<\\/");
-const runtime = fs.readFileSync(path.join(__dirname, "demo-runtime.js"), "utf8")
-  .replace("__CATALOGO__", () => json({ itens, kits, frota }))
-  .replace("__DESENHOS__", () => json(desenhos));
-const ui = fs.readFileSync(path.join(__dirname, "demo-ui.js"), "utf8");
+let h = fs.readFileSync(ORIGEM, "utf8");
+/* o modo demonstração antigo (banco falso dentro do v6.html) saiu: a demonstração agora usa o banco real */
+const tira = (txt, id) => txt.replace(new RegExp(`\\n?<(script|style) id="${id}">[\\s\\S]*?</\\1>`), "");
+const limpo = ["v6-demo-css", "v6-demo", "v6-demo-ui"].reduce(tira, h);
+if (limpo !== h) { fs.writeFileSync(ORIGEM, limpo); console.log("v6.html: modo demonstração antigo removido"); }
+h = limpo;
+
+const grava = (rel, txt) => {
+  const p = path.join(RAIZ, rel);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, txt);
+  console.log(`${rel} · ${(txt.length / 1024).toFixed(0)} KB`);
+};
+const naHead = (txt, extra) => { const i = txt.indexOf("</head>"); return txt.slice(0, i) + extra + txt.slice(i); };
+const noFim = (txt, extra) => { const i = txt.lastIndexOf("</body>"); return txt.slice(0, i) + extra + txt.slice(i); };
+
+/* sistema: igual ao v6.html, fora dos buscadores */
+grava("publicar/app/index.html", naHead(h, `<meta name="robots" content="noindex, nofollow">\n`));
+
+/* demonstração */
 const css = fs.readFileSync(path.join(__dirname, "demo.css"), "utf8");
-
-let h = fs.readFileSync(ARQ, "utf8");
-const tira = id => { h = h.replace(new RegExp(`\\n?<(script|style) id="${id}">[\\s\\S]*?</\\1>`), ""); };
-["v6-demo-css", "v6-demo", "v6-demo-ui"].forEach(tira);
-
-const cdn = h.match(/<script src="[^"]*supabase-js[^"]*"><\/script>/);
-if (!cdn) throw new Error("Não achei o <script> do supabase-js no v6.html.");
-h = h.replace(cdn[0], () => cdn[0] + `\n<script id="v6-demo">\n${runtime}</script>`);
-const head = h.indexOf("</head>");
-h = h.slice(0, head) + `<style id="v6-demo-css">\n${css}</style>\n` + h.slice(head);
-const fim = h.lastIndexOf("</body>");
-h = h.slice(0, fim) + `<script id="v6-demo-ui">\n${ui}</script>\n` + h.slice(fim);
-
-fs.writeFileSync(ARQ, h);
-console.log(`v6.html atualizado · ${itens.length} itens, ${Object.keys(desenhos).length} ilustrações, ${(h.length / 1024).toFixed(0)} KB`);
+const js = fs.readFileSync(path.join(__dirname, "demo-login.js"), "utf8").replace("__CFG__", () => JSON.stringify(CFG));
+let demo = h.replace(/<title>[^<]*<\/title>/, "<title>EventFlow · Demonstração</title>");
+demo = naHead(demo, `<style id="v6-demo-css">\n${css}</style>\n`);
+demo = noFim(demo, `<script id="v6-demo">\n${js}</script>\n`);
+grava("publicar/demo/index.html", demo);

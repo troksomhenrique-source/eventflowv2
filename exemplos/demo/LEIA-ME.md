@@ -1,20 +1,30 @@
-# Modo demonstração
+# Empresa de demonstração e arquivos para publicar
 
-Uma locadora de grande porte já preenchida (Atlas Eventos & Locação), para apresentar o EventFlow sem tocar no banco.
+## O que tem aqui
 
-**Como abrir**
-- Na tela de login, em "Conhecer com dados de demonstração", escolha Gerência, Produção ou Estoque.
-- Ou pelo endereço: `v6.html?demo=gerencia`, `?demo=producao` ou `?demo=estoque`.
-- Dentro do sistema, a faixa no topo troca o nível de acesso ou sai da demonstração.
+| Arquivo | Para quê |
+|---|---|
+| `dados.js` | os dados da empresa fictícia **Atlas Eventos & Locação** (pessoas, inventário, negócios, OS, cargas, financeiro, parceiros, mural, chat…) |
+| `config.js` | e-mails e senha dos logins de demonstração |
+| `gerar-sql.js` | gera `supabase/demo/empresa_demo.sql` |
+| `demo-login.js`, `demo.css` | a tela de entrada da demonstração (três botões) e a faixa "Demonstração" |
+| `montar.js` | gera `publicar/app/index.html` e `publicar/demo/index.html` a partir do `v6.html` |
 
-**O que tem**: 18 pessoas nos 3 níveis, 16 clientes, 14 freelancers, 117 equipamentos com ilustração, 11 kits, 9 veículos, 39 negócios em todas as etapas do funil, 21 ordens de serviço (um ano de histórico + eventos em andamento), cargas e movimentações, reembolsos, contas a pagar e receber, parceiros e sublocações (enviadas e recebidas), mural, chat, notas, agenda, avisos e histórico de alterações. As datas são relativas ao dia de hoje.
+## Como colocar a demonstração no ar
 
-**Como funciona**: o app recebe um banco falso em memória no lugar do Supabase. Nada sai do navegador; ao sair ou trocar de perfil, tudo volta ao início. Chamadas de voz/vídeo e envio de arquivos não funcionam na demonstração.
+1. **Supabase → SQL Editor**: cole o arquivo `supabase/demo/empresa_demo.sql` inteiro e clique em **Run**.
+   No fim aparece uma tabela com quantos registros entraram em cada parte. Se alguma parte mostrar "não gravados", o motivo está na última coluna.
+   Pode rodar de novo quando quiser: ele apaga só os dados da empresa de demonstração e recria tudo com as datas de hoje. Nenhuma outra empresa é tocada.
+2. **Cloudflare Pages**: publique a pasta `publicar/demo` num projeto (aberto ao público) e a pasta `publicar/app` em outro (protegido com Cloudflare Access).
 
-**Para editar os dados**: altere `demo-runtime.js` (dados e banco falso), `demo-ui.js` (login e faixa) ou `demo.css`, e rode na raiz do repositório:
+Logins criados (senha em `config.js`, hoje `Demo@2026`):
+`gerencia@atlas.example.com`, `producao@atlas.example.com`, `estoque@atlas.example.com` e mais 15 pessoas da equipe.
+
+## Depois de mudar algo
+
+Na raiz do repositório:
 
 ```
-node exemplos/demo/montar.js
+node exemplos/demo/gerar-sql.js   # mudou dados.js ou config.js
+node exemplos/demo/montar.js      # mudou o v6.html, demo-login.js, demo.css ou config.js
 ```
-
-O script grava os blocos `v6-demo-css`, `v6-demo` e `v6-demo-ui` dentro do `v6.html` (substitui os anteriores). O catálogo e as ilustrações vêm de `exemplos/gerador`.

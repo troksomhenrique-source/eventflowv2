@@ -1,41 +1,16 @@
-/* =====================================================================
-   EventFlow · modo demonstração
-   Uma empresa de grande porte, completa, para conhecer o sistema sem
-   tocar no banco. Entra pela tela de login ("Conhecer com dados de
-   demonstração") ou pelo endereço ?demo=gerencia | producao | estoque.
+// EventFlow · dados da empresa de demonstração (Atlas Eventos & Locação)
+// Usado por gerar-sql.js para montar supabase/demo/empresa_demo.sql.
+// As datas saem como marcadores relativos ("@D:-3" = 3 dias atrás,
+// "@T:-1:14:30" = ontem às 14h30); o SQL converte para o dia em que rodar.
+const CATALOGO = (() => { const { itens, kits, frota } = require("../gerador/catalogo"); return { itens, kits, frota }; })();
+const { svg, tipos } = require("../gerador/desenhos");
+const DESENHOS = Object.fromEntries(tipos.map(t => [t, svg(t)]));
 
-   Como funciona: em vez do cliente do Supabase, o app recebe um banco
-   falso em memória com as mesmas tabelas e funções que ele usa. As telas
-   carregam pelo caminho normal; nada sai do navegador e tudo volta ao
-   início ao sair ou trocar de perfil.
-
-   Este bloco é gerado por exemplos/demo/montar.js — edite lá, não aqui.
-   ===================================================================== */
-(function(){
-const PAPEIS=["gerencia","producao","estoque"];
-let papel=null;
-try{
-  const q=new URLSearchParams(location.search).get("demo");
-  if(q&&PAPEIS.includes(q)) sessionStorage.setItem("ef-demo",q);
-  papel=sessionStorage.getItem("ef-demo");
-}catch(e){}
-var limparUrl=()=>{try{const u=new URL(location.href);u.searchParams.delete("demo");history.replaceState(null,"",u.pathname+u.search+u.hash);}catch(e){}};
-window.EF_DEMO={
-  ativo:PAPEIS.includes(papel), papel:PAPEIS.includes(papel)?papel:null,
-  entrar(p){try{sessionStorage.setItem("ef-demo",p);}catch(e){} limparUrl(); location.reload();},
-  sair(){try{sessionStorage.removeItem("ef-demo");}catch(e){} limparUrl(); location.reload();}
-};
-if(!EF_DEMO.ativo) return;
-limparUrl();   /* o endereço fica limpo; a demonstração segue nesta aba até sair */
-
-/* ---------------- catálogo e ilustrações ---------------- */
-const CATALOGO=__CATALOGO__;
-const DESENHOS=__DESENHOS__;
-
+module.exports = function dadosDemo(){
 /* ---------------- utilidades ---------------- */
-const HOJE=new Date().toISOString().slice(0,10);
-const d=n=>{const x=new Date(HOJE+"T12:00:00");x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
-const ts=(n,h)=>{const [a,b]=String(h||"10:00").split(":");return d(Math.trunc(n))+"T"+String(+a||0).padStart(2,"0")+":"+String(+b||0).padStart(2,"0")+":00";};
+const d=n=>"@D:"+Math.round(n);
+const ts=(n,h)=>{const [a,b]=String(h||"10:00").split(":");return "@T:"+Math.trunc(n)+":"+String(+a||0).padStart(2,"0")+":"+String(+b||0).padStart(2,"0");};
+const dn=t=>+String(t).split(":")[1];   /* marcador → número de dias a partir de hoje */
 let semente=20261002;
 const rnd=()=>{semente=(semente*1103515245+12345)%2147483648;return semente/2147483648;};
 const id=(p,n)=>p+"0000000-0000-4000-8000-"+String(n).padStart(12,"0");
@@ -70,7 +45,7 @@ const P=[
 ].map((x,i)=>({id:id("a",i+1),papel:x[0],nome:x[1],cargo:x[2],cor:x[3],ativo:true,empresa_id:EMP,
   email:x[1].toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(" ",".")+"@atlas-demo.com.br"}));
 const pessoa=nome=>P.find(p=>p.nome.startsWith(nome)).id;
-const EU=P.find(p=>p.papel===papel);   /* primeira pessoa de cada nível */
+const EU=P[0];   /* a dona da conta de gerência */
 const G1=pessoa("Marina"),G2=pessoa("Ricardo"),G3=pessoa("Helena"),G4=pessoa("Fábio");
 const PR=["Lucas","Camila","Diego","Juliana"].map(pessoa),P3D=pessoa("Patrícia"),ENG=pessoa("Bruno"),SOM=pessoa("Rafael"),LUZ=pessoa("Tiago");
 const E1=pessoa("André"),E2=pessoa("Sérgio"),E3=pessoa("Wesley"),EMAN=pessoa("Gabriel"),ELOG=pessoa("Renata"),MOT=pessoa("Márcio");
@@ -82,8 +57,7 @@ const it=c=>itens.find(i=>i.cod===c)||{cod:c,nome:c,categoria:"Extras",diaria:0}
 const kits=CATALOGO.kits.map(k=>({cod:k[0],nome:k[1],categoria:k[2],observacao:k[3],kit_itens:k[4].map(x=>({item_cod:x[0],quantidade:x[1]}))}));
 const frota=CATALOGO.frota.map(f=>({cod:f[0],nome:f[1],tipo:f[2],placa:f[3],capacidade_kg:f[4],capacidade_cases:f[5],lugares:f[6],
   em_manutencao:f[7]==="sim",observacao:f[8]||""}));
-const svgUrl=t=>"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(DESENHOS[t]||DESENHOS.rack||"");
-const fotos=itens.filter(i=>DESENHOS[i.desenho]).map(i=>({empresa_id:EMP,item_cod:i.cod,imagem:svgUrl(i.desenho)}));
+const fotos=itens.filter(i=>DESENHOS[i.desenho]).map(i=>({item_cod:i.cod,desenho:i.desenho}));
 itens.forEach(i=>delete i.desenho);
 
 /* ---------------- clientes ---------------- */
@@ -140,7 +114,7 @@ function linhasOrc(lista,dias,ambPlen){
 function negocio(o){
   const etapa=o.etapa, ix=ETP.indexOf(etapa), nId=id("d",negocios.length+1);
   const plen=nid("2");
-  const dias=Math.max(1,(new Date(o.desm)-new Date(o.mont))/86400000+1);
+  const dias=Math.max(1,dn(o.desm)-dn(o.mont)+1);
   const lin=linhasOrc(o.itens||[],dias,plen);
   if(o.externos) o.externos.forEach((x,k)=>lin.push({id:nid("1"),ordem:lin.length+k,tipo:"externo",item_cod:null,descricao:x[0],categoria:x[1],
     quantidade:1,diarias:1,valor_unitario:x[2],cobranca:"fechado",fornecedor:x[3]||"",observacao:"",ambiente_id:plen}));
@@ -334,8 +308,8 @@ negocio({titulo:"Lançamento app Conecta+",cli:cli("Conecta"),etapa:"qualificaca
 const cargas=[], movs=[];
 function romaneio(os){const m={};os.os_itens.forEach(i=>{m[i.item_cod]=(m[i.item_cod]||0)+i.quantidade;});return Object.entries(m).map(([c,q])=>({item_cod:c,descricao:it(c).nome,quantidade:q,observacao:null}));}
 function carga(os,status,veic,equipe,obs){
-  const c={id:id("k",cargas.length+1),codigo:"OSC-"+String(++seqOSC).padStart(4,"0"),os_id:os.id,evento_avulso:null,status,data_carga:d(-1+((new Date(os.montagem)-new Date(HOJE))/86400000)),
-    hora_carga:"07:00",data_descarga:d(1+((new Date(os.desmontagem)-new Date(HOJE))/86400000)),veiculo:veic,equipe:equipe||"",observacao:obs||"",osc_itens:romaneio(os)};
+  const c={id:id("k",cargas.length+1),codigo:"OSC-"+String(++seqOSC).padStart(4,"0"),os_id:os.id,evento_avulso:null,status,data_carga:d(dn(os.montagem)-1),
+    hora_carga:"07:00",data_descarga:d(dn(os.desmontagem)+1),veiculo:veic,equipe:equipe||"",observacao:obs||"",osc_itens:romaneio(os)};
   cargas.push(c);
   if(status==="Carregada"||status==="Retornada"){
     movs.push({id:nid("m"),codigo:"MOV-"+(++seqMov),data:c.data_carga,tipo:"SAIDA",ordem_carga_id:c.id,referencia:os.evento,usuario_id:E2,
@@ -414,7 +388,7 @@ const compromissos=[
 const notificacoes=[
  ["Nova nota de reembolso no Congresso Paulista de Cardiologia (R$ 412,00).",["gerencia"],"reembolsos",null,-0.2],
  ["Ordem de carga OSC-0091 em separação para a Convenção Meridiano.",["gerencia","producao","estoque"],"cargas",null,-0.5],
- ["Pedido de sublocação recebido da Sonora Locações: 6 caixas RCF para o dia "+d(6).slice(8,10)+"/"+d(6).slice(5,7)+".",["gerencia","estoque"],"parceiros",null,-0.6],
+ ["Pedido de sublocação recebido da Sonora Locações: 6 caixas RCF para a próxima semana.",["gerencia","estoque"],"parceiros",null,-0.6],
  ["Negócio Fórum Conecta Saúde 2027 avançou para Fechamento.",["gerencia","producao"],"crm",null,-1],
  ["Projeto 3D do Lançamento Jardins enviado ao cliente.",["gerencia","producao"],"crm",null,-2],
  ["2 contas a pagar vencem nesta semana.",["gerencia"],"contas",null,-0.1]
@@ -459,7 +433,7 @@ const conta=(tipo,desc,cat,contra,venc,valor,pago,extra)=>contas.push(Object.ass
   emissao:d(Math.min(venc,0)-20),vencimento:d(venc),valor,pago_em:pago!=null?d(pago):null,valor_pago:pago!=null?valor:null,forma:pago!=null?"Pix":"Boleto",
   os_id:null,sublocacao_id:null,reembolso_id:null,parcela:null,observacao:""},extra||{}));
 ordens.forEach(o=>{const c=CL.find(x=>x.id===o.cliente_id).nome, v=o.valor;
-  const ini=(new Date(o.montagem)-new Date(HOJE))/86400000;
+  const ini=dn(o.montagem);
   conta("receber","Sinal 50% · "+o.evento,"Sinal / entrada",c,Math.round(ini)-20,Math.round(v/2),ini-20<0?Math.round(ini)-21:null,{os_id:o.id,parcela:"1/2"});
   conta("receber","Saldo 50% · "+o.evento,"Saldo do evento",c,Math.round(ini)-5,v-Math.round(v/2),ini-5<-3?Math.round(ini)-6:null,{os_id:o.id,parcela:"2/2"});});
 conta("pagar","Sublocação SUB-2610-002 · 8 moving beam","Sublocação","Sonora Locações",14,6400,null,{sublocacao_id:sublocs[0].id});
@@ -497,145 +471,7 @@ canal("grupo","Estoque e manutenção",[E1,E2,E3,EMAN,ELOG,MOT,G4,EU.id],[
 const dm=EU.id===G1?G2:G1;
 canal("dm","",[EU.id,dm],[[dm,"Consegue revisar a proposta da Premiação Kairos até amanhã?",-1,"18:00"],[EU.id,"Consigo sim, te mando de manhã.",-1,"18:10"]]);
 
-/* ---------------- histórico de alterações (auditoria) ---------------- */
-const auditoria=[
- [0,"09:42",P.find(p=>p.id===PR[0]),"UPDATE","ordens_venda",OSN("Congresso Paulista").codigo+" · status",{status:"Em produção"},{status:"Liberada"}],
- [0,"08:15",P.find(p=>p.id===E2),"UPDATE","ordens_carga","OSC-0090 · carregada",{status:"Em separação"},{status:"Carregada"}],
- [-1,"17:30",P.find(p=>p.id===G3),"INSERT","contas","Diesel da frota",null,{valor:9850,vencimento:d(-2)}],
- [-1,"11:05",P.find(p=>p.id===G2),"UPDATE","negocios","Fórum Conecta Saúde 2027 · etapa",{etapa:"orcamento"},{etapa:"fechamento"}],
- [-2,"16:20",P.find(p=>p.id===E1),"UPDATE","itens","Quantidade em manutenção",{em_manutencao:0},{em_manutencao:2}],
- [-3,"10:00",P.find(p=>p.id===G1),"INSERT","clientes","Conecta Saúde Seguros",null,{nome:"Conecta Saúde Seguros",tipo:"Corporativo"}],
- [-4,"14:12",P.find(p=>p.id===PR[3]),"UPDATE","reembolsos","Frete de painéis",{status:"Enviado"},{status:"Recusado"}],
- [-6,"09:30",P.find(p=>p.id===G4),"DELETE","compromissos","Reunião cancelada",{titulo:"Alinhamento fornecedores"},null]
-].map((a,i)=>({id:i+1,ocorrido_em:ts(a[0],a[1]),autor_nome:a[2].nome,autor_papel:a[2].papel,operacao:a[3],tabela:a[4],registro:a[5],resumo:a[5],antes:a[6],depois:a[7]}));
 
-/* ---------------- tabelas ---------------- */
-const DB={
-  perfis:P, clientes:CL, v_itens:itens, itens, kits, frota,
-  v_negocios:negocios, negocios, v_ordens_venda:ordens, ordens_venda:ordens,
-  ordens_carga:cargas, movimentos:movs, canais:[], mensagens:[], posts, notas, compromissos, notificacoes,
-  v_freelancers:FR, freelancers:FR, reembolsos:RB,
-  parceiros, sublocacoes:sublocs, contas, item_fotos:fotos, organograma_miro:[]
+return {EMPRESA, PARC_EMP, P, CL, FR, itens, kits, frota, fotos, negocios, ordens, cargas, movs, RB, posts, notas, compromissos,
+  notificacoes, parceiros, sublocs, contas, chat, DESENHOS};
 };
-
-/* ---------------- banco falso ---------------- */
-const ok=data=>({data,error:null});
-const falha=m=>({data:null,error:{code:"DEMO",message:m}});
-const agora=()=>new Date().toISOString();
-const uuid=()=>(crypto.randomUUID?crypto.randomUUID():nid("f"));
-function consulta(tab){
-  const st={op:"select",filtros:[],payload:null,single:null,range:null,limit:null};
-  const linhas=()=>DB[tab]||(DB[tab]=[]);
-  const casa=r=>st.filtros.every(f=>f(r));
-  const exec=()=>{
-    const t=linhas();
-    if(st.op==="select"){
-      let r=t.filter(casa);
-      if(st.range) r=r.slice(st.range[0],st.range[1]+1);
-      if(st.limit!=null) r=r.slice(0,st.limit);
-      r=JSON.parse(JSON.stringify(r));
-      if(st.single) return ok(r[0]||null);
-      return ok(r);
-    }
-    let out=[];
-    const lista=[].concat(st.payload||[]);
-    if(st.op==="insert"||st.op==="upsert"){
-      lista.forEach(p=>{const x=Object.assign({id:p.id||uuid(),criado_em:agora()},p);
-        const k=x.id?t.findIndex(r=>r.id===x.id):-1;
-        if(k>=0) t[k]=Object.assign(t[k],x); else t.push(x); out.push(x);});
-    }else if(st.op==="update"){
-      t.filter(casa).forEach(r=>{Object.assign(r,st.payload);out.push(r);});
-    }else if(st.op==="delete"){
-      for(let k=t.length-1;k>=0;k--) if(casa(t[k])){out.push(t[k]);t.splice(k,1);}
-    }
-    out=JSON.parse(JSON.stringify(out));
-    return ok(st.single?out[0]||null:out);
-  };
-  const o={
-    select(){return o;}, insert(p){st.op="insert";st.payload=p;return o;}, upsert(p){st.op="upsert";st.payload=p;return o;},
-    update(p){st.op="update";st.payload=p;return o;}, delete(){st.op="delete";return o;},
-    eq(c,v){st.filtros.push(r=>r[c]===v);return o;}, neq(c,v){st.filtros.push(r=>r[c]!==v);return o;},
-    in(c,a){st.filtros.push(r=>(a||[]).includes(r[c]));return o;}, is(c,v){st.filtros.push(r=>(r[c]==null)===(v==null));return o;},
-    gt(){return o;},gte(){return o;},lt(){return o;},lte(){return o;},like(){return o;},ilike(){return o;},not(){return o;},or(){return o;},
-    match(){return o;},filter(){return o;},contains(){return o;},textSearch(){return o;},order(){return o;},
-    limit(n){st.limit=n;return o;}, range(a,b){st.range=[a,b];return o;},
-    single(){st.single=true;return o;}, maybeSingle(){st.single=true;return o;},
-    then(res,rej){return Promise.resolve().then(exec).then(res,rej);}
-  };
-  return o;
-}
-
-/* conversas do chat no formato das funções do banco */
-function chatLista(){
-  return chat.canais.filter(c=>c.membros.some(m=>m.perfil_id===EU.id)).map(c=>{
-    const ms=chat.msgs.filter(m=>m.canal_id===c.id).sort((a,b)=>a.criado_em<b.criado_em?-1:1);
-    const eu=c.membros.find(m=>m.perfil_id===EU.id);
-    return Object.assign(JSON.parse(JSON.stringify(c)),{ultima:ms.length?JSON.parse(JSON.stringify(ms[ms.length-1])):null,
-      novas:ms.filter(m=>m.autor_id!==EU.id&&m.criado_em>(eu.lido_em||"")).length});});
-}
-const RPC={
-  plataforma_owner:()=>ok(false),
-  contexto_empresa:()=>ok(EMPRESA),
-  meu_perfil_completo:()=>ok(Object.assign({telefone:"(11) 99000-0000",whatsapp:"(11) 99000-0000",cidade:"São Paulo",estado:"SP",avatar_path:null},EU)),
-  salvar_meu_perfil:a=>{Object.assign(EU,a&&a.p_dados||{});return ok(true);},
-  pessoas_online:()=>ok(P.filter((p,i)=>i%3!==2).map((p,i)=>({nome:p.nome,cargo:p.cargo,papel:p.papel,email:p.email,visto_em:new Date(Date.now()-i*9000).toISOString()}))),
-  registrar_presenca:()=>ok(true),
-  listar_auditoria:a=>ok(auditoria.filter(r=>(!a.p_tabela||r.tabela===a.p_tabela)&&(!a.p_acao||r.operacao===a.p_acao)&&
-    (!a.p_busca||JSON.stringify(r).toLowerCase().includes(String(a.p_busca).toLowerCase())))),
-  empresa_por_codigo:a=>ok(a&&a.p_id===PARC_EMP?"Sonora Locações":null),
-  importar_inventario:a=>{const l=(a&&a.p_itens)||[];return ok({criados:l.length,atualizados:0});},
-  chat_listar:()=>ok(chatLista()),
-  chat_mensagens:a=>{let ms=chat.msgs.filter(m=>m.canal_id===a.p_canal);
-    if(a.p_busca) ms=ms.filter(m=>(m.texto||"").toLowerCase().includes(a.p_busca.toLowerCase()));
-    if(a.p_antes) ms=ms.filter(m=>m.criado_em<a.p_antes);
-    const c=chat.canais.find(x=>x.id===a.p_canal);if(c){const m=c.membros.find(x=>x.perfil_id===EU.id);if(m)m.lido_em=agora();}
-    return ok(JSON.parse(JSON.stringify(ms.sort((x,y)=>x.criado_em<y.criado_em?1:-1).slice(0,100))));},
-  chat_enviar:a=>{chat.msgs.push({id:a.p_id||uuid(),canal_id:a.p_canal,autor_id:EU.id,texto:a.p_texto||"",criado_em:agora(),editado_em:null,apagado:false,anexo:a.p_anexo||null,resposta_id:a.p_resposta||null});return ok(true);},
-  chat_editar:a=>{const m=chat.msgs.find(x=>x.id===a.p_id);if(m){if(a.p_apagar)m.apagado=true;else{m.texto=a.p_texto;m.editado_em=agora();}}return ok(true);},
-  chat_criar:a=>{const c=canal(a.p_direta?"dm":"grupo",a.p_nome||"",[EU.id,...(a.p_membros||[])],[],0);c.criado_em=agora();return ok(c.id);},
-  chat_gerenciar:a=>{const c=chat.canais.find(x=>x.id===a.p_canal);if(!c)return ok(true);
-    if(a.p_acao==="nome")c.nome=a.p_nome;else if(a.p_acao==="adicionar"&&a.p_pessoa)c.membros.push({perfil_id:a.p_pessoa,admin:false,lido_em:null});
-    else if(a.p_acao==="remover")c.membros=c.membros.filter(m=>m.perfil_id!==a.p_pessoa);
-    else if(a.p_acao==="sair")c.membros=c.membros.filter(m=>m.perfil_id!==EU.id);
-    else{const m=c.membros.find(x=>x.perfil_id===a.p_pessoa);if(m)m.admin=a.p_acao==="promover";}
-    return ok(true);},
-  chat_ligar:()=>falha("Chamadas de voz e vídeo não funcionam na demonstração."),
-  chat_chamada_acao:()=>ok(true), chat_sinal:()=>ok(true), chat_telefonia:()=>falha("Indisponível na demonstração."),
-  /* operações de estoque: no banco real são transações; aqui mexem direto no estado do app */
-  gerar_ordem_carga:a=>{const S=window.__efS&&window.__efS();const o=S&&S.os.find(x=>x.id===a.p_os);if(!o)return falha("OS não encontrada.");
-    const it2=typeof romaneioDaOS==="function"?romaneioDaOS(o):o.itens;
-    const c={id:uuid(),codigo:"OSC-"+String(++seqOSC).padStart(4,"0"),osId:o.id,evento:"",status:"Liberada",carga:d(Math.round((new Date(o.montagem)-new Date(HOJE))/86400000)-1),
-      horaCarga:"07:00",descarga:d(Math.round((new Date(o.desmontagem)-new Date(HOJE))/86400000)+1),veiculo:"",equipe:"",conferente:"",obs:"",
-      itens:it2.map(i=>({cod:i.cod,nome:i.nome||"",qtd:i.qtd,obs:i.obs||""}))};
-    S.cargas.push(c);o.status="Liberada";return ok({id:c.id,codigo:c.codigo});},
-  confirmar_carga:a=>{const S=window.__efS&&window.__efS();const c=S&&S.cargas.find(x=>x.id===a.p_ordem);if(!c)return falha("Carga não encontrada.");
-    c.status="Carregada";S.movs.push({id:uuid(),codigo:"MOV-"+(++seqMov),data:HOJE,tipo:"SAÍDA",oscId:c.id,ref:c.codigo,quem:EU.id,user:EU.nome,
-      linhas:c.itens.filter(i=>i.cod).map(i=>[i.cod,i.qtd]),avarias:[]});return ok({data:HOJE});},
-  registrar_descarga:a=>{const S=window.__efS&&window.__efS();const c=S&&S.cargas.find(x=>x.id===a.p_ordem);if(!c)return falha("Carga não encontrada.");
-    const av=a.p_avarias||{};c.status="Retornada";
-    S.movs.push({id:uuid(),codigo:"MOV-"+(++seqMov),data:HOJE,tipo:"ENTRADA",oscId:c.id,ref:c.codigo,quem:EU.id,user:EU.nome,
-      linhas:c.itens.filter(i=>i.cod).map(i=>[i.cod,i.qtd]),avarias:Object.entries(av)});
-    Object.entries(av).forEach(([cod,q])=>{const i=S.cat.find(x=>x.cod===cod);if(i)i.manut=(i.manut||0)+q;});
-    return ok({data:HOJE});}
-};
-const canalFalso=()=>{const ch={on(){return ch;},subscribe(cb){if(typeof cb==="function")setTimeout(()=>cb("SUBSCRIBED"),0);return ch;},
-  track:async()=>"ok",untrack:async()=>"ok",send:async()=>"ok",presenceState:()=>({}),unsubscribe:async()=>"ok"};return ch;};
-const cliente={
-  auth:{
-    getUser:async()=>({data:{user:{id:EU.id,email:EU.email}},error:null}),
-    getSession:async()=>({data:{session:{user:{id:EU.id,email:EU.email}}},error:null}),
-    onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),
-    signInWithPassword:async()=>({data:null,error:{message:"Você está na demonstração. Saia dela para entrar com a sua conta."}}),
-    signOut:async()=>{try{sessionStorage.removeItem("ef-demo");}catch(e){} limparUrl();return {error:null};},
-    resetPasswordForEmail:async()=>({error:null}), updateUser:async()=>({data:{},error:null})
-  },
-  from:t=>consulta(t),
-  rpc:async(n,a)=>{const f=RPC[n];try{return f?f(a||{}):ok(null);}catch(e){return falha(e.message);}},
-  channel:()=>canalFalso(), removeChannel:async()=>"ok", removeAllChannels:async()=>[],
-  storage:{from:()=>({upload:async p=>ok({path:p}),remove:async()=>ok([]),createSignedUrl:async()=>ok({signedUrl:""}),
-    createSignedUrls:async l=>ok((l||[]).map(p=>({path:p,signedUrl:""}))),getPublicUrl:()=>({data:{publicUrl:""}})})},
-  functions:{invoke:async()=>({data:null,error:{message:"Indisponível na demonstração."}})}
-};
-window.supabase={createClient:()=>cliente};
-EF_DEMO.empresa=EMPRESA; EF_DEMO.eu=EU;
-})();

@@ -1,7 +1,5 @@
-/* EventFlow · modo demonstração */
-.demo-login{border-top:1px solid var(--line2);padding:16px 22px 18px;display:grid;gap:10px}
-.demo-login .demo-t{font-family:var(--disp);font-size:13px;font-weight:700}
-.demo-login p{margin:0;font-size:12px;line-height:1.5;color:var(--ink3)}
+/* EventFlow · página de demonstração */
+.demo-entrada{padding:18px 22px 22px;display:grid;gap:14px}
 .demo-niveis{display:grid;gap:8px}
 .demo-nivel{display:grid;gap:2px;text-align:left;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit;color:var(--ink);transition:border-color .15s,background .15s}
 .demo-nivel b{font-family:var(--disp);font-size:13px;font-weight:700}

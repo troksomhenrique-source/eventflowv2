@@ -7,7 +7,7 @@
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F1ED">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16171B">
 <meta name="description" content="EventFlow — ERP e CRM para locadora de eventos.">
-<title>EventFlow</title>
+<title>EventFlow · Demonstração</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -159,6 +159,33 @@ input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
 button:disabled{cursor:not-allowed;opacity:.6}
 @media(max-width:700px){.top{flex-wrap:wrap;height:auto;min-height:60px;padding:12px}.sync-status{padding:9px 16px}.modal{width:calc(100vw - 24px);max-height:90dvh}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+<style id="v6-demo-css">
+/* EventFlow · página de demonstração */
+.demo-entrada{padding:18px 22px 22px;display:grid;gap:14px}
+.demo-niveis{display:grid;gap:8px}
+.demo-nivel{display:grid;gap:2px;text-align:left;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit;color:var(--ink);transition:border-color .15s,background .15s}
+.demo-nivel b{font-family:var(--disp);font-size:13px;font-weight:700}
+.demo-nivel span{font-size:11.5px;color:var(--ink3);line-height:1.4}
+.demo-nivel:hover,.demo-nivel:focus-visible{border-color:var(--accent);background:var(--accentSoft)}
+.demo-faixa{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border-radius:14px;
+  background:var(--accentSoft);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);color:var(--ink);font-size:12.5px;line-height:1.45}
+.demo-faixa .demo-txt{flex:1 1 320px;min-width:0}
+.demo-faixa .demo-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.demo-seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:2px;gap:2px}
+.demo-seg button{background:none;border:0;border-radius:99px;padding:5px 11px;cursor:pointer;font:inherit;font-size:12px;font-weight:600;color:var(--ink2)}
+.demo-seg button.on{background:var(--accent);color:var(--onAccent)}
+.demo-curto{display:none}
+@media (max-width:600px){
+  .demo-faixa{padding:9px 10px;gap:8px;margin-bottom:12px;font-size:12px}
+  .demo-faixa .demo-txt{flex-basis:100%}
+  .demo-longo{display:none}
+  .demo-curto{display:inline}
+  .demo-faixa .demo-acoes{width:100%;flex-wrap:nowrap}
+  .demo-seg{flex:1;min-width:0}
+  .demo-seg button{flex:1;padding:6px 2px;font-size:11.5px}
+}
+@media print{.demo-faixa{display:none!important}}
 </style>
 </head>
 <body>
@@ -10550,6 +10577,73 @@ document.addEventListener("keydown",ev=>{if(!OWN.on||(ev.key!=="Enter"&&ev.key!=
 /* “Atualizar” do topo recarrega a lista da plataforma */
 document.addEventListener("click",ev=>{if(!OWN.on) return;const b=ev.target.closest('[data-act="recarregar"]');if(b){ev.stopImmediatePropagation();carregar("Lista atualizada.");}},true);
 const css=document.createElement("style");css.textContent="@media (max-width:900px){#owGrade{grid-template-columns:minmax(0,1fr)!important}}";document.head.appendChild(css);
+})();
+</script>
+<script id="v6-demo">
+/* EventFlow · página de demonstração
+   Entra com um clique nos logins da empresa de demonstração (banco real,
+   empresa separada). Gerado por exemplos/demo/montar.js — edite lá. */
+(function(){
+const CFG={"senha":"Demo@2026","logins":{"gerencia":"gerencia@atlas.example.com","producao":"producao@atlas.example.com","estoque":"estoque@atlas.example.com"}};
+const NIVEIS=[["gerencia","Gerência","Tudo: comercial, valores, financeiro e equipe"],
+  ["producao","Produção","Negócios, OS, memoriais e escalas, sem financeiro"],
+  ["estoque","Estoque","Inventário, cargas, frota e sublocação"]];
+const TROCA="ef-demo-trocar";
+const lerTroca=()=>{try{const p=sessionStorage.getItem(TROCA);sessionStorage.removeItem(TROCA);return p;}catch(e){return null;}};
+
+async function entrar(papel){
+  telaCarregando("Abrindo a demonstração…");
+  try{
+    const {error}=await sb.auth.signInWithPassword({email:CFG.logins[papel],password:CFG.senha});
+    if(error) return telaLogin(error.message==="Invalid login credentials"
+      ?"A demonstração ainda não foi preparada neste banco (rode o empresa_demo.sql no Supabase)."
+      :"Não foi possível abrir a demonstração: "+error.message);
+    await iniciar();
+  }catch(e){telaLogin("Não foi possível abrir a demonstração: "+mensagemErro(e));}
+}
+
+/* tela de entrada: em vez de e-mail e senha, três botões */
+const _login=telaLogin;
+telaLogin=function(msg){
+  const r=_login.apply(this,arguments);
+  const pend=lerTroca();
+  if(pend&&CFG.logins[pend]){entrar(pend);return r;}
+  const card=document.querySelector("#authHost .authcard"),form=card&&card.querySelector("#formLogin");
+  if(form){
+    form.outerHTML=`<div class="demo-entrada"><div><h2>Conheça o EventFlow</h2>
+      <p class="sub">Uma locadora de grande porte já preenchida: equipe, inventário com fotos, negócios, ordens de serviço, cargas, financeiro e parceiros. Escolha com qual nível de acesso quer entrar.</p></div>
+      ${msg?`<div class="erro">${esc(msg)}</div>`:""}
+      <div class="demo-niveis">${NIVEIS.map(n=>`<button type="button" class="demo-nivel" data-demo="${n[0]}"><b>${n[1]}</b><span>${n[2]}</span></button>`).join("")}</div></div>`;
+    const f=card.querySelector("footer");
+    if(f) f.innerHTML="Ambiente de demonstração com dados fictícios. Outros visitantes também usam esta empresa, e os dados voltam ao original periodicamente.";
+  }
+  return r;
+};
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest("[data-demo]");if(!b) return;
+  ev.preventDefault();
+  const p=b.dataset.demo;
+  if(p==="sair"){sair();return;}
+  if(!CFG.logins[p]) return;
+  if(document.getElementById("app").hidden) return entrar(p);
+  if(p===S.role) return;
+  /* troca de nível: sai desta conta e entra na outra assim que a página recarregar */
+  try{sessionStorage.setItem(TROCA,p);}catch(e){}
+  sair();
+});
+
+/* faixa no topo de cada tela */
+function faixa(){
+  const v=document.getElementById("view");if(!v||v.querySelector(".demo-faixa")||!S.perfilId) return;
+  const eu=(typeof me==="function"&&me())||{};
+  const el=document.createElement("div");el.className="demo-faixa";el.setAttribute("role","note");
+  el.innerHTML=`<div class="demo-txt"><b>Demonstração</b> · você está como <b>${esc(eu.nome||"")}</b><span class="demo-longo"> (${esc(eu.cargo||"")})</span>. Dados fictícios.</div>
+    <div class="demo-acoes"><div class="demo-seg" role="group" aria-label="Ver como">${NIVEIS.map(n=>`<button type="button" data-demo="${n[0]}" class="${n[0]===S.role?"on":""}" aria-pressed="${n[0]===S.role}">${n[1]}</button>`).join("")}</div>
+    <button type="button" class="btn sm ghost" data-demo="sair"><span class="demo-longo">Sair da demonstração</span><span class="demo-curto">Sair</span></button></div>`;
+  v.prepend(el);
+}
+const _render=render;
+render=function(){const r=_render.apply(this,arguments);faixa();return r;};
 })();
 </script>
 </body>
