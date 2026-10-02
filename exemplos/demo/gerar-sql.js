@@ -97,7 +97,8 @@ add("post_comentarios", D.posts.flatMap(p => p.post_comentarios.map(c => ({ post
 add("notificacoes", D.notificacoes.map(n => so(n, ["id", "texto", "tipo", "destino", "tela", "referencia", "criado_em"])));
 
 add("canais", D.chat.canais.map(c => ({ id: c.id, tipo: c.tipo === "dm" ? "dm" : "@GRUPO", nome: c.nome || null, criado_em: c.criado_em, criado_por: G1 })));
-add("canal_membros", D.chat.canais.flatMap(c => c.membros.map(m => ({ canal_id: c.id, perfil_id: m.perfil_id, admin: m.admin, lido_em: m.lido_em }))));
+add("canal_membros", D.chat.canais.flatMap(c => c.membros.filter((m, k, l) => l.findIndex(x => x.perfil_id === m.perfil_id) === k)
+  .map(m => ({ canal_id: c.id, perfil_id: m.perfil_id, admin: m.admin, lido_em: m.lido_em }))));
 add("mensagens", D.chat.msgs.map(m => ({ id: m.id, canal_id: m.canal_id, autor_id: m.autor_id, texto: m.texto, sistema: false, criado_em: m.criado_em })));
 
 add("parceiros", D.parceiros.map(p => { const x = { ...p }; delete x.empresa_id; return x; }));
@@ -329,7 +330,10 @@ begin
   insert into pg_temp.demo_res(tabela) values ('ordens_carga · status');
   for x in select * from jsonb_array_elements(${J(D.cargas.filter(c => c.status !== "Liberada").map(c => ({ id: c.id, status: c.status })))}) loop
     begin
-      update public.ordens_carga set status = x->>'status' where id = (x->>'id')::uuid;
+      /* o status é um tipo próprio do banco: converte pelo tipo da coluna */
+      update public.ordens_carga
+         set status = (select r.status from jsonb_populate_record(null::public.ordens_carga, jsonb_build_object('status', x->>'status')) r)
+       where id = (x->>'id')::uuid;
       update pg_temp.demo_res set ok = ok + 1 where tabela = 'ordens_carga · status';
     exception when others then
       update pg_temp.demo_res set falhas = falhas + 1, erro = coalesce(erro, sqlerrm) where tabela = 'ordens_carga · status';
