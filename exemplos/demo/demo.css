@@ -1,0 +1,27 @@
+/* EventFlow · modo demonstração */
+.demo-login{border-top:1px solid var(--line2);padding:16px 22px 18px;display:grid;gap:10px}
+.demo-login .demo-t{font-family:var(--disp);font-size:13px;font-weight:700}
+.demo-login p{margin:0;font-size:12px;line-height:1.5;color:var(--ink3)}
+.demo-niveis{display:grid;gap:8px}
+.demo-nivel{display:grid;gap:2px;text-align:left;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit;color:var(--ink);transition:border-color .15s,background .15s}
+.demo-nivel b{font-family:var(--disp);font-size:13px;font-weight:700}
+.demo-nivel span{font-size:11.5px;color:var(--ink3);line-height:1.4}
+.demo-nivel:hover,.demo-nivel:focus-visible{border-color:var(--accent);background:var(--accentSoft)}
+.demo-faixa{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border-radius:14px;
+  background:var(--accentSoft);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);color:var(--ink);font-size:12.5px;line-height:1.45}
+.demo-faixa .demo-txt{flex:1 1 320px;min-width:0}
+.demo-faixa .demo-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.demo-seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:2px;gap:2px}
+.demo-seg button{background:none;border:0;border-radius:99px;padding:5px 11px;cursor:pointer;font:inherit;font-size:12px;font-weight:600;color:var(--ink2)}
+.demo-seg button.on{background:var(--accent);color:var(--onAccent)}
+.demo-curto{display:none}
+@media (max-width:600px){
+  .demo-faixa{padding:9px 10px;gap:8px;margin-bottom:12px;font-size:12px}
+  .demo-faixa .demo-txt{flex-basis:100%}
+  .demo-longo{display:none}
+  .demo-curto{display:inline}
+  .demo-faixa .demo-acoes{width:100%;flex-wrap:nowrap}
+  .demo-seg{flex:1;min-width:0}
+  .demo-seg button{flex:1;padding:6px 2px;font-size:11.5px}
+}
+@media print{.demo-faixa{display:none!important}}
