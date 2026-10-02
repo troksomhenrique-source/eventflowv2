@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>EventFlow · ERP para locadoras de eventos</title>
+<meta name="description" content="EventFlow: comercial, produção técnica, estoque, cargas, financeiro e equipe de uma locadora de equipamentos para eventos num só lugar.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* mesmos tokens do sistema (v6) */
+:root{
+  --bg:#F2F1ED; --sf:#FFFFFF; --sf2:#F7F6F3; --ink:#26272C; --ink2:#52545C; --ink3:#767983; --ln:#E7E5DF; --ln2:#EFEDE8;
+  --acc:#4B5BD0; --acc2:#3F4EB8; --accS:#ECEEFB; --on:#FFFFFF;
+  --c2:#2FA38A; --c3:#E3A23B; --c4:#D9657B; --c5:#8C6FD6;
+  --okS:#E4F4EE; --ok:#22806B; --wS:#FBF0DA; --w:#8E6110;
+  --sh:0 1px 2px rgba(38,39,44,.04),0 8px 24px -8px rgba(38,39,44,.08);
+  --hero:linear-gradient(135deg,#5563D6 0%,#6B5BD0 55%,#7E63D2 100%);
+  --f:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:22px; --r2:12px; --rp:99px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#16171B; --sf:#1F2025; --sf2:#25262C; --ink:#E6E6EA; --ink2:#B4B5BE; --ink3:#8E909B; --ln:#2E2F36; --ln2:#272830;
+  --acc:#8D99F0; --acc2:#A3ADF4; --accS:#272A40; --on:#16171B; --c2:#5FCDB4; --c3:#EBB866; --c4:#EC8DA0; --c5:#B39BF0;
+  --okS:#1D3A33; --ok:#6FD3BB; --wS:#3B3120; --w:#EBC27A;
+  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px -8px rgba(0,0,0,.35);
+  --hero:linear-gradient(135deg,#3B46A3 0%,#4B3FA0 55%,#573FA3 100%); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#16171B; --sf:#1F2025; --sf2:#25262C; --ink:#E6E6EA; --ink2:#B4B5BE; --ink3:#8E909B; --ln:#2E2F36; --ln2:#272830;
+  --acc:#8D99F0; --acc2:#A3ADF4; --accS:#272A40; --on:#16171B; --c2:#5FCDB4; --c3:#EBB866; --c4:#EC8DA0; --c5:#B39BF0;
+  --okS:#1D3A33; --ok:#6FD3BB; --wS:#3B3120; --w:#EBC27A;
+  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px -8px rgba(0,0,0,.35);
+  --hero:linear-gradient(135deg,#3B46A3 0%,#4B3FA0 55%,#573FA3 100%); color-scheme:dark}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--f);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* topo */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--ln)}
+.top .wrap{display:flex;align-items:center;gap:22px;height:68px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;font-size:18px;letter-spacing:-.02em}
+.mk{width:32px;height:32px;border-radius:10px;background:var(--hero);display:grid;place-items:center;box-shadow:0 6px 16px -6px rgba(75,91,208,.6)}
+.top nav{display:flex;gap:4px;margin-left:12px}
+.top nav a{text-decoration:none;font-size:14px;font-weight:600;color:var(--ink2);padding:8px 12px;border-radius:var(--rp)}
+.top nav a:hover{background:var(--sf);color:var(--ink)}
+.grow{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 18px;border-radius:var(--rp);border:1px solid var(--ln);background:var(--sf);
+  font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:transform .15s,border-color .15s,background .15s}
+.btn:hover{border-color:var(--ink3)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--on)}
+.btn.pri:hover{background:var(--acc2);border-color:var(--acc2)}
+.btn.lg{height:50px;padding:0 24px;font-size:15px}
+.btn.ghost{background:none;border-color:transparent}
+.iconbtn{width:42px;padding:0}
+
+/* hero */
+.hero{padding:64px 0 40px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:48px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);background:var(--accS);padding:6px 12px;border-radius:var(--rp)}
+h1{font-size:clamp(34px,4.6vw,54px);line-height:1.06;letter-spacing:-.035em;margin:18px 0 16px;font-weight:800}
+h1 em{font-style:normal;background:var(--hero);-webkit-background-clip:text;background-clip:text;color:transparent;padding:0 .08em .06em 0;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.lead{font-size:18px;color:var(--ink2);max-width:540px;margin:0 0 28px}
+.ctas{display:flex;gap:10px;flex-wrap:wrap}
+.provas{display:flex;gap:22px;flex-wrap:wrap;margin-top:28px;color:var(--ink3);font-size:13.5px}
+.provas span{display:flex;align-items:center;gap:7px}
+.provas .ic{width:17px;height:17px;color:var(--ok)}
+
+/* mini painel (o mesmo visual do sistema) */
+.painel{background:var(--sf);border:1px solid var(--ln);border-radius:28px;box-shadow:var(--sh);padding:18px;display:grid;gap:12px}
+.painel .bar{display:flex;align-items:center;gap:8px;padding:2px 4px 6px}
+.painel .bar i{width:10px;height:10px;border-radius:50%;background:var(--ln)}
+.painel .bar b{margin-left:8px;font-size:13px}
+.kpis{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
+.kpi{background:var(--sf2);border-radius:18px;padding:14px}
+.kpi small{display:block;font-size:11.5px;color:var(--ink3);font-weight:600}
+.kpi strong{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:4px}
+.kpi.h{background:var(--hero);color:#fff}
+.kpi.h small{color:rgba(255,255,255,.8)}
+.kpi .ok{font-size:11.5px;color:var(--ok);font-weight:700}
+.kpi.h .ok{color:#fff;opacity:.85}
+.grafico{background:var(--sf2);border-radius:18px;padding:14px;display:flex;align-items:flex-end;gap:8px;height:150px}
+.grafico div{flex:1;border-radius:8px 8px 4px 4px;background:var(--accS);position:relative}
+.grafico div.on{background:var(--acc)}
+.linhas{display:grid;gap:8px}
+.linha{display:flex;align-items:center;gap:10px;background:var(--sf2);border-radius:14px;padding:10px 12px;font-size:13px}
+.linha .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;flex:none}
+.linha b{display:block;font-size:13px}
+.linha small{color:var(--ink3);font-size:11.5px}
+.pill{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:var(--rp);background:var(--okS);color:var(--ok);white-space:nowrap}
+.pill.w{background:var(--wS);color:var(--w)}
+
+/* seções */
+section{padding:56px 0}
+.sh{max-width:680px;margin-bottom:30px}
+.sh .eyebrow{margin-bottom:12px}
+h2{font-size:clamp(26px,3.2vw,38px);letter-spacing:-.03em;line-height:1.12;margin:0 0 10px;font-weight:800}
+.sh p{margin:0;color:var(--ink2);font-size:16.5px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);box-shadow:var(--sh);padding:22px}
+.vant .ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--accS);color:var(--acc);margin-bottom:14px}
+.vant h3{margin:0 0 6px;font-size:17px;letter-spacing:-.01em}
+.vant p{margin:0;color:var(--ink2);font-size:14.5px}
+.vant ul{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px;font-size:13.5px;color:var(--ink2)}
+.vant li{display:flex;gap:8px}
+.vant li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--acc);margin-top:8px;flex:none}
+.numeros{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
+.numeros .card{padding:20px 22px}
+.numeros strong{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em}
+.numeros span{color:var(--ink3);font-size:13.5px}
+
+/* planos */
+.ciclo{display:inline-flex;background:var(--sf);border:1px solid var(--ln);border-radius:var(--rp);padding:4px;gap:4px;margin-bottom:24px}
+.ciclo button{border:0;background:none;border-radius:var(--rp);padding:9px 18px;font-weight:700;font-size:14px;cursor:pointer;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.ciclo button.on{background:var(--acc);color:var(--on)}
+.ciclo .tagd{font-size:11px;background:var(--okS);color:var(--ok);padding:2px 8px;border-radius:var(--rp)}
+.ciclo button.on .tagd{background:rgba(255,255,255,.22);color:inherit}
+.planos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
+.plano{display:flex;flex-direction:column;gap:14px;position:relative}
+.plano.dest{border:2px solid var(--acc);box-shadow:0 20px 40px -20px rgba(75,91,208,.45)}
+.plano .selo{position:absolute;top:-13px;left:22px;background:var(--hero);color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:5px 12px;border-radius:var(--rp)}
+.plano h3{margin:0;font-size:19px}
+.plano .para{color:var(--ink3);font-size:13.5px;margin:-8px 0 0}
+.preco{display:flex;align-items:baseline;gap:4px}
+.preco b{font-size:40px;font-weight:800;letter-spacing:-.04em}
+.preco span{color:var(--ink3);font-size:14px;font-weight:600}
+.preco-sub{color:var(--ink3);font-size:12.5px;margin-top:-10px;min-height:19px}
+.plano ul{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14px;flex:1}
+.plano li{display:flex;gap:9px;align-items:flex-start}
+.plano li .ic{width:18px;height:18px;color:var(--ok);margin-top:2px}
+.plano li.nao{color:var(--ink3)}
+.plano li.nao .ic{color:var(--ink3)}
+.obs-planos{margin-top:16px;color:var(--ink3);font-size:13px}
+
+/* compra */
+.compra{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start}
+.etapa{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.etapa .n{width:28px;height:28px;border-radius:50%;background:var(--accS);color:var(--acc);display:grid;place-items:center;font-weight:800;font-size:13px}
+.etapa h3{margin:0;font-size:16px}
+.bloco+.bloco{border-top:1px solid var(--ln2);margin-top:22px;padding-top:22px}
+.escolhas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.escolha{border:1.5px solid var(--ln);border-radius:16px;padding:12px 14px;cursor:pointer;background:var(--sf);text-align:left;display:grid;gap:2px;transition:border-color .15s,background .15s}
+.escolha b{font-size:14.5px}
+.escolha small{color:var(--ink3);font-size:12.5px}
+.escolha.on{border-color:var(--acc);background:var(--accS)}
+.campos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.campo{display:grid;gap:6px}
+.campo.w{grid-column:1/-1}
+.campo label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
+.campo input,.campo select{height:44px;border:1px solid var(--ln);border-radius:var(--r2);background:var(--sf2);padding:0 12px;outline:none;width:100%}
+.campo input:focus,.campo select:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--accS);background:var(--sf)}
+.campo input[aria-invalid="true"]{border-color:var(--c4)}
+.usuarios{display:flex;align-items:center;gap:12px}
+.usuarios input[type=range]{flex:1;accent-color:var(--acc);height:auto;border:0;background:none;padding:0;box-shadow:none}
+.usuarios output{min-width:84px;text-align:right;font-weight:800}
+.dica{color:var(--ink3);font-size:12.5px;margin:8px 0 0}
+.resumo{position:sticky;top:90px;display:grid;gap:14px}
+.resumo h3{margin:0;font-size:16px}
+.res-linhas{display:grid;gap:9px;font-size:14px}
+.res-linhas div{display:flex;justify-content:space-between;gap:12px}
+.res-linhas span{color:var(--ink2)}
+.res-linhas .desc b{color:var(--ok)}
+.total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--ln2);padding-top:14px}
+.total b{font-size:28px;font-weight:800;letter-spacing:-.03em}
+.total small{color:var(--ink3);font-size:12.5px;display:block}
+.seguro{display:flex;gap:10px;align-items:flex-start;background:var(--sf2);border-radius:14px;padding:12px;font-size:12.5px;color:var(--ink2)}
+.seguro .ic{color:var(--ok)}
+.erro{color:var(--c4);font-size:13px;font-weight:600;min-height:18px;margin:0}
+.ok-envio{background:var(--okS);color:var(--ok);border-radius:14px;padding:12px 14px;font-size:13.5px;font-weight:600}
+
+/* perguntas e rodapé */
+.faq{display:grid;gap:10px;max-width:820px}
+details{background:var(--sf);border:1px solid var(--ln);border-radius:18px;padding:16px 20px}
+summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--acc);font-size:20px;line-height:1}
+details[open] summary::after{content:"−"}
+details p{margin:10px 0 0;color:var(--ink2);font-size:14.5px}
+.final{background:var(--hero);color:#fff;border-radius:28px;padding:40px;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.final h2{color:#fff;margin:0}
+.final p{margin:6px 0 0;opacity:.85}
+.final .btn{background:#fff;color:#3F4EB8;border-color:#fff}
+.final .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+footer{padding:36px 0 48px;color:var(--ink3);font-size:13px}
+footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+
+/* responsivo */
+@media (max-width:980px){
+  .hero,.compra{grid-template-columns:minmax(0,1fr)}
+  .hero{padding-top:36px;gap:32px}
+  .grid3,.planos{grid-template-columns:minmax(0,1fr)}
+  .numeros{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .resumo{position:static}
+  .top nav{display:none}
+}
+@media (max-width:600px){
+  .wrap{padding:0 16px}
+  .top .wrap{height:60px;gap:10px}
+  .top .btn:not(.pri):not(.iconbtn){display:none}
+  section{padding:40px 0}
+  .lead{font-size:16px}
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpis .kpi.h{grid-column:1/-1}
+  .escolhas,.campos{grid-template-columns:minmax(0,1fr)}
+  .card{padding:18px}
+  .final{padding:28px}
+  .ciclo{display:flex;width:100%}
+  .ciclo button{flex:1;justify-content:center;padding:9px 8px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></symbol>
+  <symbol id="i-funil" viewBox="0 0 24 24"><path d="M3.5 5h17l-6.5 7.5v5L10 20v-7.5z"/></symbol>
+  <symbol id="i-regua" viewBox="0 0 24 24"><path d="M3 16.5L16.5 3l4.5 4.5L7.5 21z"/><path d="M7 12.5l2 2M10 9.5l2 2M13 6.5l2 2"/></symbol>
+  <symbol id="i-caixa" viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></symbol>
+  <symbol id="i-caminhao" viewBox="0 0 24 24"><path d="M2.5 6h11v10h-11zM13.5 9.5h4L21 13v3h-7.5"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></symbol>
+  <symbol id="i-carteira" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-maos" viewBox="0 0 24 24"><path d="M3 12l4-4 4 2 3-3 3 1 4 4"/><path d="M7 8l-1 6 4 4 2-1 2 2 2-1 2-3-3-4"/></symbol>
+  <symbol id="i-cel" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="3"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.5-3.2 8.2-7.5 9.5-4.3-1.3-7.5-5-7.5-9.5V6z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></symbol>
+  <symbol id="i-lua" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></symbol>
+  <symbol id="i-seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.8v6.4l5.2-3.2z"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#inicio" aria-label="EventFlow, início">
+      <span class="mk"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h6M2.5 8h8.5M2.5 11.5h6"/><path d="M11.2 4.6L14 8l-2.8 3.4"/></svg></span>
+      EventFlow
+    </a>
+    <nav aria-label="Seções"><a href="#vantagens">Vantagens</a><a href="#planos">Planos</a><a href="#comprar">Comprar</a><a href="#perguntas">Dúvidas</a></nav>
+    <div class="grow"></div>
+    <button class="btn iconbtn ghost" id="tema" type="button" aria-label="Alternar tema claro e escuro"><svg class="ic"><use href="#i-lua"/></svg></button>
+    <a class="btn" data-link="demo" href="#" target="_blank" rel="noopener">Ver demonstração</a>
+    <a class="btn pri" href="#planos">Assinar</a>
+  </div>
+</header>
+
+<main id="inicio">
+  <div class="wrap hero">
+    <div>
+      <span class="eyebrow">ERP + CRM para locadoras de eventos</span>
+      <h1>Do orçamento à volta do caminhão, <em>tudo num só lugar</em>.</h1>
+      <p class="lead">O EventFlow junta comercial, produção técnica, estoque, cargas, financeiro e equipe. Sem planilha perdida, sem equipamento em dois eventos ao mesmo tempo.</p>
+      <div class="ctas">
+        <a class="btn pri lg" href="#planos">Ver planos e preços <svg class="ic"><use href="#i-seta"/></svg></a>
+        <a class="btn lg" data-link="demo" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-play"/></svg> Testar a demonstração</a>
+      </div>
+      <div class="provas">
+        <span><svg class="ic"><use href="#i-check"/></svg>Sem instalação</span>
+        <span><svg class="ic"><use href="#i-check"/></svg>Funciona no celular</span>
+        <span><svg class="ic"><use href="#i-check"/></svg>Cancele quando quiser</span>
+      </div>
+    </div>
+    <div class="painel" aria-hidden="true">
+      <div class="bar"><i></i><i></i><i></i><b>Painel operacional</b></div>
+      <div class="kpis">
+        <div class="kpi h"><small>Receita contratada · 12 meses</small><strong>R$ 1,2 mi</strong><span class="ok">+18% vs ano anterior</span></div>
+        <div class="kpi"><small>OS em andamento</small><strong>8</strong><span class="ok">3 liberadas</span></div>
+        <div class="kpi"><small>Conflitos</small><strong>1</strong><span class="ok" style="color:var(--w)">sublocar</span></div>
+      </div>
+      <div class="grafico"><div style="height:30%"></div><div style="height:45%"></div><div style="height:38%"></div><div style="height:55%"></div><div style="height:48%"></div><div style="height:62%"></div><div style="height:58%"></div><div class="on" style="height:92%"></div></div>
+      <div class="linhas">
+        <div class="linha"><span class="av" style="background:#4B5BD0">SP</span><div><b>Congresso de Cardiologia</b><small>OS-0129 · Expo Center Norte</small></div><span class="pill">Carregada</span></div>
+        <div class="linha"><span class="av" style="background:#2FA38A">GM</span><div><b>Convenção Nacional de Vendas</b><small>OS-0130 · Hotel Grand Paulista</small></div><span class="pill w">Em separação</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="vantagens">
+    <div class="wrap">
+      <div class="sh"><span class="eyebrow">Vantagens</span><h2>Feito para quem vive de montar evento</h2>
+        <p>Cada módulo nasceu da rotina de uma locadora: do primeiro contato do cliente até o equipamento voltar para a prateleira.</p></div>
+      <div class="grid3" id="listaVantagens"></div>
+      <div class="numeros">
+        <div class="card"><strong>3</strong><span>níveis de acesso: gerência, produção e estoque</span></div>
+        <div class="card"><strong>1 clique</strong><span>do negócio fechado à ordem de serviço</span></div>
+        <div class="card"><strong>0</strong><span>equipamentos reservados em dois eventos ao mesmo tempo</span></div>
+        <div class="card"><strong>100%</strong><span>na nuvem, no computador e no celular</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="planos">
+    <div class="wrap">
+      <div class="sh"><span class="eyebrow">Planos</span><h2>Escolha o tamanho da sua operação</h2>
+        <p>Todos os planos têm atualizações, backup diário e suporte. Troque de plano quando precisar.</p></div>
+      <div class="ciclo" role="group" aria-label="Forma de cobrança">
+        <button type="button" data-ciclo="mensal" class="on" aria-pressed="true">Mensal</button>
+        <button type="button" data-ciclo="anual" aria-pressed="false">Anual <span class="tagd" id="tagDesconto"></span></button>
+      </div>
+      <div class="planos" id="listaPlanos"></div>
+      <p class="obs-planos" id="obsPlanos"></p>
+    </div>
+  </section>
+
+  <section id="comprar">
+    <div class="wrap">
+      <div class="sh"><span class="eyebrow">Comprar</span><h2>Monte sua assinatura</h2>
+        <p>Escolha o plano, informe os dados da empresa e siga para o pagamento seguro. O acesso é liberado assim que o pagamento é confirmado.</p></div>
+      <div class="compra">
+        <form class="card" id="formCompra" novalidate>
+          <div class="bloco">
+            <div class="etapa"><span class="n">1</span><h3>Plano e usuários</h3></div>
+            <div class="escolhas" id="escolhaPlano" role="radiogroup" aria-label="Plano"></div>
+            <div class="campo" style="margin-top:16px">
+              <label for="cUsuarios">Quantas pessoas vão usar</label>
+              <div class="usuarios"><input type="range" id="cUsuarios" min="1" max="60" value="5"><output id="oUsuarios" for="cUsuarios">5 pessoas</output></div>
+              <p class="dica" id="dicaUsuarios"></p>
+            </div>
+          </div>
+          <div class="bloco">
+            <div class="etapa"><span class="n">2</span><h3>Dados da empresa</h3></div>
+            <div class="campos">
+              <div class="campo w"><label for="cEmpresa">Nome da empresa</label><input id="cEmpresa" autocomplete="organization" required placeholder="Ex.: Atlas Eventos e Locação"></div>
+              <div class="campo"><label for="cDoc">CNPJ ou CPF</label><input id="cDoc" inputmode="numeric" required placeholder="00.000.000/0000-00"></div>
+              <div class="campo"><label for="cNome">Seu nome</label><input id="cNome" autocomplete="name" required></div>
+              <div class="campo"><label for="cEmail">E-mail</label><input id="cEmail" type="email" autocomplete="email" required placeholder="voce@empresa.com.br"></div>
+              <div class="campo"><label for="cTel">WhatsApp</label><input id="cTel" type="tel" autocomplete="tel" inputmode="tel" required placeholder="(11) 99999-9999"></div>
+            </div>
+          </div>
+          <div class="bloco">
+            <div class="etapa"><span class="n">3</span><h3>Forma de pagamento</h3></div>
+            <div class="escolhas" id="escolhaPagamento" role="radiogroup" aria-label="Forma de pagamento">
+              <button type="button" class="escolha on" data-pag="pix" role="radio" aria-checked="true"><b>Pix</b><small>Liberação imediata</small></button>
+              <button type="button" class="escolha" data-pag="cartao" role="radio" aria-checked="false"><b>Cartão</b><small>Recorrente, sem burocracia</small></button>
+              <button type="button" class="escolha" data-pag="boleto" role="radio" aria-checked="false"><b>Boleto</b><small>Liberação em até 2 dias úteis</small></button>
+            </div>
+          </div>
+        </form>
+        <aside class="card resumo" aria-label="Resumo do pedido">
+          <h3>Resumo do pedido</h3>
+          <div class="res-linhas" id="resLinhas"></div>
+          <div class="total"><div><small id="totLabel">Total por mês</small><b id="totValor">—</b></div><small id="totSub" style="text-align:right"></small></div>
+          <p class="erro" id="erroCompra" role="alert"></p>
+          <button class="btn pri lg" type="submit" form="formCompra" id="btnPagar">Ir para o pagamento seguro <svg class="ic"><use href="#i-seta"/></svg></button>
+          <div class="seguro"><svg class="ic"><use href="#i-escudo"/></svg><span id="txtSeguro">O pagamento é feito no ambiente seguro do nosso parceiro de pagamentos. Os dados do seu cartão não passam por esta página.</span></div>
+          <div id="okEnvio" hidden class="ok-envio"></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="perguntas">
+    <div class="wrap">
+      <div class="sh"><span class="eyebrow">Dúvidas</span><h2>Perguntas frequentes</h2></div>
+      <div class="faq">
+        <details><summary>Preciso instalar alguma coisa?</summary><p>Não. O EventFlow roda no navegador, no computador e no celular. Basta entrar com o e-mail e a senha de cada pessoa.</p></details>
+        <details><summary>Consigo importar o meu inventário?</summary><p>Sim. Você importa itens, kits, frota e fotos por uma planilha Excel, e baixa um modelo pronto dentro do sistema.</p></details>
+        <details><summary>Cada pessoa vê tudo?</summary><p>Não. São três níveis de acesso: gerência vê tudo, inclusive valores e financeiro; produção cuida de negócios, OS e memoriais; estoque cuida de inventário, cargas e frota.</p></details>
+        <details><summary>Posso trabalhar com outras locadoras?</summary><p>Sim. Em Parceiros e sublocação você pede equipamento a outras empresas, com datas de retirada e devolução, e responde aos pedidos delas. Se a parceira também usa o EventFlow, o pedido chega direto no sistema dela.</p></details>
+        <details><summary>Meus dados ficam seguros?</summary><p>Os dados ficam num banco na nuvem com backup diário, e cada empresa só enxerga as próprias informações. Toda alteração fica registrada no histórico.</p></details>
+        <details><summary>Posso cancelar?</summary><p>No plano mensal, sim, a qualquer momento, sem multa. No anual, o desconto vale pelo período contratado.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="final">
+        <div class="grow"><h2>Veja o sistema funcionando antes de assinar</h2><p>Uma locadora de grande porte já preenchida, com os três níveis de acesso.</p></div>
+        <a class="btn ghost lg" data-link="demo" href="#" target="_blank" rel="noopener">Abrir demonstração</a>
+        <a class="btn lg" href="#comprar">Assinar agora</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><b style="color:var(--ink)">EventFlow</b><span>ERP e CRM para locadoras de equipamentos para eventos</span><div class="grow"></div><a href="#" data-link="contato" id="lnkContato">Fale com a gente</a></div></footer>
+
+<script>
+/* =====================================================================
+   CONFIGURAÇÃO · edite aqui preços, links de pagamento e contatos
+   ===================================================================== */
+const CONFIG = {
+  demo: "https://eventflow-demo.pages.dev",          // endereço da demonstração
+  whatsapp: "5511999999999",                          // só números, com DDI 55 e DDD
+  email: "contato@seudominio.com.br",
+  descontoAnual: 0.20,                                // 20% de desconto no plano anual
+  usuarioExtra: 39,                                   // R$ por pessoa a mais, por mês
+  planos: [
+    { id: "essencial", nome: "Essencial", para: "Locadoras pequenas começando a se organizar", mensal: 349, usuarios: 5, implantacao: 0,
+      inclui: ["Estoque com fotos e disponibilidade por período", "Ordens de serviço e ordens de carga", "Agenda de cargas e frota", "Importação do inventário por Excel", "App no celular"],
+      nao: ["Pipeline comercial e orçamentos", "Financeiro (contas e reembolsos)", "Parceiros e sublocação"] },
+    { id: "profissional", nome: "Profissional", para: "A operação completa de uma locadora em crescimento", mensal: 749, usuarios: 15, implantacao: 990, destaque: true,
+      inclui: ["Tudo do Essencial", "Pipeline comercial, visita técnica, 3D e orçamentos", "Memorial de solo e aéreo por sala", "Contas a pagar e receber, reembolsos", "Mural, chat e notas da equipe", "Escalas de freelancers"],
+      nao: ["Parceiros e sublocação entre empresas"] },
+    { id: "empresa", nome: "Empresa", para: "Grandes locadoras e grupos com várias equipes", mensal: 1490, usuarios: 40, implantacao: 2490,
+      inclui: ["Tudo do Profissional", "Parceiros e sublocação entre empresas", "Histórico de alterações (auditoria)", "Implantação assistida e treinamento da equipe", "Suporte prioritário por WhatsApp"],
+      nao: [] }
+  ],
+  /* links de pagamento de cada plano (Mercado Pago, Stripe, Asaas, PagSeguro…).
+     Deixe "" enquanto não tiver: o pedido segue pelo WhatsApp com tudo preenchido. */
+  pagamento: {
+    essencial:    { mensal: "", anual: "" },
+    profissional: { mensal: "", anual: "" },
+    empresa:      { mensal: "", anual: "" }
+  }
+};
+
+/* ===================================================================== */
+const $ = s => document.querySelector(s);
+const brl = n => "R$ " + Math.round(n).toLocaleString("pt-BR");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ic = n => `<svg class="ic"><use href="#i-${n}"/></svg>`;
+const E = { ciclo: "mensal", plano: (CONFIG.planos.find(p => p.destaque) || CONFIG.planos[0]).id, pag: "pix" };
+const plano = () => CONFIG.planos.find(p => p.id === E.plano);
+const mensalDe = p => E.ciclo === "anual" ? p.mensal * (1 - CONFIG.descontoAnual) : p.mensal;
+
+/* links fixos */
+document.querySelectorAll('[data-link="demo"]').forEach(a => a.href = CONFIG.demo);
+$("#lnkContato").href = "https://wa.me/" + CONFIG.whatsapp;
+$("#tagDesconto").textContent = "−" + Math.round(CONFIG.descontoAnual * 100) + "%";
+
+/* tema claro/escuro, lembrado neste navegador */
+(() => { try { const t = localStorage.getItem("ef-site-tema"); if (t) document.documentElement.dataset.theme = t; } catch (e) {} })();
+$("#tema").addEventListener("click", () => {
+  const escuro = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = escuro ? "light" : "dark";
+  try { localStorage.setItem("ef-site-tema", document.documentElement.dataset.theme); } catch (e) {}
+});
+
+/* vantagens */
+const VANTAGENS = [
+  ["funil", "Comercial que fecha mais", "Pipeline do primeiro contato ao contrato, com briefing, visita técnica, projeto 3D e orçamento em PDF.", ["Orçamento por sala e por diária", "Temperatura e previsão de cada negócio"]],
+  ["regua", "Produção técnica segura", "Memorial de solo e aéreo por sala, pontos de ancoragem, cargas e descritivo prontos para o engenheiro.", ["Compartilhe memoriais pelo WhatsApp", "Escopo da OS gerado do orçamento"]],
+  ["caixa", "Estoque sem conflito", "Disponibilidade calculada pela janela de carga e descarga. O sistema avisa antes de faltar equipamento.", ["Fotos, kits e consumo elétrico", "Manutenção e avarias na volta"]],
+  ["caminhao", "Cargas e logística", "Ordem de carga com romaneio, frota, motoristas e escala de freelancers por dia.", ["Baixa automática na saída e na volta", "Agenda de cargas da semana"]],
+  ["carteira", "Financeiro na mão", "Contas a pagar e receber ligadas às OS, fluxo de caixa projetado e reembolsos com comprovante.", ["Sinal e saldo gerados da OS", "Inadimplência e vencimentos"]],
+  ["maos", "Parceiros e sublocação", "Peça equipamento a outras locadoras com datas, contraproposta e reserva no estoque do parceiro.", ["Pedidos chegam direto se o parceiro usa EventFlow", "Bloco de sublocação no orçamento"]],
+  ["chat", "Equipe conectada", "Mural, chat, notas e agenda no mesmo lugar, com avisos automáticos da operação.", ["Canal por OS", "Notificações por nível de acesso"]],
+  ["cel", "No celular, de verdade", "Barra inferior por categorias e telas pensadas para quem está no galpão ou no evento.", ["Conferência de carga pelo celular", "Tema claro e escuro"]],
+  ["escudo", "Acesso por nível e histórico", "Gerência, produção e estoque veem só o que precisam. Toda alteração fica registrada.", ["Valores visíveis só para a gerência", "Backup diário"]]
+];
+$("#listaVantagens").innerHTML = VANTAGENS.map(v => `<article class="card vant"><div class="ico">${ic(v[0])}</div><h3>${esc(v[1])}</h3><p>${esc(v[2])}</p>
+  <ul>${v[3].map(x => `<li>${esc(x)}</li>`).join("")}</ul></article>`).join("");
+
+/* planos */
+function pintarPlanos() {
+  document.querySelectorAll("[data-ciclo]").forEach(b => { const on = b.dataset.ciclo === E.ciclo; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  $("#listaPlanos").innerHTML = CONFIG.planos.map(p => `<article class="card plano ${p.destaque ? "dest" : ""}">
+    ${p.destaque ? `<span class="selo">Mais escolhido</span>` : ""}
+    <h3>${esc(p.nome)}</h3><p class="para">${esc(p.para)}</p>
+    <div class="preco"><b>${brl(mensalDe(p))}</b><span>/mês</span></div>
+    <div class="preco-sub">${E.ciclo === "anual" ? `${brl(mensalDe(p) * 12)} por ano · economia de ${brl(p.mensal * 12 * CONFIG.descontoAnual)}` : `até ${p.usuarios} pessoas incluídas`}</div>
+    <ul>${p.inclui.map(x => `<li>${ic("check")}<span>${esc(x)}</span></li>`).join("")}${p.nao.map(x => `<li class="nao">${ic("x")}<span>${esc(x)}</span></li>`).join("")}</ul>
+    <button class="btn ${p.destaque ? "pri" : ""} lg" type="button" data-assinar="${p.id}">Assinar o ${esc(p.nome)}</button></article>`).join("");
+  $("#obsPlanos").textContent = `Pessoa a mais além do limite do plano: ${brl(CONFIG.usuarioExtra)} por mês. Implantação: ` +
+    CONFIG.planos.map(p => `${p.nome} ${p.implantacao ? brl(p.implantacao) : "grátis"}`).join(" · ") + (CONFIG.descontoAnual ? " (grátis no plano anual)." : ".");
+  pintarCompra();
+}
+document.addEventListener("click", ev => {
+  const c = ev.target.closest("[data-ciclo]"); if (c) { E.ciclo = c.dataset.ciclo; pintarPlanos(); return; }
+  const a = ev.target.closest("[data-assinar]");
+  if (a) { E.plano = a.dataset.assinar; const p = plano(); const u = $("#cUsuarios"); if (+u.value < p.usuarios) u.value = Math.min(p.usuarios, +u.max); pintarCompra(); $("#comprar").scrollIntoView(); return; }
+  const ep = ev.target.closest("[data-escolha-plano]"); if (ep) { E.plano = ep.dataset.escolhaPlano; pintarCompra(); return; }
+  const pg = ev.target.closest("[data-pag]");
+  if (pg) { E.pag = pg.dataset.pag; document.querySelectorAll("[data-pag]").forEach(b => { const on = b === pg; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); pintarCompra(); }
+});
+
+/* compra */
+function calculo() {
+  const p = plano(), u = +$("#cUsuarios").value, extras = Math.max(0, u - p.usuarios);
+  const base = mensalDe(p), extra = extras * CONFIG.usuarioExtra * (E.ciclo === "anual" ? 1 - CONFIG.descontoAnual : 1);
+  const mensal = base + extra, impl = E.ciclo === "anual" ? 0 : p.implantacao;
+  const total = E.ciclo === "anual" ? mensal * 12 : mensal + impl;
+  return { p, u, extras, base, extra, mensal, impl, total };
+}
+function pintarCompra() {
+  $("#escolhaPlano").innerHTML = CONFIG.planos.map(p => `<button type="button" class="escolha ${p.id === E.plano ? "on" : ""}" data-escolha-plano="${p.id}" role="radio" aria-checked="${p.id === E.plano}">
+    <b>${esc(p.nome)}</b><small>${brl(mensalDe(p))}/mês · até ${p.usuarios} pessoas</small></button>`).join("");
+  const k = calculo();
+  $("#oUsuarios").textContent = k.u + (k.u === 1 ? " pessoa" : " pessoas");
+  $("#dicaUsuarios").textContent = k.extras ? `${k.extras} além das ${k.p.usuarios} incluídas no ${k.p.nome}: ${brl(CONFIG.usuarioExtra)} cada por mês.` : `Incluídas no ${k.p.nome}: até ${k.p.usuarios} pessoas.`;
+  const L = [[`Plano ${k.p.nome} · ${E.ciclo}`, brl(k.base) + "/mês"]];
+  if (k.extras) L.push([`${k.extras} pessoa(s) a mais`, brl(k.extra) + "/mês"]);
+  if (E.ciclo === "anual") L.push([`Desconto anual (${Math.round(CONFIG.descontoAnual * 100)}%)`, `<b>− ${brl((k.p.mensal + k.extras * CONFIG.usuarioExtra) * 12 * CONFIG.descontoAnual)}</b>`, "desc"]);
+  L.push(["Implantação", k.impl ? brl(k.impl) : (k.p.implantacao ? "<b>grátis no anual</b>" : "grátis"), k.impl ? "" : "desc"]);
+  L.push(["Pagamento", { pix: "Pix", cartao: "Cartão", boleto: "Boleto" }[E.pag]]);
+  $("#resLinhas").innerHTML = L.map(l => `<div class="${l[2] || ""}"><span>${esc(l[0])}</span><span>${l[1]}</span></div>`).join("");
+  $("#totLabel").textContent = E.ciclo === "anual" ? "Total por ano" : (k.impl ? "Primeiro mês (com implantação)" : "Total por mês");
+  $("#totValor").textContent = brl(k.total);
+  $("#totSub").textContent = E.ciclo === "anual" ? `equivale a ${brl(k.mensal)}/mês` : (k.impl ? `depois ${brl(k.mensal)}/mês` : "");
+  const link = (CONFIG.pagamento[E.plano] || {})[E.ciclo];
+  $("#btnPagar").firstChild.textContent = link ? "Ir para o pagamento seguro " : "Enviar pedido pelo WhatsApp ";
+  $("#txtSeguro").textContent = link ? "O pagamento é feito no ambiente seguro do nosso parceiro de pagamentos. Os dados do seu cartão não passam por esta página."
+    : "Você recebe o link de pagamento pelo WhatsApp em seguida. Os dados do seu cartão nunca passam por esta página.";
+}
+$("#cUsuarios").addEventListener("input", pintarCompra);
+
+$("#formCompra").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const campos = ["cEmpresa", "cDoc", "cNome", "cEmail", "cTel"].map(id => $("#" + id));
+  let falta = null;
+  campos.forEach(c => { const ruim = !c.value.trim() || (c.type === "email" && !/^\S+@\S+\.\S+$/.test(c.value)) || (c.id === "cDoc" && c.value.replace(/\D/g, "").length < 11);
+    c.setAttribute("aria-invalid", ruim); if (ruim && !falta) falta = c; });
+  if (falta) { $("#erroCompra").textContent = "Confira os campos destacados."; falta.focus(); return; }
+  $("#erroCompra").textContent = "";
+  const k = calculo(), v = id => $("#" + id).value.trim();
+  const pedido = { plano: k.p.nome, ciclo: E.ciclo, pessoas: k.u, pagamento: E.pag, total: brl(k.total), empresa: v("cEmpresa"), documento: v("cDoc"), nome: v("cNome"), email: v("cEmail"), whatsapp: v("cTel") };
+  const link = (CONFIG.pagamento[E.plano] || {})[E.ciclo];
+  if (link) {
+    const u = new URL(link); u.searchParams.set("email", pedido.email); u.searchParams.set("prefilled_email", pedido.email);
+    window.open(u.href, "_blank", "noopener");
+  } else {
+    const txt = [`*Novo pedido EventFlow*`, `Plano: ${pedido.plano} (${pedido.ciclo})`, `Pessoas: ${pedido.pessoas}`, `Pagamento: ${{ pix: "Pix", cartao: "Cartão", boleto: "Boleto" }[pedido.pagamento]}`,
+      `Total: ${pedido.total}${E.ciclo === "anual" ? " por ano" : ""}`, ``, `Empresa: ${pedido.empresa}`, `CNPJ/CPF: ${pedido.documento}`, `Responsável: ${pedido.nome}`, `E-mail: ${pedido.email}`, `WhatsApp: ${pedido.whatsapp}`].join("\n");
+    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(txt)}`, "_blank", "noopener");
+  }
+  const ok = $("#okEnvio"); ok.hidden = false;
+  ok.textContent = link ? "Abrimos o pagamento numa nova aba. Assim que for confirmado, você recebe o acesso no e-mail informado."
+    : "Pedido montado! Confirme o envio no WhatsApp e mandamos o link de pagamento e o acesso.";
+});
+
+pintarPlanos();
+</script>
+</body>
+</html>
