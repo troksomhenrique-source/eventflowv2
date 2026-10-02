@@ -5,220 +5,355 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>EventFlow · ERP para locadoras de eventos</title>
-<meta name="description" content="EventFlow: comercial, produção técnica, estoque, cargas, financeiro e equipe de uma locadora de equipamentos para eventos num só lugar.">
+<meta name="description" content="EventFlow: comercial, produção técnica, estoque, cargas, financeiro, parceiros e equipe de uma locadora de equipamentos para eventos num só sistema. A partir de R$ 100 por licença.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <style>
-/* mesmos tokens do sistema (v6) */
+/* ---------- marca: os mesmos tokens do sistema ---------- */
 :root{
   --bg:#F2F1ED; --sf:#FFFFFF; --sf2:#F7F6F3; --ink:#26272C; --ink2:#52545C; --ink3:#767983; --ln:#E7E5DF; --ln2:#EFEDE8;
   --acc:#4B5BD0; --acc2:#3F4EB8; --accS:#ECEEFB; --on:#FFFFFF;
   --c2:#2FA38A; --c3:#E3A23B; --c4:#D9657B; --c5:#8C6FD6;
   --okS:#E4F4EE; --ok:#22806B; --wS:#FBF0DA; --w:#8E6110;
   --sh:0 1px 2px rgba(38,39,44,.04),0 8px 24px -8px rgba(38,39,44,.08);
+  --shG:0 40px 80px -30px rgba(63,78,184,.45),0 18px 36px -18px rgba(38,39,44,.25);
   --hero:linear-gradient(135deg,#5563D6 0%,#6B5BD0 55%,#7E63D2 100%);
   --f:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --r:22px; --r2:12px; --rp:99px;
+  --r:22px; --r2:12px; --rp:99px; --e:cubic-bezier(.23,1,.32,1);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#16171B; --sf:#1F2025; --sf2:#25262C; --ink:#E6E6EA; --ink2:#B4B5BE; --ink3:#8E909B; --ln:#2E2F36; --ln2:#272830;
   --acc:#8D99F0; --acc2:#A3ADF4; --accS:#272A40; --on:#16171B; --c2:#5FCDB4; --c3:#EBB866; --c4:#EC8DA0; --c5:#B39BF0;
   --okS:#1D3A33; --ok:#6FD3BB; --wS:#3B3120; --w:#EBC27A;
-  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px -8px rgba(0,0,0,.35);
+  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px -8px rgba(0,0,0,.35); --shG:0 40px 80px -30px rgba(0,0,0,.7);
   --hero:linear-gradient(135deg,#3B46A3 0%,#4B3FA0 55%,#573FA3 100%); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#16171B; --sf:#1F2025; --sf2:#25262C; --ink:#E6E6EA; --ink2:#B4B5BE; --ink3:#8E909B; --ln:#2E2F36; --ln2:#272830;
   --acc:#8D99F0; --acc2:#A3ADF4; --accS:#272A40; --on:#16171B; --c2:#5FCDB4; --c3:#EBB866; --c4:#EC8DA0; --c5:#B39BF0;
   --okS:#1D3A33; --ok:#6FD3BB; --wS:#3B3120; --w:#EBC27A;
-  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px -8px rgba(0,0,0,.35);
+  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px -8px rgba(0,0,0,.35); --shG:0 40px 80px -30px rgba(0,0,0,.7);
   --hero:linear-gradient(135deg,#3B46A3 0%,#4B3FA0 55%,#573FA3 100%); color-scheme:dark}
 
 *{box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:84px}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--f);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--f);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;overflow-x:hidden}
+main,footer{overflow-x:clip}
+img{max-width:100%;display:block}
 a{color:inherit}
 button,input,select{font:inherit;color:inherit}
-.wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
 .ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
-
-/* topo */
-.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--ln)}
-.top .wrap{display:flex;align-items:center;gap:22px;height:68px}
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;font-size:18px;letter-spacing:-.02em}
-.mk{width:32px;height:32px;border-radius:10px;background:var(--hero);display:grid;place-items:center;box-shadow:0 6px 16px -6px rgba(75,91,208,.6)}
-.top nav{display:flex;gap:4px;margin-left:12px}
-.top nav a{text-decoration:none;font-size:14px;font-weight:600;color:var(--ink2);padding:8px 12px;border-radius:var(--rp)}
-.top nav a:hover{background:var(--sf);color:var(--ink)}
 .grow{flex:1}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 18px;border-radius:var(--rp);border:1px solid var(--ln);background:var(--sf);
-  font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:transform .15s,border-color .15s,background .15s}
-.btn:hover{border-color:var(--ink3)}
-.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--on)}
-.btn.pri:hover{background:var(--acc2);border-color:var(--acc2)}
-.btn.lg{height:50px;padding:0 24px;font-size:15px}
+
+/* ---------- animações ---------- */
+.rv{opacity:0;transform:translateY(28px);transition:opacity .8s var(--e),transform .8s var(--e);transition-delay:calc(var(--d,0) * 90ms)}
+.rv.vis{opacity:1;transform:none}
+.rv.esq{transform:translateX(-36px)} .rv.dir{transform:translateX(36px)} .rv.zoom{transform:scale(.94)}
+.rv.esq.vis,.rv.dir.vis,.rv.zoom.vis{transform:none}
+@keyframes flutua{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes entra{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes brilho{from{background-position:0% 50%}to{background-position:200% 50%}}
+@keyframes rola{to{transform:translateX(-50%)}}
+@keyframes pulsa{0%{box-shadow:0 0 0 0 rgba(75,91,208,.45)}70%{box-shadow:0 0 0 14px rgba(75,91,208,0)}100%{box-shadow:0 0 0 0 rgba(75,91,208,0)}}
+@keyframes barra{from{width:0}to{width:100%}}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .rv{opacity:1;transform:none}
+}
+
+/* ---------- topo ---------- */
+.top{position:fixed;inset:0 0 auto 0;z-index:30;transition:background .3s,box-shadow .3s,border-color .3s;border-bottom:1px solid transparent}
+.top.sol{background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);border-color:var(--ln)}
+.top .wrap{display:flex;align-items:center;gap:18px;height:70px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.mk{width:34px;height:34px;border-radius:11px;background:var(--hero);display:grid;place-items:center;box-shadow:0 6px 16px -6px rgba(75,91,208,.6)}
+.top nav{display:flex;gap:2px;margin-left:14px}
+.top nav a{white-space:nowrap;text-decoration:none;font-size:14.5px;font-weight:600;color:var(--ink2);padding:8px 13px;border-radius:var(--rp);transition:background .2s,color .2s}
+.top nav a:hover,.top nav a.on{background:var(--sf);color:var(--ink)}
+.btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:9px;height:44px;padding:0 20px;border-radius:var(--rp);border:1px solid var(--ln);background:var(--sf);
+  font-weight:700;font-size:14.5px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:transform .25s var(--e),border-color .2s,background .2s,box-shadow .25s}
+.btn:hover{border-color:var(--ink3);transform:translateY(-2px)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--on);box-shadow:0 10px 24px -10px rgba(75,91,208,.7)}
+.btn.pri:hover{background:var(--acc2);border-color:var(--acc2);box-shadow:0 16px 30px -12px rgba(75,91,208,.8)}
+.btn.pri::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);transform:translateX(-120%);transition:transform .7s var(--e)}
+.btn.pri:hover::after{transform:translateX(120%)}
+.btn.lg{height:54px;padding:0 28px;font-size:16px}
 .btn.ghost{background:none;border-color:transparent}
-.iconbtn{width:42px;padding:0}
+.btn.pulso{animation:pulsa 2.4s infinite}
+.iconbtn{width:44px;padding:0}
+.btn .ic{transition:transform .25s var(--e)}
+.btn:hover .ic.seta{transform:translateX(4px)}
 
-/* hero */
-.hero{padding:64px 0 40px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:48px;align-items:center}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);background:var(--accS);padding:6px 12px;border-radius:var(--rp)}
-h1{font-size:clamp(34px,4.6vw,54px);line-height:1.06;letter-spacing:-.035em;margin:18px 0 16px;font-weight:800}
-h1 em{font-style:normal;background:var(--hero);-webkit-background-clip:text;background-clip:text;color:transparent;padding:0 .08em .06em 0;-webkit-box-decoration-break:clone;box-decoration-break:clone}
-.lead{font-size:18px;color:var(--ink2);max-width:540px;margin:0 0 28px}
-.ctas{display:flex;gap:10px;flex-wrap:wrap}
-.provas{display:flex;gap:22px;flex-wrap:wrap;margin-top:28px;color:var(--ink3);font-size:13.5px}
+/* ---------- hero ---------- */
+.hero{position:relative;padding:150px 0 70px;text-align:center;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-20% -10% auto;height:760px;background:radial-gradient(60% 50% at 50% 30%,rgba(107,91,208,.20),transparent 70%),radial-gradient(40% 40% at 85% 10%,rgba(47,163,138,.14),transparent 70%);pointer-events:none}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);background:var(--accS);padding:7px 14px;border-radius:var(--rp)}
+.eyebrow .pt{width:8px;height:8px;border-radius:50%;background:var(--c2);animation:pulsa 2s infinite}
+h1{position:relative;font-size:clamp(34px,5.6vw,68px);line-height:1.02;letter-spacing:-.045em;margin:22px auto 20px;font-weight:800;max-width:980px}
+.grad{background:linear-gradient(90deg,#5563D6,#8C6FD6,#2FA38A,#5563D6);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:brilho 6s linear infinite;padding:0 .06em .08em 0}
+.troca{display:inline-block;text-align:left}
+h1 .l1,h1 .l2{display:block}
+h1 .l1{white-space:nowrap}
+@media (max-width:700px){h1 .l1{white-space:normal}h1 .troca{display:block;text-align:center}}
+.troca span{display:inline-block;animation:entra .55s var(--e)}
+.lead{position:relative;font-size:clamp(17px,1.6vw,20px);color:var(--ink2);max-width:720px;margin:0 auto 34px}
+.ctas{position:relative;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.provas{position:relative;display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin-top:26px;color:var(--ink3);font-size:14px}
 .provas span{display:flex;align-items:center;gap:7px}
-.provas .ic{width:17px;height:17px;color:var(--ok)}
+.provas .ic{width:18px;height:18px;color:var(--ok)}
 
-/* mini painel (o mesmo visual do sistema) */
-.painel{background:var(--sf);border:1px solid var(--ln);border-radius:28px;box-shadow:var(--sh);padding:18px;display:grid;gap:12px}
-.painel .bar{display:flex;align-items:center;gap:8px;padding:2px 4px 6px}
-.painel .bar i{width:10px;height:10px;border-radius:50%;background:var(--ln)}
-.painel .bar b{margin-left:8px;font-size:13px}
-.kpis{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
-.kpi{background:var(--sf2);border-radius:18px;padding:14px}
-.kpi small{display:block;font-size:11.5px;color:var(--ink3);font-weight:600}
-.kpi strong{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:4px}
-.kpi.h{background:var(--hero);color:#fff}
-.kpi.h small{color:rgba(255,255,255,.8)}
-.kpi .ok{font-size:11.5px;color:var(--ok);font-weight:700}
-.kpi.h .ok{color:#fff;opacity:.85}
-.grafico{background:var(--sf2);border-radius:18px;padding:14px;display:flex;align-items:flex-end;gap:8px;height:150px}
-.grafico div{flex:1;border-radius:8px 8px 4px 4px;background:var(--accS);position:relative}
-.grafico div.on{background:var(--acc)}
-.linhas{display:grid;gap:8px}
-.linha{display:flex;align-items:center;gap:10px;background:var(--sf2);border-radius:14px;padding:10px 12px;font-size:13px}
-.linha .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;flex:none}
-.linha b{display:block;font-size:13px}
-.linha small{color:var(--ink3);font-size:11.5px}
-.pill{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:var(--rp);background:var(--okS);color:var(--ok);white-space:nowrap}
-.pill.w{background:var(--wS);color:var(--w)}
+/* tela do sistema com cartões flutuando */
+.palco{position:relative;max-width:1080px;margin:64px auto 0;perspective:1600px}
+.janela{position:relative;border-radius:20px;background:var(--sf);border:1px solid var(--ln);box-shadow:var(--shG);overflow:hidden;transform:rotateX(14deg) scale(.96);transform-origin:50% 0;transition:transform 1.2s var(--e)}
+.palco.vis .janela{transform:rotateX(0) scale(1)}
+.janela .barra{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--ln);background:var(--sf2)}
+.janela .barra i{width:11px;height:11px;border-radius:50%;background:#E5675A}
+.janela .barra i:nth-child(2){background:#E8B64C}.janela .barra i:nth-child(3){background:#5BBE6B}
+.janela .barra span{margin:0 auto;font-size:12px;color:var(--ink3);background:var(--sf);border:1px solid var(--ln);padding:3px 14px;border-radius:8px}
+.janela img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top}
+.flut{position:absolute;display:flex;align-items:center;gap:11px;background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:11px 14px;box-shadow:var(--sh),0 20px 40px -20px rgba(38,39,44,.35);
+  font-size:13.5px;text-align:left;opacity:0;z-index:2}
+.palco.vis .flut{animation:entra .7s var(--e) forwards,flutua 5s ease-in-out infinite;animation-delay:calc(.6s + var(--d) * .35s),calc(1.4s + var(--d) * .35s)}
+.flut b{display:block;font-size:13.5px}
+.flut small{color:var(--ink3);font-size:12px}
+.flut .bol{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none}
+.f1{left:-46px;top:16%}.f2{right:-40px;top:34%}.f3{left:-30px;bottom:12%}.f4{right:-26px;bottom:-14px}
 
-/* seções */
-section{padding:56px 0}
-.sh{max-width:680px;margin-bottom:30px}
-.sh .eyebrow{margin-bottom:12px}
-h2{font-size:clamp(26px,3.2vw,38px);letter-spacing:-.03em;line-height:1.12;margin:0 0 10px;font-weight:800}
-.sh p{margin:0;color:var(--ink2);font-size:16.5px}
-.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.card{background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);box-shadow:var(--sh);padding:22px}
-.vant .ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--accS);color:var(--acc);margin-bottom:14px}
-.vant h3{margin:0 0 6px;font-size:17px;letter-spacing:-.01em}
-.vant p{margin:0;color:var(--ink2);font-size:14.5px}
-.vant ul{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px;font-size:13.5px;color:var(--ink2)}
-.vant li{display:flex;gap:8px}
-.vant li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--acc);margin-top:8px;flex:none}
-.numeros{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
-.numeros .card{padding:20px 22px}
-.numeros strong{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em}
-.numeros span{color:var(--ink3);font-size:13.5px}
+/* faixa de segmentos */
+.marquee{overflow:hidden;padding:30px 0;border-block:1px solid var(--ln);background:var(--sf2);-webkit-mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
+.marquee .trilho{display:flex;gap:14px;width:max-content;animation:rola 38s linear infinite}
+.marquee:hover .trilho{animation-play-state:paused}
+.chip{display:inline-flex;align-items:center;gap:9px;background:var(--sf);border:1px solid var(--ln);padding:10px 18px;border-radius:var(--rp);font-weight:700;font-size:14.5px;white-space:nowrap}
+.chip i{width:9px;height:9px;border-radius:50%}
 
-/* planos */
-.ciclo{display:inline-flex;background:var(--sf);border:1px solid var(--ln);border-radius:var(--rp);padding:4px;gap:4px;margin-bottom:24px}
-.ciclo button{border:0;background:none;border-radius:var(--rp);padding:9px 18px;font-weight:700;font-size:14px;cursor:pointer;color:var(--ink2);display:flex;align-items:center;gap:8px}
-.ciclo button.on{background:var(--acc);color:var(--on)}
-.ciclo .tagd{font-size:11px;background:var(--okS);color:var(--ok);padding:2px 8px;border-radius:var(--rp)}
-.ciclo button.on .tagd{background:rgba(255,255,255,.22);color:inherit}
-.planos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
-.plano{display:flex;flex-direction:column;gap:14px;position:relative}
-.plano.dest{border:2px solid var(--acc);box-shadow:0 20px 40px -20px rgba(75,91,208,.45)}
-.plano .selo{position:absolute;top:-13px;left:22px;background:var(--hero);color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:5px 12px;border-radius:var(--rp)}
-.plano h3{margin:0;font-size:19px}
-.plano .para{color:var(--ink3);font-size:13.5px;margin:-8px 0 0}
-.preco{display:flex;align-items:baseline;gap:4px}
-.preco b{font-size:40px;font-weight:800;letter-spacing:-.04em}
-.preco span{color:var(--ink3);font-size:14px;font-weight:600}
-.preco-sub{color:var(--ink3);font-size:12.5px;margin-top:-10px;min-height:19px}
-.plano ul{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14px;flex:1}
-.plano li{display:flex;gap:9px;align-items:flex-start}
-.plano li .ic{width:18px;height:18px;color:var(--ok);margin-top:2px}
-.plano li.nao{color:var(--ink3)}
-.plano li.nao .ic{color:var(--ink3)}
-.obs-planos{margin-top:16px;color:var(--ink3);font-size:13px}
+/* ---------- seções ---------- */
+section{padding:96px 0}
+.sh{max-width:760px;margin:0 auto 46px;text-align:center}
+.sh.esq{margin-left:0;text-align:left}
+.sh .eyebrow{margin-bottom:14px}
+h2{font-size:clamp(30px,4vw,50px);letter-spacing:-.04em;line-height:1.06;margin:0 0 14px;font-weight:800}
+.sh p{margin:0;color:var(--ink2);font-size:18px}
 
-/* compra */
-.compra{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start}
+/* números */
+.numeros{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.num{background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);padding:26px;box-shadow:var(--sh)}
+.num strong{display:block;font-size:44px;font-weight:800;letter-spacing:-.04em;line-height:1;background:var(--hero);-webkit-background-clip:text;background-clip:text;color:transparent}
+.num span{display:block;margin-top:10px;color:var(--ink2);font-size:14.5px}
+
+/* tour interativo */
+.tour{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:28px;align-items:start}
+.abas{display:grid;gap:8px}
+.aba{position:relative;overflow:hidden;text-align:left;background:transparent;border:1px solid transparent;border-radius:18px;padding:16px 18px;cursor:pointer;transition:background .3s,border-color .3s}
+.aba:hover{background:var(--sf)}
+.aba.on{background:var(--sf);border-color:var(--ln);box-shadow:var(--sh)}
+.aba .t{display:flex;align-items:center;gap:12px;font-weight:800;font-size:16.5px}
+.aba .t .ic{width:22px;height:22px;color:var(--ink3);transition:color .3s}
+.aba.on .t .ic{color:var(--acc)}
+.aba p{margin:8px 0 0 34px;color:var(--ink2);font-size:14.5px;display:none}
+.aba.on p{display:block;animation:entra .5s var(--e)}
+.aba .prog{position:absolute;left:0;bottom:0;height:3px;background:var(--hero);width:0}
+.aba.on .prog{animation:barra var(--tempo,7s) linear forwards}
+.tour.parado .aba.on .prog{animation:none;width:100%}
+.vitrine{position:sticky;top:96px}
+.vitrine .janela{transform:none}
+.vitrine img{transition:opacity .45s var(--e),transform .6s var(--e)}
+.vitrine img.saindo{opacity:0;transform:scale(1.015)}
+
+/* funcionalidades detalhadas */
+.mods{display:grid;gap:110px}
+.mod{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:56px;align-items:center}
+.mod.inv .txt{order:2}
+.mod .eyebrow{margin-bottom:14px}
+.mod h3{font-size:clamp(26px,3vw,38px);letter-spacing:-.035em;line-height:1.1;margin:0 0 14px}
+.mod .txt>p{color:var(--ink2);font-size:17px;margin:0 0 22px}
+.lista{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.lista li{display:flex;gap:12px;align-items:flex-start;font-size:15px}
+.lista .ck{width:24px;height:24px;border-radius:8px;background:var(--okS);color:var(--ok);display:grid;place-items:center;flex:none;margin-top:1px}
+.lista .ck .ic{width:15px;height:15px;stroke-width:2.4}
+.lista b{font-weight:700}
+.img{position:relative}
+.img .janela{transform:none}
+.img .janela img{aspect-ratio:16/10}
+.img::before{content:"";position:absolute;inset:8% -6% -8% 6%;background:var(--hero);opacity:.13;border-radius:40px;filter:blur(30px);z-index:-1}
+.cel{max-width:300px;margin:0 auto;border-radius:44px;padding:12px;background:#111214;box-shadow:var(--shG)}
+.cel img{border-radius:34px;aspect-ratio:390/844;object-fit:cover;object-position:top}
+
+/* tudo incluso */
+.grade{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.mini{background:var(--sf);border:1px solid var(--ln);border-radius:18px;padding:18px;transition:transform .35s var(--e),box-shadow .35s,border-color .35s}
+.mini:hover{transform:translateY(-6px);box-shadow:var(--shG);border-color:transparent}
+.mini .ico{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:var(--accS);color:var(--acc);margin-bottom:12px;transition:transform .4s var(--e)}
+.mini:hover .ico{transform:rotate(-8deg) scale(1.08)}
+.mini b{display:block;font-size:15px;margin-bottom:4px}
+.mini span{color:var(--ink2);font-size:13.5px}
+
+/* ---------- preços ---------- */
+.precos{background:var(--sf2);border-block:1px solid var(--ln)}
+.ciclo{display:flex;width:max-content;margin:0 auto 34px;background:var(--sf);border:1px solid var(--ln);border-radius:var(--rp);padding:5px;gap:4px;position:relative}
+.ciclo button{position:relative;z-index:1;border:0;background:none;border-radius:var(--rp);padding:10px 22px;font-weight:700;font-size:14.5px;cursor:pointer;color:var(--ink2);display:flex;align-items:center;gap:8px;transition:color .3s}
+.ciclo button.on{color:var(--on)}
+.ciclo .bolha{position:absolute;top:5px;bottom:5px;border-radius:var(--rp);background:var(--acc);transition:left .45s var(--e),width .45s var(--e);z-index:0}
+.ciclo .tagd{font-size:11.5px;background:var(--okS);color:var(--ok);padding:2px 9px;border-radius:var(--rp)}
+.ciclo button.on .tagd{background:rgba(255,255,255,.25);color:inherit}
+.pacotes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:stretch}
+.pac{position:relative;display:flex;flex-direction:column;gap:12px;background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);padding:26px 22px;box-shadow:var(--sh);transition:transform .4s var(--e),box-shadow .4s}
+.pac:hover{transform:translateY(-8px);box-shadow:var(--shG)}
+.pac.dest{border:2px solid var(--acc);box-shadow:var(--shG)}
+.pac .selo{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:var(--hero);color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px;border-radius:var(--rp);white-space:nowrap}
+.pac h3{margin:0;font-size:18px}
+.pac .qtd{color:var(--ink3);font-size:14px;margin-top:-8px}
+.valor{display:flex;align-items:baseline;gap:4px;margin-top:6px}
+.valor small{font-size:16px;font-weight:700;color:var(--ink2)}
+.valor b{font-size:44px;font-weight:800;letter-spacing:-.045em;line-height:1}
+.valor span{color:var(--ink3);font-size:14px;font-weight:600}
+.cada{font-size:13px;color:var(--ink3);min-height:20px}
+.cada .econ{color:var(--ok);font-weight:700}
+.pac ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:9px;font-size:14px;flex:1}
+.pac li{display:flex;gap:9px}
+.pac li .ic{width:18px;height:18px;color:var(--ok);margin-top:2px;stroke-width:2.2}
+.calc{margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px 36px;align-items:center;background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);padding:26px 28px;box-shadow:var(--sh)}
+.calc h3{margin:0 0 4px;font-size:18px}
+.calc p{margin:0;color:var(--ink2);font-size:14.5px}
+.faixas{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.faixa{flex:1;min-width:110px;border:1px solid var(--ln);border-radius:12px;padding:8px 10px;font-size:12.5px;color:var(--ink3);transition:all .3s var(--e)}
+.faixa b{display:block;font-size:15px;color:var(--ink2)}
+.faixa.on{border-color:var(--acc);background:var(--accS);color:var(--acc);transform:translateY(-3px)}
+.faixa.on b{color:var(--acc)}
+.slider{grid-column:1/-1;display:flex;align-items:center;gap:18px}
+.slider input{flex:1;accent-color:var(--acc);height:28px}
+.slider output{font-weight:800;font-size:18px;min-width:120px;text-align:right}
+.calc .res{text-align:right}
+.calc .res b{display:block;font-size:40px;font-weight:800;letter-spacing:-.04em;line-height:1.05}
+.calc .res small{color:var(--ink3);font-size:13px}
+.inclui{margin-top:26px;text-align:center;color:var(--ink2);font-size:15px}
+
+/* ---------- compra ---------- */
+.compra{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);box-shadow:var(--sh);padding:26px}
+.passos{display:flex;gap:8px;margin-bottom:22px}
+.passo{flex:1;height:5px;border-radius:9px;background:var(--ln);overflow:hidden}
+.passo i{display:block;height:100%;width:0;background:var(--hero);transition:width .5s var(--e)}
+.passo.ok i{width:100%}
 .etapa{display:flex;align-items:center;gap:10px;margin:0 0 14px}
-.etapa .n{width:28px;height:28px;border-radius:50%;background:var(--accS);color:var(--acc);display:grid;place-items:center;font-weight:800;font-size:13px}
-.etapa h3{margin:0;font-size:16px}
-.bloco+.bloco{border-top:1px solid var(--ln2);margin-top:22px;padding-top:22px}
+.etapa .n{width:30px;height:30px;border-radius:50%;background:var(--accS);color:var(--acc);display:grid;place-items:center;font-weight:800;font-size:13.5px;transition:background .3s,color .3s}
+.etapa.ok .n{background:var(--ok);color:#fff}
+.etapa h3{margin:0;font-size:17px}
+.bloco+.bloco{border-top:1px solid var(--ln2);margin-top:24px;padding-top:24px}
+.qtdbox{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.stepper{display:flex;align-items:center;border:1px solid var(--ln);border-radius:var(--rp);background:var(--sf2)}
+.stepper button{width:46px;height:46px;border:0;background:none;font-size:22px;font-weight:700;cursor:pointer;border-radius:50%;color:var(--acc)}
+.stepper button:hover{background:var(--accS)}
+.stepper input{width:64px;text-align:center;border:0;background:none;font-size:20px;font-weight:800;height:46px;outline:none;-moz-appearance:textfield}
+.stepper input::-webkit-inner-spin-button{-webkit-appearance:none}
 .escolhas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.escolha{border:1.5px solid var(--ln);border-radius:16px;padding:12px 14px;cursor:pointer;background:var(--sf);text-align:left;display:grid;gap:2px;transition:border-color .15s,background .15s}
-.escolha b{font-size:14.5px}
+.escolha{border:1.5px solid var(--ln);border-radius:16px;padding:13px 15px;cursor:pointer;background:var(--sf);text-align:left;display:grid;gap:2px;transition:border-color .2s,background .2s,transform .25s var(--e)}
+.escolha:hover{transform:translateY(-2px)}
+.escolha b{font-size:15px}
 .escolha small{color:var(--ink3);font-size:12.5px}
 .escolha.on{border-color:var(--acc);background:var(--accS)}
+.opcao{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--ln);border-radius:16px;padding:14px 16px;cursor:pointer;margin-top:14px;transition:border-color .2s,background .2s}
+.opcao:has(input:checked){border-color:var(--acc);background:var(--accS)}
+.opcao input{width:20px;height:20px;accent-color:var(--acc);margin-top:2px}
+.opcao b{display:block}
+.opcao small{color:var(--ink2);font-size:13px}
 .campos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .campo{display:grid;gap:6px}
 .campo.w{grid-column:1/-1}
 .campo label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
-.campo input,.campo select{height:44px;border:1px solid var(--ln);border-radius:var(--r2);background:var(--sf2);padding:0 12px;outline:none;width:100%}
-.campo input:focus,.campo select:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--accS);background:var(--sf)}
-.campo input[aria-invalid="true"]{border-color:var(--c4)}
-.usuarios{display:flex;align-items:center;gap:12px}
-.usuarios input[type=range]{flex:1;accent-color:var(--acc);height:auto;border:0;background:none;padding:0;box-shadow:none}
-.usuarios output{min-width:84px;text-align:right;font-weight:800}
-.dica{color:var(--ink3);font-size:12.5px;margin:8px 0 0}
-.resumo{position:sticky;top:90px;display:grid;gap:14px}
-.resumo h3{margin:0;font-size:16px}
-.res-linhas{display:grid;gap:9px;font-size:14px}
-.res-linhas div{display:flex;justify-content:space-between;gap:12px}
-.res-linhas span{color:var(--ink2)}
-.res-linhas .desc b{color:var(--ok)}
-.total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--ln2);padding-top:14px}
-.total b{font-size:28px;font-weight:800;letter-spacing:-.03em}
+.campo input{height:46px;border:1px solid var(--ln);border-radius:var(--r2);background:var(--sf2);padding:0 13px;outline:none;width:100%;transition:border-color .2s,box-shadow .2s,background .2s}
+.campo input:focus{border-color:var(--acc);box-shadow:0 0 0 4px var(--accS);background:var(--sf)}
+.campo input[aria-invalid="true"]{border-color:var(--c4);animation:treme .35s}
+@keyframes treme{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.resumo{position:sticky;top:92px;display:grid;gap:14px}
+.resumo h3{margin:0;font-size:17px}
+.res-linhas{display:grid;gap:10px;font-size:14.5px}
+.res-linhas div{display:flex;justify-content:space-between;gap:12px;animation:entra .4s var(--e)}
+.res-linhas span:first-child{color:var(--ink2)}
+.res-linhas .desc span:last-child{color:var(--ok);font-weight:700}
+.total{display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid var(--ln2);padding-top:16px;gap:12px}
+.total b{display:block;font-size:34px;font-weight:800;letter-spacing:-.04em;line-height:1.05}
 .total small{color:var(--ink3);font-size:12.5px;display:block}
 .seguro{display:flex;gap:10px;align-items:flex-start;background:var(--sf2);border-radius:14px;padding:12px;font-size:12.5px;color:var(--ink2)}
 .seguro .ic{color:var(--ok)}
-.erro{color:var(--c4);font-size:13px;font-weight:600;min-height:18px;margin:0}
-.ok-envio{background:var(--okS);color:var(--ok);border-radius:14px;padding:12px 14px;font-size:13.5px;font-weight:600}
+.erro{color:var(--c4);font-size:13.5px;font-weight:600;min-height:18px;margin:0}
+.okbox{background:var(--okS);color:var(--ok);border-radius:14px;padding:14px;font-size:14px;font-weight:600;animation:entra .5s var(--e)}
 
-/* perguntas e rodapé */
-.faq{display:grid;gap:10px;max-width:820px}
-details{background:var(--sf);border:1px solid var(--ln);border-radius:18px;padding:16px 20px}
-summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:12px}
+/* ---------- prova social, dúvidas, final ---------- */
+.depo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.depo .card p{margin:0 0 16px;font-size:15.5px;color:var(--ink2)}
+.depo .quem{display:flex;align-items:center;gap:10px;font-size:14px}
+.depo .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800}
+.depo .quem small{display:block;color:var(--ink3)}
+.estrelas{color:#E3A23B;letter-spacing:2px;margin-bottom:10px}
+.faq{display:grid;gap:10px;max-width:860px;margin:0 auto}
+details{background:var(--sf);border:1px solid var(--ln);border-radius:18px;padding:18px 22px;transition:box-shadow .3s}
+details[open]{box-shadow:var(--sh)}
+summary{cursor:pointer;font-weight:700;font-size:16px;list-style:none;display:flex;justify-content:space-between;gap:12px}
 summary::-webkit-details-marker{display:none}
-summary::after{content:"+";color:var(--acc);font-size:20px;line-height:1}
-details[open] summary::after{content:"−"}
-details p{margin:10px 0 0;color:var(--ink2);font-size:14.5px}
-.final{background:var(--hero);color:#fff;border-radius:28px;padding:40px;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
-.final h2{color:#fff;margin:0}
-.final p{margin:6px 0 0;opacity:.85}
-.final .btn{background:#fff;color:#3F4EB8;border-color:#fff}
-.final .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
-footer{padding:36px 0 48px;color:var(--ink3);font-size:13px}
+summary::after{content:"+";color:var(--acc);font-size:22px;line-height:1;transition:transform .3s var(--e)}
+details[open] summary::after{transform:rotate(45deg)}
+details p{margin:12px 0 0;color:var(--ink2);font-size:15px;animation:entra .4s var(--e)}
+.final{position:relative;overflow:hidden;background:var(--hero);color:#fff;border-radius:34px;padding:64px 48px;text-align:center}
+.final::before{content:"";position:absolute;width:520px;height:520px;border-radius:50%;background:rgba(255,255,255,.08);top:-260px;right:-120px}
+.final h2{color:#fff;position:relative;max-width:760px;margin:0 auto 12px}
+.final p{position:relative;opacity:.88;font-size:18px;margin:0 auto 28px;max-width:620px}
+.final .ctas .btn{background:#fff;color:#3F4EB8;border-color:#fff}
+.final .ctas .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.55)}
+footer{padding:40px 0 110px;color:var(--ink3);font-size:13.5px}
 footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
 
-/* responsivo */
-@media (max-width:980px){
-  .hero,.compra{grid-template-columns:minmax(0,1fr)}
-  .hero{padding-top:36px;gap:32px}
-  .grid3,.planos{grid-template-columns:minmax(0,1fr)}
-  .numeros{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .resumo{position:static}
+/* barra de compra fixa no celular */
+.barra-compra{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:40;display:none;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--ln);border-radius:20px;padding:10px 10px 10px 16px;box-shadow:var(--shG);transform:translateY(140%);transition:transform .5s var(--e)}
+.barra-compra.on{transform:none}
+.barra-compra small{display:block;color:var(--ink3);font-size:11.5px}
+.barra-compra b{font-size:17px}
+
+/* ---------- responsivo ---------- */
+@media (max-width:1060px){
+  .flut{display:none}
+  .tour{grid-template-columns:minmax(0,1fr)}
+  .vitrine{position:static;order:-1}
+  .abas{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aba p{display:none!important}
+  .pacotes{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grade{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:900px){
   .top nav{display:none}
+  .mod,.compra{grid-template-columns:minmax(0,1fr);gap:28px}
+  .mod.inv .txt{order:0}
+  .resumo{position:static}
+  .numeros,.depo{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .barra-compra{display:flex}
 }
 @media (max-width:600px){
   .wrap{padding:0 16px}
-  .top .wrap{height:60px;gap:10px}
+  .top .wrap{height:62px;gap:8px}
   .top .btn:not(.pri):not(.iconbtn){display:none}
-  section{padding:40px 0}
-  .lead{font-size:16px}
-  .kpis{grid-template-columns:1fr 1fr}
-  .kpis .kpi.h{grid-column:1/-1}
-  .escolhas,.campos{grid-template-columns:minmax(0,1fr)}
-  .card{padding:18px}
-  .final{padding:28px}
-  .ciclo{display:flex;width:100%}
-  .ciclo button{flex:1;justify-content:center;padding:9px 8px}
+  .top .btn.pri{height:40px;padding:0 16px}
+  .hero{padding:110px 0 40px}
+  section{padding:64px 0}
+  .palco{margin-top:40px}
+  .numeros,.depo,.pacotes,.grade,.escolhas,.campos{grid-template-columns:minmax(0,1fr)}
+  .abas{grid-template-columns:minmax(0,1fr)}
+  .calc{grid-template-columns:minmax(0,1fr);padding:22px}
+  .calc .res{text-align:left}
+  .card{padding:20px}
+  .final{padding:44px 22px;border-radius:26px}
+  .btn.lg{height:52px;padding:0 22px;width:100%}
+  .ctas{width:100%}
+  .ciclo{width:100%}
+  .ciclo button{flex:1;justify-content:center;padding:10px 6px}
+  .mods{gap:72px}
 }
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></symbol>
-  <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></symbol>
   <symbol id="i-funil" viewBox="0 0 24 24"><path d="M3.5 5h17l-6.5 7.5v5L10 20v-7.5z"/></symbol>
   <symbol id="i-regua" viewBox="0 0 24 24"><path d="M3 16.5L16.5 3l4.5 4.5L7.5 21z"/><path d="M7 12.5l2 2M10 9.5l2 2M13 6.5l2 2"/></symbol>
   <symbol id="i-caixa" viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></symbol>
@@ -231,97 +366,148 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
   <symbol id="i-lua" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></symbol>
   <symbol id="i-seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.8v6.4l5.2-3.2z"/></symbol>
+  <symbol id="i-grade" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></symbol>
+  <symbol id="i-pessoas" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.2 2.7-5 6-5s6 1.8 6 5"/><path d="M16 5a3 3 0 010 6M18 14c1.8.7 3 2.2 3 5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></symbol>
+  <symbol id="i-excel" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 8l8 8M16 8l-8 8"/></symbol>
+  <symbol id="i-foto" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></symbol>
+  <symbol id="i-sino" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 004 0"/></symbol>
+  <symbol id="i-historico" viewBox="0 0 24 24"><path d="M4 12a8 8 0 102.3-5.7L4 8.5"/><path d="M4 4v4.5h4.5M12 8v4.5l3 2"/></symbol>
+  <symbol id="i-raio" viewBox="0 0 24 24"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></symbol>
 </svg>
 
-<header class="top">
+<header class="top" id="topo">
   <div class="wrap">
     <a class="brand" href="#inicio" aria-label="EventFlow, início">
-      <span class="mk"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h6M2.5 8h8.5M2.5 11.5h6"/><path d="M11.2 4.6L14 8l-2.8 3.4"/></svg></span>
+      <span class="mk"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h6M2.5 8h8.5M2.5 11.5h6"/><path d="M11.2 4.6L14 8l-2.8 3.4"/></svg></span>
       EventFlow
     </a>
-    <nav aria-label="Seções"><a href="#vantagens">Vantagens</a><a href="#planos">Planos</a><a href="#comprar">Comprar</a><a href="#perguntas">Dúvidas</a></nav>
+    <nav aria-label="Seções"><a href="#tour">Como funciona</a><a href="#funcionalidades">Funcionalidades</a><a href="#precos">Preços</a><a href="#perguntas">Dúvidas</a></nav>
     <div class="grow"></div>
     <button class="btn iconbtn ghost" id="tema" type="button" aria-label="Alternar tema claro e escuro"><svg class="ic"><use href="#i-lua"/></svg></button>
-    <a class="btn" data-link="demo" href="#" target="_blank" rel="noopener">Ver demonstração</a>
-    <a class="btn pri" href="#planos">Assinar</a>
+    <a class="btn ghost" data-link="app" href="#">Entrar</a>
+    <a class="btn" data-link="demo" href="#" target="_blank" rel="noopener">Demonstração</a>
+    <a class="btn pri" href="#comprar">Assinar agora</a>
   </div>
 </header>
 
 <main id="inicio">
-  <div class="wrap hero">
-    <div>
-      <span class="eyebrow">ERP + CRM para locadoras de eventos</span>
-      <h1>Do orçamento à volta do caminhão, <em>tudo num só lugar</em>.</h1>
-      <p class="lead">O EventFlow junta comercial, produção técnica, estoque, cargas, financeiro e equipe. Sem planilha perdida, sem equipamento em dois eventos ao mesmo tempo.</p>
-      <div class="ctas">
-        <a class="btn pri lg" href="#planos">Ver planos e preços <svg class="ic"><use href="#i-seta"/></svg></a>
-        <a class="btn lg" data-link="demo" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-play"/></svg> Testar a demonstração</a>
+  <!-- ============ hero ============ -->
+  <div class="hero">
+    <div class="wrap">
+      <span class="eyebrow rv"><i class="pt"></i>ERP + CRM feito para locadoras de eventos</span>
+      <h1 class="rv" style="--d:1"><span class="l1">Sua locadora de <span class="troca" id="troca"><span class="grad">som</span></span></span> <span class="l2">organizada de ponta a ponta</span></h1>
+      <p class="lead rv" style="--d:2">Do primeiro contato do cliente até o caminhão voltar ao galpão: comercial, produção técnica, estoque, cargas, financeiro e equipe num só sistema. Sem planilha perdida, sem equipamento em dois eventos ao mesmo tempo.</p>
+      <div class="ctas rv" style="--d:3">
+        <a class="btn pri lg pulso" href="#precos"><span>Ver preços · a partir de R$ <span data-preco-min>100</span>/licença</span> <svg class="ic seta"><use href="#i-seta"/></svg></a>
+        <a class="btn lg" data-link="demo" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-play"/></svg> Testar a demonstração grátis</a>
       </div>
-      <div class="provas">
+      <div class="provas rv" style="--d:4">
         <span><svg class="ic"><use href="#i-check"/></svg>Sem instalação</span>
-        <span><svg class="ic"><use href="#i-check"/></svg>Funciona no celular</span>
+        <span><svg class="ic"><use href="#i-check"/></svg>Computador e celular</span>
+        <span><svg class="ic"><use href="#i-check"/></svg>Todos os módulos inclusos</span>
         <span><svg class="ic"><use href="#i-check"/></svg>Cancele quando quiser</span>
       </div>
-    </div>
-    <div class="painel" aria-hidden="true">
-      <div class="bar"><i></i><i></i><i></i><b>Painel operacional</b></div>
-      <div class="kpis">
-        <div class="kpi h"><small>Receita contratada · 12 meses</small><strong>R$ 1,2 mi</strong><span class="ok">+18% vs ano anterior</span></div>
-        <div class="kpi"><small>OS em andamento</small><strong>8</strong><span class="ok">3 liberadas</span></div>
-        <div class="kpi"><small>Conflitos</small><strong>1</strong><span class="ok" style="color:var(--w)">sublocar</span></div>
-      </div>
-      <div class="grafico"><div style="height:30%"></div><div style="height:45%"></div><div style="height:38%"></div><div style="height:55%"></div><div style="height:48%"></div><div style="height:62%"></div><div style="height:58%"></div><div class="on" style="height:92%"></div></div>
-      <div class="linhas">
-        <div class="linha"><span class="av" style="background:#4B5BD0">SP</span><div><b>Congresso de Cardiologia</b><small>OS-0129 · Expo Center Norte</small></div><span class="pill">Carregada</span></div>
-        <div class="linha"><span class="av" style="background:#2FA38A">GM</span><div><b>Convenção Nacional de Vendas</b><small>OS-0130 · Hotel Grand Paulista</small></div><span class="pill w">Em separação</span></div>
+      <div class="palco" id="palco">
+        <div class="janela"><div class="barra"><i></i><i></i><i></i><span>app.eventflow · Painel operacional</span></div>
+          <img src="img/painel.jpg" alt="Painel operacional do EventFlow com receita contratada, OS em andamento, gráfico de receita e próximos eventos" width="1440" height="900" fetchpriority="high"></div>
+        <div class="flut f1" style="--d:0"><span class="bol" style="background:var(--okS);color:var(--ok)"><svg class="ic"><use href="#i-check"/></svg></span><div><b>Negócio fechado</b><small>Congresso · R$ 185 mil</small></div></div>
+        <div class="flut f2" style="--d:1"><span class="bol" style="background:var(--accS);color:var(--acc)"><svg class="ic"><use href="#i-caminhao"/></svg></span><div><b>Carga OSC-0091 saiu</b><small>312 peças · baixa automática</small></div></div>
+        <div class="flut f3" style="--d:2"><span class="bol" style="background:var(--wS);color:var(--w)"><svg class="ic"><use href="#i-maos"/></svg></span><div><b>Falta 8 moving beam</b><small>Sublocado do parceiro em 1 clique</small></div></div>
+        <div class="flut f4" style="--d:3"><span class="bol" style="background:var(--accS);color:var(--acc)"><svg class="ic"><use href="#i-regua"/></svg></span><div><b>Memorial pronto</b><small>Solo e aéreo · enviado no WhatsApp</small></div></div>
       </div>
     </div>
   </div>
 
-  <section id="vantagens">
+  <div class="marquee" aria-label="Para locadoras de"><div class="trilho" id="trilho"></div></div>
+
+  <!-- ============ números ============ -->
+  <section>
     <div class="wrap">
-      <div class="sh"><span class="eyebrow">Vantagens</span><h2>Feito para quem vive de montar evento</h2>
-        <p>Cada módulo nasceu da rotina de uma locadora: do primeiro contato do cliente até o equipamento voltar para a prateleira.</p></div>
-      <div class="grid3" id="listaVantagens"></div>
       <div class="numeros">
-        <div class="card"><strong>3</strong><span>níveis de acesso: gerência, produção e estoque</span></div>
-        <div class="card"><strong>1 clique</strong><span>do negócio fechado à ordem de serviço</span></div>
-        <div class="card"><strong>0</strong><span>equipamentos reservados em dois eventos ao mesmo tempo</span></div>
-        <div class="card"><strong>100%</strong><span>na nuvem, no computador e no celular</span></div>
+        <div class="num rv" style="--d:0"><strong data-conta="9">0</strong><span>módulos integrados, do comercial ao financeiro</span></div>
+        <div class="num rv" style="--d:1"><strong data-conta="3">0</strong><span>níveis de acesso: gerência, produção e estoque</span></div>
+        <div class="num rv" style="--d:2"><strong data-conta="1" data-suf=" clique">0</strong><span>do negócio fechado à ordem de serviço</span></div>
+        <div class="num rv" style="--d:3"><strong data-conta="100" data-suf="%">0</strong><span>na nuvem, sem servidor, sem instalação</span></div>
       </div>
     </div>
   </section>
 
-  <section id="planos">
+  <!-- ============ tour ============ -->
+  <section id="tour" style="padding-top:20px">
     <div class="wrap">
-      <div class="sh"><span class="eyebrow">Planos</span><h2>Escolha o tamanho da sua operação</h2>
-        <p>Todos os planos têm atualizações, backup diário e suporte. Troque de plano quando precisar.</p></div>
-      <div class="ciclo" role="group" aria-label="Forma de cobrança">
+      <div class="sh rv"><span class="eyebrow">Como funciona</span><h2>Veja o EventFlow por dentro</h2>
+        <p>Clique em cada etapa da operação e veja a tela real do sistema.</p></div>
+      <div class="tour" id="tourBox">
+        <div class="abas" id="abas" role="tablist" aria-label="Etapas"></div>
+        <div class="vitrine rv zoom"><div class="janela"><div class="barra"><i></i><i></i><i></i><span id="tourUrl">app.eventflow</span></div>
+          <img id="tourImg" src="img/pipeline.jpg" alt="" width="1440" height="900" loading="lazy"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ funcionalidades ============ -->
+  <section id="funcionalidades">
+    <div class="wrap">
+      <div class="sh rv"><span class="eyebrow">Funcionalidades</span><h2>Tudo o que uma locadora precisa, sem remendo</h2>
+        <p>Cada módulo nasceu da rotina de quem monta evento. E todos conversam entre si: o que o comercial vende vira escopo, carga e conta a receber sozinho.</p></div>
+      <div class="mods" id="mods"></div>
+    </div>
+  </section>
+
+  <!-- ============ tudo incluso ============ -->
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <div class="sh rv"><span class="eyebrow">E tem mais</span><h2>Detalhes que fazem diferença no dia a dia</h2></div>
+      <div class="grade" id="grade"></div>
+    </div>
+  </section>
+
+  <!-- ============ preços ============ -->
+  <section id="precos" class="precos">
+    <div class="wrap">
+      <div class="sh rv"><span class="eyebrow">Preços</span><h2>Pague só pelas licenças que usar</h2>
+        <p>Cada licença é uma pessoa da sua equipe com login próprio. Quanto mais licenças, menor o preço de cada uma. <b>Todos os módulos estão inclusos em todos os pacotes.</b></p></div>
+      <div class="ciclo rv" role="group" aria-label="Forma de cobrança">
+        <span class="bolha" id="bolha"></span>
         <button type="button" data-ciclo="mensal" class="on" aria-pressed="true">Mensal</button>
         <button type="button" data-ciclo="anual" aria-pressed="false">Anual <span class="tagd" id="tagDesconto"></span></button>
       </div>
-      <div class="planos" id="listaPlanos"></div>
-      <p class="obs-planos" id="obsPlanos"></p>
+      <div class="pacotes" id="pacotes"></div>
+      <div class="calc rv">
+        <div><h3>Precisa de outra quantidade?</h3><p>Arraste e veja na hora quanto fica. O preço de cada licença cai conforme a faixa.</p></div>
+        <div class="res"><b id="calcTotal">—</b><small id="calcSub"></small></div>
+        <div class="slider"><input type="range" id="calcQtd" min="1" max="60" value="8" aria-label="Quantidade de licenças"><output id="calcOut" for="calcQtd"></output></div>
+        <div class="faixas" id="faixas"></div>
+        <div style="grid-column:1/-1;display:flex;justify-content:flex-end"><button class="btn pri" type="button" id="calcAssinar">Assinar com esta quantidade <svg class="ic seta"><use href="#i-seta"/></svg></button></div>
+      </div>
+      <p class="inclui rv" id="obsPrecos"></p>
     </div>
   </section>
 
+  <!-- ============ compra ============ -->
   <section id="comprar">
     <div class="wrap">
-      <div class="sh"><span class="eyebrow">Comprar</span><h2>Monte sua assinatura</h2>
-        <p>Escolha o plano, informe os dados da empresa e siga para o pagamento seguro. O acesso é liberado assim que o pagamento é confirmado.</p></div>
+      <div class="sh rv"><span class="eyebrow">Assinar</span><h2>Leva 2 minutos</h2>
+        <p>Escolha as licenças, informe a empresa e siga para o pagamento seguro. O acesso é liberado assim que o pagamento é confirmado.</p></div>
       <div class="compra">
-        <form class="card" id="formCompra" novalidate>
+        <form class="card rv esq" id="formCompra" novalidate>
+          <div class="passos" aria-hidden="true"><div class="passo ok" id="p1"><i></i></div><div class="passo" id="p2"><i></i></div><div class="passo" id="p3"><i></i></div></div>
           <div class="bloco">
-            <div class="etapa"><span class="n">1</span><h3>Plano e usuários</h3></div>
-            <div class="escolhas" id="escolhaPlano" role="radiogroup" aria-label="Plano"></div>
-            <div class="campo" style="margin-top:16px">
-              <label for="cUsuarios">Quantas pessoas vão usar</label>
-              <div class="usuarios"><input type="range" id="cUsuarios" min="1" max="60" value="5"><output id="oUsuarios" for="cUsuarios">5 pessoas</output></div>
-              <p class="dica" id="dicaUsuarios"></p>
+            <div class="etapa ok" id="e1"><span class="n">1</span><h3>Licenças e cobrança</h3></div>
+            <div class="qtdbox">
+              <div class="stepper"><button type="button" data-q="-1" aria-label="Menos uma licença">−</button><input id="cQtd" type="number" min="1" max="500" value="5" aria-label="Quantidade de licenças"><button type="button" data-q="1" aria-label="Mais uma licença">+</button></div>
+              <span id="cQtdTxt" style="color:var(--ink2);font-size:14.5px"></span>
             </div>
+            <div class="escolhas" style="margin-top:14px" role="radiogroup" aria-label="Cobrança">
+              <button type="button" class="escolha on" data-cc="mensal" role="radio" aria-checked="true"><b>Mensal</b><small>Cancele quando quiser</small></button>
+              <button type="button" class="escolha" data-cc="anual" role="radio" aria-checked="false"><b>Anual</b><small id="ccAnual"></small></button>
+            </div>
+            <label class="opcao"><input type="checkbox" id="cImpl"><span><b>Implantação assistida · <span id="implValor"></span></b><small>Importamos o seu inventário, kits e frota, configuramos a equipe e treinamos todo mundo por vídeo. Grátis no plano anual.</small></span></label>
           </div>
           <div class="bloco">
-            <div class="etapa"><span class="n">2</span><h3>Dados da empresa</h3></div>
+            <div class="etapa" id="e2"><span class="n">2</span><h3>Dados da empresa</h3></div>
             <div class="campos">
               <div class="campo w"><label for="cEmpresa">Nome da empresa</label><input id="cEmpresa" autocomplete="organization" required placeholder="Ex.: Atlas Eventos e Locação"></div>
               <div class="campo"><label for="cDoc">CNPJ ou CPF</label><input id="cDoc" inputmode="numeric" required placeholder="00.000.000/0000-00"></div>
@@ -331,173 +517,325 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
             </div>
           </div>
           <div class="bloco">
-            <div class="etapa"><span class="n">3</span><h3>Forma de pagamento</h3></div>
-            <div class="escolhas" id="escolhaPagamento" role="radiogroup" aria-label="Forma de pagamento">
+            <div class="etapa" id="e3"><span class="n">3</span><h3>Forma de pagamento</h3></div>
+            <div class="escolhas" role="radiogroup" aria-label="Forma de pagamento">
               <button type="button" class="escolha on" data-pag="pix" role="radio" aria-checked="true"><b>Pix</b><small>Liberação imediata</small></button>
               <button type="button" class="escolha" data-pag="cartao" role="radio" aria-checked="false"><b>Cartão</b><small>Recorrente, sem burocracia</small></button>
-              <button type="button" class="escolha" data-pag="boleto" role="radio" aria-checked="false"><b>Boleto</b><small>Liberação em até 2 dias úteis</small></button>
+              <button type="button" class="escolha" data-pag="boleto" role="radio" aria-checked="false"><b>Boleto</b><small>Até 2 dias úteis</small></button>
             </div>
           </div>
         </form>
-        <aside class="card resumo" aria-label="Resumo do pedido">
+        <aside class="card resumo rv dir" aria-label="Resumo do pedido">
           <h3>Resumo do pedido</h3>
           <div class="res-linhas" id="resLinhas"></div>
           <div class="total"><div><small id="totLabel">Total por mês</small><b id="totValor">—</b></div><small id="totSub" style="text-align:right"></small></div>
           <p class="erro" id="erroCompra" role="alert"></p>
-          <button class="btn pri lg" type="submit" form="formCompra" id="btnPagar">Ir para o pagamento seguro <svg class="ic"><use href="#i-seta"/></svg></button>
-          <div class="seguro"><svg class="ic"><use href="#i-escudo"/></svg><span id="txtSeguro">O pagamento é feito no ambiente seguro do nosso parceiro de pagamentos. Os dados do seu cartão não passam por esta página.</span></div>
-          <div id="okEnvio" hidden class="ok-envio"></div>
+          <button class="btn pri lg" type="submit" form="formCompra" id="btnPagar"><span id="btnPagarTxt">Ir para o pagamento seguro</span> <svg class="ic seta"><use href="#i-seta"/></svg></button>
+          <div class="seguro"><svg class="ic"><use href="#i-escudo"/></svg><span id="txtSeguro"></span></div>
+          <div id="okEnvio" hidden class="okbox"></div>
         </aside>
       </div>
     </div>
   </section>
 
-  <section id="perguntas">
+  <!-- ============ depoimentos (exemplos) ============ -->
+  <section style="padding-top:20px">
     <div class="wrap">
-      <div class="sh"><span class="eyebrow">Dúvidas</span><h2>Perguntas frequentes</h2></div>
-      <div class="faq">
-        <details><summary>Preciso instalar alguma coisa?</summary><p>Não. O EventFlow roda no navegador, no computador e no celular. Basta entrar com o e-mail e a senha de cada pessoa.</p></details>
-        <details><summary>Consigo importar o meu inventário?</summary><p>Sim. Você importa itens, kits, frota e fotos por uma planilha Excel, e baixa um modelo pronto dentro do sistema.</p></details>
-        <details><summary>Cada pessoa vê tudo?</summary><p>Não. São três níveis de acesso: gerência vê tudo, inclusive valores e financeiro; produção cuida de negócios, OS e memoriais; estoque cuida de inventário, cargas e frota.</p></details>
-        <details><summary>Posso trabalhar com outras locadoras?</summary><p>Sim. Em Parceiros e sublocação você pede equipamento a outras empresas, com datas de retirada e devolução, e responde aos pedidos delas. Se a parceira também usa o EventFlow, o pedido chega direto no sistema dela.</p></details>
-        <details><summary>Meus dados ficam seguros?</summary><p>Os dados ficam num banco na nuvem com backup diário, e cada empresa só enxerga as próprias informações. Toda alteração fica registrada no histórico.</p></details>
-        <details><summary>Posso cancelar?</summary><p>No plano mensal, sim, a qualquer momento, sem multa. No anual, o desconto vale pelo período contratado.</p></details>
-      </div>
+      <div class="sh rv"><span class="eyebrow">Na prática</span><h2>O que muda na sua rotina</h2></div>
+      <div class="depo" id="depo"></div>
     </div>
   </section>
 
-  <section>
+  <!-- ============ dúvidas ============ -->
+  <section id="perguntas" style="padding-top:20px">
     <div class="wrap">
-      <div class="final">
-        <div class="grow"><h2>Veja o sistema funcionando antes de assinar</h2><p>Uma locadora de grande porte já preenchida, com os três níveis de acesso.</p></div>
-        <a class="btn ghost lg" data-link="demo" href="#" target="_blank" rel="noopener">Abrir demonstração</a>
-        <a class="btn lg" href="#comprar">Assinar agora</a>
+      <div class="sh rv"><span class="eyebrow">Dúvidas</span><h2>Perguntas frequentes</h2></div>
+      <div class="faq" id="faq"></div>
+    </div>
+  </section>
+
+  <section style="padding-top:10px">
+    <div class="wrap">
+      <div class="final rv zoom">
+        <h2>Comece hoje e organize o próximo evento no EventFlow</h2>
+        <p>Teste a demonstração com uma locadora de grande porte já preenchida, ou assine agora a partir de R$ <span data-preco-min>100</span> por licença.</p>
+        <div class="ctas"><a class="btn lg" href="#comprar">Assinar agora <svg class="ic seta"><use href="#i-seta"/></svg></a><a class="btn ghost lg" data-link="demo" href="#" target="_blank" rel="noopener">Abrir a demonstração</a></div>
       </div>
     </div>
   </section>
 </main>
 
-<footer><div class="wrap"><b style="color:var(--ink)">EventFlow</b><span>ERP e CRM para locadoras de equipamentos para eventos</span><div class="grow"></div><a href="#" data-link="contato" id="lnkContato">Fale com a gente</a></div></footer>
+<footer><div class="wrap"><b style="color:var(--ink)">EventFlow</b><span>ERP e CRM para locadoras de equipamentos para eventos</span><div class="grow"></div><a href="#" data-link="whats">Fale com a gente no WhatsApp</a><a href="#" data-link="email">E-mail</a></div></footer>
+
+<div class="barra-compra" id="barraCompra"><div class="grow"><small>A partir de</small><b>R$ <span data-preco-min>100</span>/licença</b></div><a class="btn pri" href="#comprar">Assinar</a></div>
 
 <script>
 /* =====================================================================
-   CONFIGURAÇÃO · edite aqui preços, links de pagamento e contatos
+   CONFIGURAÇÃO · edite aqui preços, links e contatos
    ===================================================================== */
 const CONFIG = {
+  app: "https://app.seudominio.com.br",              // endereço do sistema (botão Entrar)
   demo: "https://eventflow-demo.pages.dev",          // endereço da demonstração
-  whatsapp: "5511999999999",                          // só números, com DDI 55 e DDD
+  whatsapp: "5511999999999",                          // só números, com 55 e DDD
   email: "contato@seudominio.com.br",
-  descontoAnual: 0.20,                                // 20% de desconto no plano anual
-  usuarioExtra: 39,                                   // R$ por pessoa a mais, por mês
-  planos: [
-    { id: "essencial", nome: "Essencial", para: "Locadoras pequenas começando a se organizar", mensal: 349, usuarios: 5, implantacao: 0,
-      inclui: ["Estoque com fotos e disponibilidade por período", "Ordens de serviço e ordens de carga", "Agenda de cargas e frota", "Importação do inventário por Excel", "App no celular"],
-      nao: ["Pipeline comercial e orçamentos", "Financeiro (contas e reembolsos)", "Parceiros e sublocação"] },
-    { id: "profissional", nome: "Profissional", para: "A operação completa de uma locadora em crescimento", mensal: 749, usuarios: 15, implantacao: 990, destaque: true,
-      inclui: ["Tudo do Essencial", "Pipeline comercial, visita técnica, 3D e orçamentos", "Memorial de solo e aéreo por sala", "Contas a pagar e receber, reembolsos", "Mural, chat e notas da equipe", "Escalas de freelancers"],
-      nao: ["Parceiros e sublocação entre empresas"] },
-    { id: "empresa", nome: "Empresa", para: "Grandes locadoras e grupos com várias equipes", mensal: 1490, usuarios: 40, implantacao: 2490,
-      inclui: ["Tudo do Profissional", "Parceiros e sublocação entre empresas", "Histórico de alterações (auditoria)", "Implantação assistida e treinamento da equipe", "Suporte prioritário por WhatsApp"],
-      nao: [] }
+  descontoAnual: 0.20,                                // 20% de desconto no anual
+  implantacao: 990,                                   // implantação assistida (grátis no anual)
+  /* preço de cada licença por mês, conforme a quantidade total */
+  faixas: [
+    { ate: 1,   preco: 100 },
+    { ate: 2,   preco: 90 },
+    { ate: 5,   preco: 85 },
+    { ate: 10,  preco: 75 },
+    { ate: 20,  preco: 65 },
+    { ate: 9999, preco: 55 }
   ],
-  /* links de pagamento de cada plano (Mercado Pago, Stripe, Asaas, PagSeguro…).
-     Deixe "" enquanto não tiver: o pedido segue pelo WhatsApp com tudo preenchido. */
-  pagamento: {
-    essencial:    { mensal: "", anual: "" },
-    profissional: { mensal: "", anual: "" },
-    empresa:      { mensal: "", anual: "" }
-  }
+  /* pacotes mostrados em destaque */
+  pacotes: [
+    { nome: "Solo", qtd: 1, para: "Para quem toca a locadora sozinho", itens: ["Todos os módulos", "Inventário com fotos ilimitadas", "App no celular", "Suporte por e-mail"] },
+    { nome: "Dupla", qtd: 2, para: "Sócio + estoque, ou comercial + produção", itens: ["Tudo do Solo", "2 logins com níveis de acesso", "Chat e mural da equipe", "Suporte por WhatsApp"] },
+    { nome: "Equipe", qtd: 5, para: "A operação completa de uma locadora", itens: ["Tudo da Dupla", "Gerência, produção e estoque", "Escalas e freelancers", "Parceiros e sublocação"], destaque: true },
+    { nome: "Empresa", qtd: 10, para: "Locadoras grandes e com várias frentes", itens: ["Tudo da Equipe", "Histórico de alterações", "Implantação grátis no anual", "Suporte prioritário"] }
+  ],
+  /* links de pagamento (Mercado Pago, Stripe, Asaas…). Vazio = o pedido vai pelo WhatsApp. */
+  pagamento: { mensal: "", anual: "" }
 };
 
 /* ===================================================================== */
-const $ = s => document.querySelector(s);
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const brl = n => "R$ " + Math.round(n).toLocaleString("pt-BR");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const ic = n => `<svg class="ic"><use href="#i-${n}"/></svg>`;
-const E = { ciclo: "mensal", plano: (CONFIG.planos.find(p => p.destaque) || CONFIG.planos[0]).id, pag: "pix" };
-const plano = () => CONFIG.planos.find(p => p.id === E.plano);
-const mensalDe = p => E.ciclo === "anual" ? p.mensal * (1 - CONFIG.descontoAnual) : p.mensal;
+const ic = (n, c) => `<svg class="ic ${c || ""}"><use href="#i-${n}"/></svg>`;
+const calma = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const E = { ciclo: "mensal", pag: "pix", qtd: 5 };
+const faixaDe = q => CONFIG.faixas.find(f => q <= f.ate);
+const precoLic = q => faixaDe(q).preco * (E.ciclo === "anual" ? 1 - CONFIG.descontoAnual : 1);
+const pMin = Math.min(...CONFIG.faixas.map(f => f.preco));
 
-/* links fixos */
-document.querySelectorAll('[data-link="demo"]').forEach(a => a.href = CONFIG.demo);
-$("#lnkContato").href = "https://wa.me/" + CONFIG.whatsapp;
+/* links */
+const LINK = { app: CONFIG.app, demo: CONFIG.demo, whats: "https://wa.me/" + CONFIG.whatsapp, email: "mailto:" + CONFIG.email };
+$$("[data-link]").forEach(a => a.href = LINK[a.dataset.link] || "#");
+$$("[data-preco-min]").forEach(s => s.textContent = pMin);
 $("#tagDesconto").textContent = "−" + Math.round(CONFIG.descontoAnual * 100) + "%";
 
-/* tema claro/escuro, lembrado neste navegador */
+/* tema */
 (() => { try { const t = localStorage.getItem("ef-site-tema"); if (t) document.documentElement.dataset.theme = t; } catch (e) {} })();
 $("#tema").addEventListener("click", () => {
-  const escuro = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  document.documentElement.dataset.theme = escuro ? "light" : "dark";
-  try { localStorage.setItem("ef-site-tema", document.documentElement.dataset.theme); } catch (e) {}
+  const r = document.documentElement, escuro = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("ef-site-tema", r.dataset.theme); } catch (e) {}
 });
 
-/* vantagens */
-const VANTAGENS = [
-  ["funil", "Comercial que fecha mais", "Pipeline do primeiro contato ao contrato, com briefing, visita técnica, projeto 3D e orçamento em PDF.", ["Orçamento por sala e por diária", "Temperatura e previsão de cada negócio"]],
-  ["regua", "Produção técnica segura", "Memorial de solo e aéreo por sala, pontos de ancoragem, cargas e descritivo prontos para o engenheiro.", ["Compartilhe memoriais pelo WhatsApp", "Escopo da OS gerado do orçamento"]],
-  ["caixa", "Estoque sem conflito", "Disponibilidade calculada pela janela de carga e descarga. O sistema avisa antes de faltar equipamento.", ["Fotos, kits e consumo elétrico", "Manutenção e avarias na volta"]],
-  ["caminhao", "Cargas e logística", "Ordem de carga com romaneio, frota, motoristas e escala de freelancers por dia.", ["Baixa automática na saída e na volta", "Agenda de cargas da semana"]],
-  ["carteira", "Financeiro na mão", "Contas a pagar e receber ligadas às OS, fluxo de caixa projetado e reembolsos com comprovante.", ["Sinal e saldo gerados da OS", "Inadimplência e vencimentos"]],
-  ["maos", "Parceiros e sublocação", "Peça equipamento a outras locadoras com datas, contraproposta e reserva no estoque do parceiro.", ["Pedidos chegam direto se o parceiro usa EventFlow", "Bloco de sublocação no orçamento"]],
-  ["chat", "Equipe conectada", "Mural, chat, notas e agenda no mesmo lugar, com avisos automáticos da operação.", ["Canal por OS", "Notificações por nível de acesso"]],
-  ["cel", "No celular, de verdade", "Barra inferior por categorias e telas pensadas para quem está no galpão ou no evento.", ["Conferência de carga pelo celular", "Tema claro e escuro"]],
-  ["escudo", "Acesso por nível e histórico", "Gerência, produção e estoque veem só o que precisam. Toda alteração fica registrada.", ["Valores visíveis só para a gerência", "Backup diário"]]
+/* topo que ganha fundo ao rolar + barra de compra no celular */
+const topo = $("#topo"), barra = $("#barraCompra");
+const aoRolar = () => {
+  topo.classList.toggle("sol", scrollY > 20);
+  const c = $("#comprar").getBoundingClientRect();
+  barra.classList.toggle("on", scrollY > 700 && !(c.top < innerHeight && c.bottom > 0));
+};
+/* garantia: o que já passou pela tela aparece mesmo se a rolagem for muito rápida */
+let pend = false;
+const revelar = () => { pend = false; const lim = innerHeight * .94;
+  $$(".rv:not(.vis)").forEach(el => { if (el.getBoundingClientRect().top < lim) { el.classList.add("vis"); el.querySelectorAll("[data-conta]").forEach(contar); } }); };
+addEventListener("scroll", () => { aoRolar(); if (!pend) { pend = true; requestAnimationFrame(revelar); } }, { passive: true }); aoRolar();
+
+/* palavra que troca no título */
+const SEG = ["som", "luz", "LED", "estrutura", "cenografia", "eventos"];
+let seg = 0;
+if (!calma) setInterval(() => { seg = (seg + 1) % SEG.length; $("#troca").innerHTML = `<span class="grad">${SEG[seg]}</span>`; }, 2300);
+
+/* faixa de segmentos */
+const CHIPS = [["Som", "#4B5BD0"], ["Iluminação", "#E3A23B"], ["Painel de LED", "#8C6FD6"], ["Estrutura e treliça", "#2FA38A"], ["Cenografia", "#D9657B"], ["Geradores", "#4B5BD0"],
+  ["Tendas e coberturas", "#2FA38A"], ["Mobiliário", "#E3A23B"], ["Internet para eventos", "#8C6FD6"], ["Transmissão ao vivo", "#D9657B"], ["Palcos", "#4B5BD0"], ["Climatização", "#2FA38A"]];
+const chips = CHIPS.map(c => `<span class="chip"><i style="background:${c[1]}"></i>${c[0]}</span>`).join("");
+$("#trilho").innerHTML = chips + chips;
+
+/* ---------- tour ---------- */
+const TOUR = [
+  ["funil", "Comercial", "Pipeline com todas as oportunidades, do primeiro contato ao contrato. Veja valor por etapa, temperatura e origem dos clientes.", "pipeline", "Pipeline comercial"],
+  ["regua", "Produção técnica", "Escopo da OS por sala, memorial de solo e aéreo calculado na hora e descritivo técnico pronto para o engenheiro.", "producao", "Memoriais e OS"],
+  ["caixa", "Estoque", "Inventário com foto de cada equipamento e saldo real no período do evento. O sistema avisa antes de faltar.", "estoque", "Inventário"],
+  ["caminhao", "Cargas", "Ordens de carga geradas da OS, com romaneio, status de separação e baixa automática na saída e na volta.", "cargas", "Ordens de carga"],
+  ["carteira", "Financeiro", "Contas a pagar e receber ligadas às OS, fluxo de caixa projetado, aging e inadimplência.", "financeiro", "Contas a pagar e receber"],
+  ["maos", "Parceiros", "Peça equipamento a outras locadoras com datas de retirada e devolução, e responda aos pedidos delas.", "parceiros", "Parceiros e sublocação"]
 ];
-$("#listaVantagens").innerHTML = VANTAGENS.map(v => `<article class="card vant"><div class="ico">${ic(v[0])}</div><h3>${esc(v[1])}</h3><p>${esc(v[2])}</p>
-  <ul>${v[3].map(x => `<li>${esc(x)}</li>`).join("")}</ul></article>`).join("");
-
-/* planos */
-function pintarPlanos() {
-  document.querySelectorAll("[data-ciclo]").forEach(b => { const on = b.dataset.ciclo === E.ciclo; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
-  $("#listaPlanos").innerHTML = CONFIG.planos.map(p => `<article class="card plano ${p.destaque ? "dest" : ""}">
-    ${p.destaque ? `<span class="selo">Mais escolhido</span>` : ""}
-    <h3>${esc(p.nome)}</h3><p class="para">${esc(p.para)}</p>
-    <div class="preco"><b>${brl(mensalDe(p))}</b><span>/mês</span></div>
-    <div class="preco-sub">${E.ciclo === "anual" ? `${brl(mensalDe(p) * 12)} por ano · economia de ${brl(p.mensal * 12 * CONFIG.descontoAnual)}` : `até ${p.usuarios} pessoas incluídas`}</div>
-    <ul>${p.inclui.map(x => `<li>${ic("check")}<span>${esc(x)}</span></li>`).join("")}${p.nao.map(x => `<li class="nao">${ic("x")}<span>${esc(x)}</span></li>`).join("")}</ul>
-    <button class="btn ${p.destaque ? "pri" : ""} lg" type="button" data-assinar="${p.id}">Assinar o ${esc(p.nome)}</button></article>`).join("");
-  $("#obsPlanos").textContent = `Pessoa a mais além do limite do plano: ${brl(CONFIG.usuarioExtra)} por mês. Implantação: ` +
-    CONFIG.planos.map(p => `${p.nome} ${p.implantacao ? brl(p.implantacao) : "grátis"}`).join(" · ") + (CONFIG.descontoAnual ? " (grátis no plano anual)." : ".");
-  pintarCompra();
+let tourIx = 0, tourTimer = null, tourParado = false;
+$("#abas").innerHTML = TOUR.map((t, i) => `<button type="button" class="aba ${i ? "" : "on"}" role="tab" aria-selected="${!i}" data-tour="${i}">
+  <span class="t">${ic(t[0])}${t[1]}</span><p>${t[2]}</p><span class="prog"></span></button>`).join("");
+function mostrarTour(i) {
+  tourIx = i;
+  $$(".aba").forEach((a, k) => { a.classList.toggle("on", k === i); a.setAttribute("aria-selected", k === i); });
+  const img = $("#tourImg"), t = TOUR[i];
+  img.classList.add("saindo");
+  setTimeout(() => { img.src = "img/" + t[3] + ".jpg"; img.alt = "Tela " + t[4] + " do EventFlow"; $("#tourUrl").textContent = "app.eventflow · " + t[4]; img.onload = () => img.classList.remove("saindo"); if (img.complete) img.classList.remove("saindo"); }, calma ? 0 : 220);
+  clearTimeout(tourTimer);
+  if (!tourParado && !calma) tourTimer = setTimeout(() => mostrarTour((tourIx + 1) % TOUR.length), 7000);
 }
-document.addEventListener("click", ev => {
-  const c = ev.target.closest("[data-ciclo]"); if (c) { E.ciclo = c.dataset.ciclo; pintarPlanos(); return; }
-  const a = ev.target.closest("[data-assinar]");
-  if (a) { E.plano = a.dataset.assinar; const p = plano(); const u = $("#cUsuarios"); if (+u.value < p.usuarios) u.value = Math.min(p.usuarios, +u.max); pintarCompra(); $("#comprar").scrollIntoView(); return; }
-  const ep = ev.target.closest("[data-escolha-plano]"); if (ep) { E.plano = ep.dataset.escolhaPlano; pintarCompra(); return; }
-  const pg = ev.target.closest("[data-pag]");
-  if (pg) { E.pag = pg.dataset.pag; document.querySelectorAll("[data-pag]").forEach(b => { const on = b === pg; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); pintarCompra(); }
-});
+$("#abas").addEventListener("click", e => { const b = e.target.closest("[data-tour]"); if (!b) return; tourParado = true; $("#tourBox").classList.add("parado"); mostrarTour(+b.dataset.tour); });
+TOUR.forEach(t => { const im = new Image(); im.src = "img/" + t[3] + ".jpg"; });
 
-/* compra */
+/* ---------- funcionalidades detalhadas ---------- */
+const MODS = [
+  { img: "pipeline", tag: "Comercial e CRM", titulo: "Venda mais, com tudo registrado do primeiro contato ao contrato",
+    txt: "Cada negócio passa por etapas claras e nada fica só na cabeça do vendedor.",
+    itens: [["Pipeline em etapas", "qualificação, briefing, visita técnica, projeto 3D, orçamento, fechamento e finalização"],
+      ["Briefing técnico por bloco", "LED, palco, estrutura, som, luz, transmissão, cenografia e internet, com porte sugerido"],
+      ["Visita técnica", "checklist do local, participantes, fotos e resumo"],
+      ["Orçamento por sala e por diária", "itens do estoque, serviços de terceiros, desconto, condições e validade, pronto para imprimir"],
+      ["Negócio fechado vira OS em 1 clique", "com escopo, salas e datas preenchidos"]] },
+  { img: "producao", tag: "Produção técnica", titulo: "Memorial de solo e aéreo calculado enquanto você monta o escopo",
+    txt: "A produção monta o evento sala por sala e o sistema faz as contas de carga.",
+    itens: [["Escopo por sala", "plenária, salas de apoio, credenciamento, camarim…"],
+      ["Memorial de solo", "carga sobre o piso em kgf/m², sobrecarga de público e apoios por equipamento"],
+      ["Memorial aéreo", "pontos de ancoragem, WLL, fator dinâmico e de desbalanceamento, fator de segurança"],
+      ["Descritivo técnico e logística", "veículos por dia, motoristas e escala da equipe"],
+      ["Compartilhe pelo WhatsApp ou e-mail", "memoriais e descritivo com um toque"]] },
+  { img: "estoque", tag: "Estoque", titulo: "Saiba o que está livre em cada data, antes de prometer ao cliente",
+    txt: "A disponibilidade é calculada pela janela de carga e descarga de cada evento.",
+    itens: [["Inventário com fotos", "visualização com ou sem foto, ícones por categoria"],
+      ["Peso, consumo elétrico e cases", "por equipamento, usados nos memoriais e na carga"],
+      ["Kits e frota", "monte kits prontos e cadastre caminhões, vans e utilitários"],
+      ["Alertas de conflito", "o painel mostra o que falta e sugere sublocar do parceiro"],
+      ["Importe e exporte em Excel", "itens, kits, frota e fotos numa planilha só"]] },
+  { img: "cargas", tag: "Cargas e logística", titulo: "Do galpão ao evento e de volta, sem perder peça",
+    txt: "Cada OS gera a ordem de carga com o romaneio pronto para o estoque.",
+    itens: [["Ordem de carga com romaneio", "itens agrupados, divisão por sala anotada na linha"],
+      ["Status de separação", "liberada, em separação, carregada e retornada"],
+      ["Baixa automática", "saída e volta registradas nas movimentações"],
+      ["Avarias e manutenção", "o que volta quebrado sai do saldo até ser consertado"],
+      ["Agenda de cargas e cargas avulsas", "para assistência técnica, empréstimos e transferências"]] },
+  { img: "financeiro", tag: "Financeiro", titulo: "O dinheiro de cada evento, do sinal ao último reembolso",
+    txt: "As contas nascem das OS e o fluxo de caixa se projeta sozinho.",
+    itens: [["Contas a pagar e a receber", "com categorias, parcelas, formas de pagamento e baixa"],
+      ["Sinal e saldo gerados da OS", "nada de digitar duas vezes"],
+      ["Fluxo de caixa projetado", "aging dos recebíveis e inadimplência"],
+      ["Reembolsos da equipe", "nota com comprovante, aprovação da gerência e importação para o financeiro"]] },
+  { img: "parceiros", tag: "Parceiros e sublocação", titulo: "Trabalhe junto com outras locadoras",
+    txt: "Faltou equipamento? Peça ao parceiro sem sair do sistema.",
+    itens: [["Pedidos com datas", "retirada e devolução, itens e valor combinados"],
+      ["Aceitar, recusar ou contrapropor", "com histórico de cada resposta"],
+      ["Reserva no estoque do parceiro", "o que ele empresta sai da disponibilidade dele"],
+      ["Integração entre locadoras", "se o parceiro também usa EventFlow, o pedido chega direto"]] },
+  { img: "celular", cel: true, tag: "Equipe e celular", titulo: "A equipe inteira conectada, no galpão ou no evento",
+    txt: "Tudo funciona no celular, com uma barra de atalhos pensada para o uso com uma mão.",
+    itens: [["3 níveis de acesso", "gerência vê tudo; produção e estoque veem o que precisam"],
+      ["Mural, chat e notas", "grupos, canal por OS, anexos e áudio"],
+      ["Agenda e notificações", "compromissos, montagens e cargas, com integração ao Google Agenda"],
+      ["Freelancers e escalas", "cadastro, especialidades, cachê e quem vai em cada dia"],
+      ["Histórico de alterações", "quem mudou o quê e quando"]] }
+];
+$("#mods").innerHTML = MODS.map((m, i) => `<article class="mod ${i % 2 ? "inv" : ""}">
+  <div class="txt rv ${i % 2 ? "dir" : "esq"}"><span class="eyebrow">${esc(m.tag)}</span><h3>${esc(m.titulo)}</h3><p>${esc(m.txt)}</p>
+    <ul class="lista">${m.itens.map((x, k) => `<li class="rv" style="--d:${k}"><span class="ck">${ic("check")}</span><span><b>${esc(x[0])}</b> · ${esc(x[1])}</span></li>`).join("")}</ul></div>
+  <div class="img rv ${i % 2 ? "esq" : "dir"}">${m.cel ? `<div class="cel"><img src="img/${m.img}.jpg" alt="EventFlow no celular" loading="lazy" width="390" height="844"></div>`
+    : `<div class="janela"><div class="barra"><i></i><i></i><i></i><span>app.eventflow</span></div><img src="img/${m.img}.jpg" alt="Tela ${esc(m.tag)} do EventFlow" loading="lazy" width="1440" height="900"></div>`}</div>
+</article>`).join("");
+
+const GRADE = [["grade", "Painel com indicadores", "Receita, OS, pipeline e conflitos numa tela"], ["cal", "Agenda de cargas", "A semana do galpão num calendário"],
+  ["doc", "Impressão profissional", "Orçamento e OS com a marca da sua empresa"], ["excel", "Excel de entrada e saída", "Importe o inventário em minutos"],
+  ["foto", "Fotos dos equipamentos", "Galeria com foto ou lista compacta"], ["sino", "Avisos automáticos", "Cada nível recebe o que importa"],
+  ["historico", "Histórico de alterações", "Auditoria de tudo o que foi mudado"], ["pessoas", "Pessoas online", "Veja quem está conectado agora"],
+  ["chat", "Chat com anexos e áudio", "Grupos, conversas e canal por OS"], ["cel", "Feito para o celular", "Barra inferior por categoria"],
+  ["raio", "Rápido e na nuvem", "Sem servidor, sem instalação, sem atualização manual"], ["escudo", "Dados separados por empresa", "Backup diário e acesso por login"]];
+$("#grade").innerHTML = GRADE.map((g, i) => `<div class="mini rv" style="--d:${i % 4}"><div class="ico">${ic(g[0])}</div><b>${esc(g[1])}</b><span>${esc(g[2])}</span></div>`).join("");
+
+/* ---------- preços ---------- */
+function moverBolha() {
+  const b = $(`[data-ciclo="${E.ciclo}"]`), c = $(".ciclo");
+  const bo = $("#bolha"); bo.style.left = (b.offsetLeft) + "px"; bo.style.width = b.offsetWidth + "px";
+  $$("[data-ciclo]").forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", on); });
+}
+/* número que rola até o valor novo */
+function animar(el, ate, fmt) {
+  const de = +el.dataset.v || 0; el.dataset.v = ate;
+  if (calma || de === ate) { el.textContent = fmt(ate); return; }
+  const t0 = performance.now(), dur = 550;
+  const passo = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(de + (ate - de) * e); if (k < 1) requestAnimationFrame(passo); };
+  requestAnimationFrame(passo);
+}
+const inteiro = n => Math.round(n).toLocaleString("pt-BR");
+function pintarPrecos() {
+  moverBolha();
+  const cheio = q => CONFIG.faixas[0].preco * q;
+  const html = CONFIG.pacotes.map(p => {
+    const tot = precoLic(p.qtd) * p.qtd, econ = cheio(p.qtd) - tot;
+    return `<article class="pac ${p.destaque ? "dest" : ""} rv" style="--d:${CONFIG.pacotes.indexOf(p)}">${p.destaque ? `<span class="selo">Mais escolhido</span>` : ""}
+      <h3>${esc(p.nome)}</h3><div class="qtd">${p.qtd} ${p.qtd === 1 ? "licença" : "licenças"} · ${esc(p.para)}</div>
+      <div class="valor"><small>R$</small><b data-pac="${p.qtd}">${inteiro(tot)}</b><span>/mês</span></div>
+      <div class="cada">${brl(precoLic(p.qtd))} por licença${econ > 0 ? ` · <span class="econ">economia de ${brl(econ)}/mês</span>` : ""}</div>
+      <ul>${p.itens.map(x => `<li>${ic("check")}<span>${esc(x)}</span></li>`).join("")}</ul>
+      <button class="btn ${p.destaque ? "pri" : ""}" type="button" data-assinar="${p.qtd}">Assinar ${esc(p.nome)}</button></article>`;
+  }).join("");
+  if (!$("#pacotes").children.length) { $("#pacotes").innerHTML = html; observar($$("#pacotes .rv")); }
+  else CONFIG.pacotes.forEach((p, i) => {
+    const card = $("#pacotes").children[i], tot = precoLic(p.qtd) * p.qtd, econ = CONFIG.faixas[0].preco * p.qtd - tot;
+    animar(card.querySelector("[data-pac]"), tot, inteiro);
+    card.querySelector(".cada").innerHTML = `${brl(precoLic(p.qtd))} por licença${econ > 0 ? ` · <span class="econ">economia de ${brl(econ)}/mês</span>` : ""}`;
+  });
+  let de = 1;
+  $("#faixas").innerHTML = CONFIG.faixas.map(f => { const t = f.ate >= 9999 ? `${de}+` : (de === f.ate ? `${de}` : `${de} a ${f.ate}`); de = f.ate + 1;
+    return `<div class="faixa" data-ate="${f.ate}"><b>${brl(f.preco * (E.ciclo === "anual" ? 1 - CONFIG.descontoAnual : 1))}</b>${t} ${t === "1" ? "licença" : "licenças"}</div>`; }).join("");
+  pintarCalc();
+  $("#obsPrecos").innerHTML = `Todos os módulos em todos os pacotes · implantação assistida ${brl(CONFIG.implantacao)} (grátis no anual) · ` +
+    `anual com ${Math.round(CONFIG.descontoAnual * 100)}% de desconto · sem fidelidade no mensal`;
+  $("#ccAnual").textContent = `${Math.round(CONFIG.descontoAnual * 100)}% de desconto + implantação grátis`;
+  $("#implValor").textContent = brl(CONFIG.implantacao);
+}
+function pintarCalc() {
+  const q = +$("#calcQtd").value, f = faixaDe(q);
+  $("#calcOut").textContent = q + (q === 1 ? " licença" : " licenças");
+  animar($("#calcTotal"), precoLic(q) * q, n => brl(n));
+  $("#calcSub").textContent = `${brl(precoLic(q))} por licença · por mês${E.ciclo === "anual" ? ", no anual" : ""}`;
+  $$(".faixa").forEach(x => x.classList.toggle("on", +x.dataset.ate === f.ate));
+}
+$("#calcQtd").addEventListener("input", pintarCalc);
+$("#calcAssinar").addEventListener("click", () => { E.qtd = +$("#calcQtd").value; pintarCompra(); $("#comprar").scrollIntoView(); });
+addEventListener("resize", moverBolha);
+
+/* ---------- compra ---------- */
 function calculo() {
-  const p = plano(), u = +$("#cUsuarios").value, extras = Math.max(0, u - p.usuarios);
-  const base = mensalDe(p), extra = extras * CONFIG.usuarioExtra * (E.ciclo === "anual" ? 1 - CONFIG.descontoAnual : 1);
-  const mensal = base + extra, impl = E.ciclo === "anual" ? 0 : p.implantacao;
-  const total = E.ciclo === "anual" ? mensal * 12 : mensal + impl;
-  return { p, u, extras, base, extra, mensal, impl, total };
+  const q = E.qtd, unit = precoLic(q), mensal = unit * q, anual = E.ciclo === "anual";
+  const impl = anual ? 0 : ($("#cImpl").checked ? CONFIG.implantacao : 0);
+  const total = anual ? mensal * 12 : mensal + impl;
+  const cheio = faixaDe(q).preco * q;
+  return { q, unit, mensal, impl, total, anual, descAnual: anual ? (cheio - mensal) * 12 : 0, descVol: (CONFIG.faixas[0].preco - faixaDe(q).preco) * q };
 }
 function pintarCompra() {
-  $("#escolhaPlano").innerHTML = CONFIG.planos.map(p => `<button type="button" class="escolha ${p.id === E.plano ? "on" : ""}" data-escolha-plano="${p.id}" role="radio" aria-checked="${p.id === E.plano}">
-    <b>${esc(p.nome)}</b><small>${brl(mensalDe(p))}/mês · até ${p.usuarios} pessoas</small></button>`).join("");
+  $("#cQtd").value = E.qtd;
+  $$("[data-cc]").forEach(b => { const on = b.dataset.cc === E.ciclo; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
+  $$("[data-pag]").forEach(b => { const on = b.dataset.pag === E.pag; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
   const k = calculo();
-  $("#oUsuarios").textContent = k.u + (k.u === 1 ? " pessoa" : " pessoas");
-  $("#dicaUsuarios").textContent = k.extras ? `${k.extras} além das ${k.p.usuarios} incluídas no ${k.p.nome}: ${brl(CONFIG.usuarioExtra)} cada por mês.` : `Incluídas no ${k.p.nome}: até ${k.p.usuarios} pessoas.`;
-  const L = [[`Plano ${k.p.nome} · ${E.ciclo}`, brl(k.base) + "/mês"]];
-  if (k.extras) L.push([`${k.extras} pessoa(s) a mais`, brl(k.extra) + "/mês"]);
-  if (E.ciclo === "anual") L.push([`Desconto anual (${Math.round(CONFIG.descontoAnual * 100)}%)`, `<b>− ${brl((k.p.mensal + k.extras * CONFIG.usuarioExtra) * 12 * CONFIG.descontoAnual)}</b>`, "desc"]);
-  L.push(["Implantação", k.impl ? brl(k.impl) : (k.p.implantacao ? "<b>grátis no anual</b>" : "grátis"), k.impl ? "" : "desc"]);
+  if (k.anual) $("#cImpl").checked = true;
+  $("#cImpl").disabled = k.anual;
+  $("#cQtdTxt").textContent = `${brl(k.unit)} por licença/mês`;
+  const L = [[`${k.q} ${k.q === 1 ? "licença" : "licenças"} × ${brl(k.unit)}`, brl(k.mensal) + "/mês"]];
+  if (k.descVol > 0) L.push(["Desconto por volume", "− " + brl(k.descVol * (k.anual ? 1 - CONFIG.descontoAnual : 1)) + "/mês", "desc"]);
+  if (k.anual) L.push([`Desconto anual (${Math.round(CONFIG.descontoAnual * 100)}%)`, "− " + brl(k.descAnual) + "/ano", "desc"]);
+  L.push(["Implantação assistida", k.anual ? "grátis" : ($("#cImpl").checked ? brl(CONFIG.implantacao) : "não incluída"), k.anual ? "desc" : ""]);
   L.push(["Pagamento", { pix: "Pix", cartao: "Cartão", boleto: "Boleto" }[E.pag]]);
-  $("#resLinhas").innerHTML = L.map(l => `<div class="${l[2] || ""}"><span>${esc(l[0])}</span><span>${l[1]}</span></div>`).join("");
-  $("#totLabel").textContent = E.ciclo === "anual" ? "Total por ano" : (k.impl ? "Primeiro mês (com implantação)" : "Total por mês");
-  $("#totValor").textContent = brl(k.total);
-  $("#totSub").textContent = E.ciclo === "anual" ? `equivale a ${brl(k.mensal)}/mês` : (k.impl ? `depois ${brl(k.mensal)}/mês` : "");
-  const link = (CONFIG.pagamento[E.plano] || {})[E.ciclo];
-  $("#btnPagar").firstChild.textContent = link ? "Ir para o pagamento seguro " : "Enviar pedido pelo WhatsApp ";
+  $("#resLinhas").innerHTML = L.map(l => `<div class="${l[2] || ""}"><span>${esc(l[0])}</span><span>${esc(l[1])}</span></div>`).join("");
+  $("#totLabel").textContent = k.anual ? "Total por ano" : (k.impl ? "Primeiro mês (com implantação)" : "Total por mês");
+  animar($("#totValor"), k.total, n => brl(n));
+  $("#totSub").textContent = k.anual ? `equivale a ${brl(k.mensal)}/mês` : (k.impl ? `depois ${brl(k.mensal)}/mês` : "");
+  const link = CONFIG.pagamento[E.ciclo];
+  $("#btnPagarTxt").textContent = link ? "Ir para o pagamento seguro" : "Enviar pedido pelo WhatsApp";
   $("#txtSeguro").textContent = link ? "O pagamento é feito no ambiente seguro do nosso parceiro de pagamentos. Os dados do seu cartão não passam por esta página."
     : "Você recebe o link de pagamento pelo WhatsApp em seguida. Os dados do seu cartão nunca passam por esta página.";
+  progresso();
 }
-$("#cUsuarios").addEventListener("input", pintarCompra);
+function progresso() {
+  const dados = ["cEmpresa", "cDoc", "cNome", "cEmail", "cTel"].every(id => $("#" + id).value.trim());
+  $("#p2").classList.toggle("ok", dados); $("#e2").classList.toggle("ok", dados);
+  const pronto = dados; $("#p3").classList.toggle("ok", pronto); $("#e3").classList.toggle("ok", pronto);
+}
+$("#formCompra").addEventListener("input", e => { if (e.target.id === "cQtd") { E.qtd = Math.max(1, Math.min(500, +e.target.value || 1)); pintarCompra(); } else progresso(); });
+$("#cImpl").addEventListener("change", pintarCompra);
+
+document.addEventListener("click", ev => {
+  const c = ev.target.closest("[data-ciclo]"); if (c) { E.ciclo = c.dataset.ciclo; pintarPrecos(); pintarCompra(); return; }
+  const cc = ev.target.closest("[data-cc]"); if (cc) { E.ciclo = cc.dataset.cc; pintarPrecos(); pintarCompra(); return; }
+  const a = ev.target.closest("[data-assinar]"); if (a) { E.qtd = +a.dataset.assinar; pintarCompra(); $("#comprar").scrollIntoView(); return; }
+  const q = ev.target.closest("[data-q]"); if (q) { E.qtd = Math.max(1, Math.min(500, E.qtd + +q.dataset.q)); pintarCompra(); return; }
+  const pg = ev.target.closest("[data-pag]"); if (pg) { E.pag = pg.dataset.pag; pintarCompra(); }
+});
 
 $("#formCompra").addEventListener("submit", ev => {
   ev.preventDefault();
@@ -507,23 +845,59 @@ $("#formCompra").addEventListener("submit", ev => {
     c.setAttribute("aria-invalid", ruim); if (ruim && !falta) falta = c; });
   if (falta) { $("#erroCompra").textContent = "Confira os campos destacados."; falta.focus(); return; }
   $("#erroCompra").textContent = "";
-  const k = calculo(), v = id => $("#" + id).value.trim();
-  const pedido = { plano: k.p.nome, ciclo: E.ciclo, pessoas: k.u, pagamento: E.pag, total: brl(k.total), empresa: v("cEmpresa"), documento: v("cDoc"), nome: v("cNome"), email: v("cEmail"), whatsapp: v("cTel") };
-  const link = (CONFIG.pagamento[E.plano] || {})[E.ciclo];
+  const k = calculo(), v = id => $("#" + id).value.trim(), link = CONFIG.pagamento[E.ciclo];
   if (link) {
-    const u = new URL(link); u.searchParams.set("email", pedido.email); u.searchParams.set("prefilled_email", pedido.email);
+    const u = new URL(link); u.searchParams.set("prefilled_email", v("cEmail")); u.searchParams.set("quantity", k.q);
     window.open(u.href, "_blank", "noopener");
   } else {
-    const txt = [`*Novo pedido EventFlow*`, `Plano: ${pedido.plano} (${pedido.ciclo})`, `Pessoas: ${pedido.pessoas}`, `Pagamento: ${{ pix: "Pix", cartao: "Cartão", boleto: "Boleto" }[pedido.pagamento]}`,
-      `Total: ${pedido.total}${E.ciclo === "anual" ? " por ano" : ""}`, ``, `Empresa: ${pedido.empresa}`, `CNPJ/CPF: ${pedido.documento}`, `Responsável: ${pedido.nome}`, `E-mail: ${pedido.email}`, `WhatsApp: ${pedido.whatsapp}`].join("\n");
+    const txt = [`*Novo pedido EventFlow*`, `Licenças: ${k.q} (${brl(k.unit)} cada)`, `Cobrança: ${k.anual ? "anual" : "mensal"}`,
+      `Implantação assistida: ${k.anual ? "grátis (anual)" : (k.impl ? "sim" : "não")}`, `Pagamento: ${{ pix: "Pix", cartao: "Cartão", boleto: "Boleto" }[E.pag]}`,
+      `Total: ${brl(k.total)}${k.anual ? " por ano" : (k.impl ? " no primeiro mês" : " por mês")}`, ``,
+      `Empresa: ${v("cEmpresa")}`, `CNPJ/CPF: ${v("cDoc")}`, `Responsável: ${v("cNome")}`, `E-mail: ${v("cEmail")}`, `WhatsApp: ${v("cTel")}`].join("\n");
     window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(txt)}`, "_blank", "noopener");
   }
   const ok = $("#okEnvio"); ok.hidden = false;
-  ok.textContent = link ? "Abrimos o pagamento numa nova aba. Assim que for confirmado, você recebe o acesso no e-mail informado."
+  ok.textContent = link ? "Abrimos o pagamento numa nova aba. Assim que for confirmado, o acesso chega no e-mail informado."
     : "Pedido montado! Confirme o envio no WhatsApp e mandamos o link de pagamento e o acesso.";
 });
 
-pintarPlanos();
+/* ---------- depoimentos e dúvidas ---------- */
+const DEPO = [["Antes era planilha e grupo de WhatsApp. Hoje o comercial fecha, a produção monta o memorial e o estoque já recebe a carga pronta.", "Exemplo de uso", "Locadora de som e luz", "#4B5BD0"],
+  ["O alerta de conflito evitou mandar o mesmo painel de LED para dois eventos. Sublocamos do parceiro ali mesmo.", "Exemplo de uso", "Locadora de LED e estrutura", "#2FA38A"],
+  ["O financeiro finalmente bate com as OS: sinal, saldo e reembolso de cada evento num lugar só.", "Exemplo de uso", "Produtora e locadora", "#8C6FD6"]];
+$("#depo").innerHTML = DEPO.map((d, i) => `<div class="card rv" style="--d:${i}"><div class="estrelas">★★★★★</div><p>“${esc(d[0])}”</p>
+  <div class="quem"><span class="av" style="background:${d[3]}">${esc(d[2].split(" ").map(x => x[0]).slice(0, 2).join(""))}</span><div><b>${esc(d[2])}</b><small>${esc(d[1])}</small></div></div></div>`).join("");
+const FAQ = [["O que é uma licença?", "É uma pessoa da sua equipe com login próprio. Você escolhe o nível de acesso de cada uma: gerência, produção ou estoque."],
+  ["Todos os módulos estão inclusos?", "Sim. Comercial, produção técnica, estoque, cargas, financeiro, parceiros, equipe e celular estão em todos os pacotes. O que muda é a quantidade de licenças."],
+  ["Preciso instalar alguma coisa?", "Não. O EventFlow funciona no navegador do computador e do celular. Basta entrar com e-mail e senha."],
+  ["Consigo importar o meu inventário?", "Sim. Você importa itens, kits, frota e fotos por planilha Excel. Na implantação assistida, nós fazemos isso para você."],
+  ["Posso aumentar ou diminuir as licenças depois?", "Sim, a qualquer momento. O preço de cada licença acompanha a faixa da nova quantidade."],
+  ["Posso trabalhar com outras locadoras?", "Sim. Em Parceiros e sublocação você pede equipamento com datas de retirada e devolução. Se o parceiro também usa o EventFlow, o pedido chega direto no sistema dele."],
+  ["Meus dados ficam seguros?", "Ficam num banco na nuvem com backup diário, e cada empresa só enxerga as próprias informações. Toda alteração fica registrada no histórico."],
+  ["Posso cancelar?", "No mensal, sim, quando quiser e sem multa. No anual, o desconto vale pelo período contratado."]];
+$("#faq").innerHTML = FAQ.map((f, i) => `<details class="rv" style="--d:${i % 4}"><summary>${esc(f[0])}</summary><p>${esc(f[1])}</p></details>`).join("");
+
+/* ---------- aparecer ao rolar e contadores ---------- */
+const io = "IntersectionObserver" in window ? new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return; e.target.classList.add("vis"); io.unobserve(e.target);
+  if (e.target.id === "palco") return;
+  e.target.querySelectorAll("[data-conta]").forEach(contar);
+}), { threshold: .14, rootMargin: "0px 0px -6% 0px" }) : null;
+function observar(els) { els.forEach(el => io ? io.observe(el) : el.classList.add("vis")); }
+function contar(el) { const ate = +el.dataset.conta, suf = el.dataset.suf || ""; animar(el, ate, n => Math.round(n) + suf); }
+observar($$(".rv")); observar([$("#palco")]);
+$$("[data-conta]").forEach(el => io && io.observe(el.closest(".num")));
+if (calma || !io) $$("[data-conta]").forEach(el => el.textContent = el.dataset.conta + (el.dataset.suf || ""));
+
+/* janela do hero acompanha o mouse */
+const palco = $("#palco"), jan = palco.querySelector(".janela");
+if (!calma && matchMedia("(pointer:fine)").matches) {
+  palco.addEventListener("mousemove", e => { const r = palco.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+    jan.style.transform = `rotateY(${x * 5}deg) rotateX(${-y * 4}deg)`; });
+  palco.addEventListener("mouseleave", () => jan.style.transform = "");
+}
+
+pintarPrecos(); pintarCompra(); mostrarTour(0);
 </script>
 </body>
 </html>
